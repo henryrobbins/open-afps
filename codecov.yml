@@ -1,0 +1,24 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+      src:
+        target: auto
+        threshold: 1%
+        flags:
+          - src
+    patch:
+      default:
+        target: auto
+
+flags:
+  src:
+    paths:
+      - src
+    carryforward: true
+
+comment:
+  layout: "header, diff, flags, components, files"
+  require_changes: false
