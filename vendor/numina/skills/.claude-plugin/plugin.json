@@ -1,0 +1,5 @@
+{
+  "name": "numina-lean-agent",
+  "version": "0.1.0",
+  "description": "Lean 4 theorem proving tools: search, verification, LLM-assisted proving"
+}

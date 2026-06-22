@@ -33,12 +33,13 @@ verifier **rejects** projects whose toolchain doesn't match the sandbox image's 
 (`ToolchainMismatch`) rather than failing deep in a build. One Mathlib image to start;
 `image` is a config field so more can be added without refactoring.
 
-## Status: Docker spine + Aristotle + AgentProver done
+## Status: Docker spine + Aristotle + AgentProver + NuminaProver done
 
 `DockerBackend` + `Verifier` work end-to-end against the Mathlib image; the
-AristotleProver and AgentProver (claude/codex/opencode + lean-lsp-mcp) are
-implemented. The Modal backend and the NuminaProver are still stubs with `TODO`s
-pointing at the milp_flare / numina source to port from.
+AristotleProver, AgentProver (claude/codex/opencode + lean-lsp-mcp), and
+NuminaProver (claude_code + vendored Numina assets + round loop) are implemented.
+The Modal backend is still a stub with `TODO`s pointing at the milp_flare source to
+port from.
 
 ```bash
 # Build the Mathlib base image (pins Lean/Mathlib v4.28.0).
@@ -70,8 +71,14 @@ print(report.verified, report.sorry_free, report.axioms)
    The agent edits the staged project in place; `prove` diffs the `.lean` files and the
    shared verifier does the final check. Needs `CLAUDE_CODE_OAUTH_TOKEN` (or a provider
    key) for real runs; the fast tests mock the launch and parse a captured stream.
-4. **NuminaProver.** Vendor Numina's `skills/`+`prompts/` (see `vendor/numina/VENDOR.md`),
-   extend `AgentProver` with the round-continuation loop + statement tracker.
+4. ~~**NuminaProver.**~~ ✅ Done: vendors Numina's `skills/`+`prompts/` (see
+   `vendor/numina/VENDOR.md`) as a selectable asset bundle, extends `AgentProver`
+   pinned to `claude_code` with the round-continuation loop (continue while the
+   coordinator reports `END_REASON:LIMIT`, stop on `COMPLETE`/`max_rounds`) and the
+   ported statement tracker (`numina_tracker.py`) guarding against weakened/deleted
+   theorems. Helper-skill API keys (Gemini/OpenAI/Leandex/Anthropic) forward into the
+   sandbox; the image pre-warms a uv cache for the skills' PEP 723 deps. Needs
+   `CLAUDE_CODE_OAUTH_TOKEN` + `GEMINI_API_KEY` for real runs (`pytest -m numina_api`).
 5. **Common API surface** (`api.py`): files + chosen provers + configs → `ProofResult`s;
    concurrency/job tracking last.
 

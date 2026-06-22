@@ -22,6 +22,7 @@ import json
 import os
 import shutil
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar
@@ -35,6 +36,83 @@ _MCP_JSON = _ASSETS / "configs" / "mcp.json"
 #: project's own sources.
 SCRIPT_FILE = "agent.sh"
 PROMPT_FILE = "agent_prompt.txt"
+
+
+def _vendor_numina_dir() -> Path:
+    """Locate the vendored Numina bundle in both wheel and source layouts."""
+    candidates = [
+        # Built wheel: force-included at open_afps/vendor/numina (see pyproject).
+        Path(__file__).parents[2] / "vendor" / "numina",
+        # Source checkout / editable install: vendor/ at the repo root.
+        Path(__file__).parents[4] / "vendor" / "numina",
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0]
+
+
+@dataclass(frozen=True)
+class AssetBundle:
+    """A selectable set of agent assets mounted into the workdir.
+
+    Attributes
+    ----------
+    name:
+        Bundle identifier matching ``AgentProverConfig.assets``.
+    skills_dir:
+        Directory whose contents become the agent's skills (copied into the
+        harness's skills location, e.g. ``.claude/skills``).
+    prompt_file:
+        Optional default system prompt for the bundle, used when the task carries
+        no explicit ``instructions``.
+    extra_dirs:
+        Additional ``(src_dir, dest_relative_to_workdir)`` trees to copy in (e.g.
+        Numina's coordinator/subagent prompts under ``.claude/prompts``).
+    """
+
+    name: str
+    skills_dir: Path
+    prompt_file: Path | None = None
+    extra_dirs: tuple[tuple[Path, str], ...] = ()
+
+    def default_prompt(self) -> str | None:
+        if self.prompt_file is not None and self.prompt_file.is_file():
+            return self.prompt_file.read_text()
+        return None
+
+
+#: The built-in bundle: the generic ``filling-sorrys`` skill, no default prompt.
+DEFAULT_BUNDLE = AssetBundle(name="default", skills_dir=_SKILLS)
+
+
+def _numina_bundle() -> AssetBundle:
+    root = _vendor_numina_dir()
+    return AssetBundle(
+        name="numina",
+        skills_dir=root / "skills",
+        prompt_file=root / "prompts" / "main_entry.md",
+        # The coordinator prompt tells the agent to read its subagent prompts from
+        # .claude/prompts/subagent_prompts/, so stage the whole prompt tree there.
+        extra_dirs=((root / "prompts", ".claude/prompts"),),
+    )
+
+
+#: Asset-bundle registry selected by ``AgentProverConfig.assets``.
+BUNDLES: dict[str, Callable[[], AssetBundle]] = {
+    "default": lambda: DEFAULT_BUNDLE,
+    "numina": _numina_bundle,
+}
+
+
+def resolve_bundle(name: str) -> AssetBundle:
+    """Resolve an ``assets`` name to its :class:`AssetBundle`."""
+    try:
+        return BUNDLES[name]()
+    except KeyError:
+        raise ValueError(
+            f"unknown asset bundle {name!r}; known: {sorted(BUNDLES)}"
+        ) from None
 
 
 @dataclass(frozen=True)
@@ -64,6 +142,13 @@ class HarnessRunResult:
     #: USD cost if the harness self-reports it (Claude Code, OpenCode); ``None``
     #: when it must be estimated from token counts (Codex).
     cost_usd: float | None = None
+    #: Final ``type:"result"`` subtype (Claude Code: ``success`` /
+    #: ``error_max_turns`` / ``error_during_execution``). Used by NuminaProver's
+    #: round loop to decide continue-vs-stop when no END_REASON marker is present.
+    subtype: str | None = None
+    #: The agent's final result text (Claude Code's ``result`` field), where the
+    #: Numina coordinator prints its ``END_REASON:<reason>`` marker.
+    result_text: str | None = None
 
 
 class Harness(ABC):
@@ -71,9 +156,12 @@ class Harness(ABC):
 
     name: ClassVar[str]
 
-    def __init__(self, model: str, effort: str = "medium") -> None:
+    def __init__(
+        self, model: str, effort: str = "medium", assets: AssetBundle | None = None
+    ) -> None:
         self.model = model
         self.effort = effort
+        self.assets = assets or DEFAULT_BUNDLE
 
     @property
     def command(self) -> str:
@@ -99,17 +187,24 @@ class Harness(ABC):
             raise RuntimeError("The agent working directory must be created first.")
         (wd / SCRIPT_FILE).write_text(self._agent_command())
         (wd / PROMPT_FILE).write_text(prompt)
+        self._copy_extra_dirs(wd)
+
+    def _copy_extra_dirs(self, wd: Path) -> None:
+        """Copy the bundle's extra asset trees (e.g. Numina's prompts) into ``wd``."""
+        for src, dest in self.assets.extra_dirs:
+            target = wd / dest
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(src, target, dirs_exist_ok=True)
 
     def parse(self, lines: list[str]) -> HarnessRunResult:
         """Parse the agent's streamed JSON lines into a :class:`HarnessRunResult`."""
         return self._parse_lines(lines)
 
-    @staticmethod
-    def _copy_skills(wd: Path, dest: str) -> None:
-        """Copy the generic skill bundle into ``wd/<dest>``."""
+    def _copy_skills(self, wd: Path, dest: str) -> None:
+        """Copy the selected bundle's skills into ``wd/<dest>``."""
         target = wd / dest
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(_SKILLS, target, dirs_exist_ok=True)
+        shutil.copytree(self.assets.skills_dir, target, dirs_exist_ok=True)
 
     def _render(self, template: str) -> str:
         """Substitute ``<<MODEL>>``/``<<EFFORT>>`` into a launch-script template."""
@@ -167,6 +262,9 @@ class ClaudeCodeHarness(Harness):
             if obj.get("type") == "result":
                 result.stop_reason = obj.get("stop_reason")
                 result.cost_usd = obj.get("total_cost_usd")
+                result.subtype = obj.get("subtype")
+                rt = obj.get("result")
+                result.result_text = rt if isinstance(rt, str) else None
                 usage = obj.get("usage", {})
                 result.input_tokens = usage.get("input_tokens", result.input_tokens)
                 result.output_tokens = usage.get("output_tokens", result.output_tokens)
@@ -247,9 +345,13 @@ class OpenCodeHarness(Harness):
     name = "opencode"
 
     def __init__(
-        self, model: str, effort: str = "medium", provider: str | None = None
+        self,
+        model: str,
+        effort: str = "medium",
+        provider: str | None = None,
+        assets: AssetBundle | None = None,
     ) -> None:
-        super().__init__(model, effort)
+        super().__init__(model, effort, assets)
         self.provider = provider or _infer_provider(model)
 
     def configure_wd(self, wd: Path, prompt: str) -> None:

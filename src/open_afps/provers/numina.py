@@ -13,16 +13,71 @@ different behaviours:
 
 Numina's helper skills call Leandex / Gemini / GPT, so its config carries those API
 keys to forward into the sandbox.
+
+Re-implementation note (vs upstream ``scripts/runner.py``): each round here is a
+fresh ``claude -p`` invocation over the *same* (bind-mounted, persistent) workdir,
+not a ``claude -c continue`` against a live session. The DockerBackend launches a
+new ``--rm`` container per round, so the Claude session does not survive between
+rounds -- which means every round is effectively a "session reset", and the agent
+resumes from the partial proof state left on disk. ``max_consecutive_limits`` is
+still tracked (and surfaced in metadata) for parity/observability.
 """
 
 from __future__ import annotations
 
+import os
+import re
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Literal
 
 from open_afps.core.result import GenerationOutput
 from open_afps.core.task import ProofTask
 from open_afps.provers.agent import AgentProver, AgentProverConfig
+from open_afps.provers.agent.cost import compute_cost_usd
+from open_afps.provers.agent.harness import (
+    HARNESSES,
+    Harness,
+    HarnessRunResult,
+    resolve_bundle,
+)
+from open_afps.provers.numina_tracker import StatementTracker
+
+# Directories never worth copying into the agent workdir (mirrors AgentProver).
+_IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
+
+# Numina's coordinator prompt (main_entry.md) does not, by itself, emit the
+# END_REASON marker the round loop keys off; append an explicit protocol so the
+# loop can tell "done" from "out of budget". (We still fall back to Claude's result
+# subtype when the marker is missing -- see ``_end_reason``.)
+_END_REASON_PROTOCOL = """
+
+---
+SESSION CONTROL PROTOCOL (open-afps round loop)
+
+When you finish this turn, the VERY LAST line of your final message MUST be
+exactly one of the following, on its own line, with no surrounding markdown,
+backticks, or trailing text:
+
+  END_REASON:COMPLETE   -- every target theorem compiles and is sorry-free
+  END_REASON:LIMIT      -- you made progress but ran out of turns/budget
+
+If you emit END_REASON:LIMIT you will be re-invoked to continue from the proof
+state currently on disk, so leave the project in the best state you can.
+"""
+
+_FALLBACK_PROMPT = (
+    "Complete every `sorry` in this Lean project so it compiles and is sorry-free "
+    "without introducing new axioms; do not weaken or delete the stated theorems."
+)
+
+# Match END_REASON:<reason> on a line of its own (case-insensitive), per upstream.
+_REASON_RE = re.compile(
+    r"(?m)^\s*END_REASON:(LIMIT|COMPLETE|SELECTED_TARGET_COMPLETE)\s*$", re.I
+)
+
+_SORRY_RE = re.compile(r"\bsorry\b")
 
 
 @dataclass
@@ -30,13 +85,21 @@ class NuminaProverConfig(AgentProverConfig):
     harness: str = "claude_code"  # Numina is claude-CLI driven; not configurable.
     assets: str = "numina"
     max_rounds: int = 20
-    # Helper-skill credentials forwarded into the sandbox.
+    # Reset (start a fresh session) after this many consecutive LIMIT rounds.
+    max_consecutive_limits: int = 2
+    # Helper-skill credentials forwarded into the sandbox (when present in the host
+    # env); skills degrade/skip when their key is absent. ANTHROPIC_API_KEY backs
+    # the informal-prover skill's Claude calls.
     helper_env_keys: tuple[str, ...] = (
         "GEMINI_API_KEY",
         "OPENAI_API_KEY",
         "LEAN_LEANDEX_API_KEY",
+        "ANTHROPIC_API_KEY",
     )
     guard_statements: bool = True
+    # On a weakened/deleted target theorem: "error" stops the run and restores the
+    # originals; "warn" restores and continues. Default rejects (safe).
+    on_statement_change: Literal["error", "warn"] = "error"
     extra_env: dict[str, str] = field(default_factory=dict)
 
 
@@ -46,11 +109,194 @@ class NuminaProver(AgentProver):
     config: NuminaProverConfig
 
     def prove(self, task: ProofTask, workdir: Path) -> GenerationOutput:
-        # TODO(phase 4):
-        #   1. Stage project + vendored Numina assets into workdir.
-        #   2. Snapshot statements (statement_tracker) if guard_statements.
-        #   3. Loop up to max_rounds: run the claude_code agent; stop when it reports
-        #      COMPLETE, continue while it reports LIMIT.
-        #   4. Re-check the statement tracker; reject runs that weakened theorems.
-        #   5. Return changed files.
-        raise NotImplementedError("NuminaProver.prove not yet implemented")
+        # 1. Stage the project so the workdir is a complete project to edit in place.
+        shutil.copytree(task.project.root, workdir, dirs_exist_ok=True, ignore=_IGNORE)
+
+        # 2. Snapshot original .lean contents for the post-run diff.
+        original = {
+            p.relative_to(workdir).as_posix(): p.read_text()
+            for p in workdir.rglob("*.lean")
+            if ".lake" not in p.parts
+        }
+
+        # 3. Configure the workdir with the Numina asset bundle (coordinator prompt
+        #    + vendored skills + subagent prompts).
+        bundle = resolve_bundle(self.config.assets)
+        harness = HARNESSES[self.config.harness](
+            self.config.model, self.config.effort, assets=bundle
+        )
+        base_prompt = task.instructions or bundle.default_prompt() or _FALLBACK_PROMPT
+        harness.configure_wd(workdir, base_prompt + _END_REASON_PROTOCOL)
+
+        # 4. Statement-change guard: snapshot the target theorems before the run.
+        tracked = self._tracked_files(task, workdir)
+        tracker: StatementTracker | None = None
+        if self.config.guard_statements and tracked:
+            tracker = StatementTracker(tracked)
+
+        # 5. Round-continuation loop.
+        loop = self._run_rounds(workdir, harness, tracker)
+
+        # 6. Diff the workdir's .lean files against the staged originals.
+        completed: dict[str, str] = {}
+        for path in sorted(workdir.rglob("*.lean")):
+            if ".lake" in path.parts:
+                continue
+            rel = path.relative_to(workdir).as_posix()
+            content = path.read_text()
+            if original.get(rel) != content:
+                completed[rel] = content
+
+        return GenerationOutput(
+            completed_files=completed,
+            cost_usd=loop["total_cost_usd"],
+            logs="\n".join(loop["lines"]),
+            metadata={
+                "harness": harness.name,
+                "model": self.config.model,
+                "effort": self.config.effort,
+                "assets": self.config.assets,
+                "input_tokens": loop["input_tokens"],
+                "output_tokens": loop["output_tokens"],
+                "rounds": loop["rounds"],
+                "end_reason": loop["end_reason"],
+                "session_resets": loop["session_resets"],
+                "guard_statements": self.config.guard_statements,
+                "statement_changed": loop["statement_changed"],
+                "statement_changes": loop["statement_changes"],
+                "round_history": loop["round_history"],
+            },
+        )
+
+    # -- round loop -----------------------------------------------------------
+
+    def _run_rounds(
+        self,
+        workdir: Path,
+        harness: Harness,
+        tracker: StatementTracker | None,
+    ) -> dict[str, Any]:
+        """Drive the agent for up to ``max_rounds``, continuing while it reports LIMIT.
+
+        Returns an accumulator dict (lines, token totals, cost, per-round history,
+        final end reason, statement-guard outcome).
+        """
+        lines: list[str] = []
+        round_history: list[dict[str, Any]] = []
+        total_cost = 0.0
+        input_tokens = 0
+        output_tokens = 0
+        consecutive_limits = 0
+        session_resets = 0
+        end_reason: str | None = None
+        statement_changed = False
+        statement_changes: list[str] = []
+
+        for round_num in range(1, self.config.max_rounds + 1):
+            # A fresh session is started whenever we have hit too many consecutive
+            # LIMITs (and, in this backend, every round -- see module docstring).
+            if consecutive_limits >= self.config.max_consecutive_limits:
+                consecutive_limits = 0
+                session_resets += 1
+
+            round_lines = self._run_agent(workdir, harness)
+            lines.extend(round_lines)
+            parsed = harness.parse(round_lines)
+
+            input_tokens += parsed.input_tokens
+            output_tokens += parsed.output_tokens
+            round_cost = parsed.cost_usd
+            if round_cost is None:
+                round_cost = (
+                    compute_cost_usd(
+                        self.config.model, parsed.input_tokens, parsed.output_tokens
+                    )
+                    or 0.0
+                )
+            total_cost += round_cost
+            end_reason = self._end_reason(parsed)
+
+            record: dict[str, Any] = {
+                "round": round_num,
+                "end_reason": end_reason,
+                "subtype": parsed.subtype,
+                "input_tokens": parsed.input_tokens,
+                "output_tokens": parsed.output_tokens,
+                "cost_usd": round_cost,
+            }
+
+            # Statement-change guard.
+            if tracker is not None:
+                ok, changes = tracker.check_initial_statements()
+                if not ok:
+                    statement_changed = True
+                    these = [str(c) for c in changes]
+                    statement_changes.extend(these)
+                    record["statement_changes"] = these
+                    tracker.restore_initial_statements(changes)
+                    if self.config.on_statement_change == "error":
+                        end_reason = "STATEMENT_CHANGED"
+                        record["end_reason"] = end_reason
+                        round_history.append(record)
+                        break
+
+            round_history.append(record)
+
+            if end_reason == "COMPLETE":
+                break
+            if end_reason == "LIMIT":
+                consecutive_limits += 1
+            else:
+                # None / SELECTED_TARGET_COMPLETE: keep going from a clean streak.
+                consecutive_limits = 0
+
+        return {
+            "lines": lines,
+            "round_history": round_history,
+            "rounds": len(round_history),
+            "total_cost_usd": total_cost,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "session_resets": session_resets,
+            "end_reason": end_reason,
+            "statement_changed": statement_changed,
+            "statement_changes": statement_changes,
+        }
+
+    @staticmethod
+    def _end_reason(parsed: HarnessRunResult) -> str | None:
+        """Resolve a round's end reason from the agent's final result.
+
+        Prefers the explicit ``END_REASON:<reason>`` marker; falls back to Claude's
+        result subtype (``success`` -> COMPLETE, ``error_max_turns`` -> LIMIT).
+        """
+        if parsed.result_text:
+            m = _REASON_RE.search(parsed.result_text)
+            if m:
+                return m.group(1).upper()
+        if parsed.subtype == "success":
+            return "COMPLETE"
+        if parsed.subtype == "error_max_turns":
+            return "LIMIT"
+        return None
+
+    # -- helpers --------------------------------------------------------------
+
+    def _tracked_files(self, task: ProofTask, workdir: Path) -> list[Path]:
+        """The workdir ``.lean`` files whose statements the guard should protect."""
+        if task.targets:
+            return [f for f in (workdir / t for t in task.targets) if f.is_file()]
+        return [
+            p
+            for p in sorted(workdir.rglob("*.lean"))
+            if ".lake" not in p.parts and _SORRY_RE.search(p.read_text())
+        ]
+
+    def _auth(self, harness: Harness) -> tuple[dict[str, str], list[tuple[str, str]]]:
+        """Extend the base auth with Numina's helper-skill credentials."""
+        env, mounts = super()._auth(harness)
+        for key in self.config.helper_env_keys:
+            value = os.environ.get(key)
+            if value is not None:
+                env.setdefault(key, value)
+        return env, mounts

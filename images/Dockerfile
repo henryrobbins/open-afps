@@ -65,4 +65,18 @@ RUN lake update && lake exe cache get
 # Verification workdirs are bind-mounted to /workspace/wd; the DockerBackend
 # symlinks /workspace/wd/.lake -> /workspace/.lake so they reuse this warm cache.
 
+# Numina's helper skills (vendor/numina/skills/cli/*.py) declare their third-party
+# deps via PEP 723 inline metadata and are invoked with `uv run`. Pre-warm the uv
+# cache with the union of those deps so the first `uv run` in the sandbox resolves
+# from cache instead of cold-downloading mid-proof. Placed after the Mathlib cache
+# layer so editing it never invalidates that expensive build step.
+RUN printf '%s\n' \
+        '# /// script' \
+        '# requires-python = ">=3.11"' \
+        '# dependencies = ["requests", "google-genai", "openai", "anthropic"]' \
+        '# ///' \
+        'print("uv skill cache warmed")' > /tmp/warm_skills.py \
+ && uv run --no-project /tmp/warm_skills.py \
+ && rm /tmp/warm_skills.py
+
 CMD ["bash"]

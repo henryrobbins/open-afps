@@ -36,8 +36,18 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/open_afps"]
 
+# The Numina bundle (skills + prompts) lives at the repo root, outside the package
+# tree, so force-include it into the package as data. Mapping to a *different* dest
+# than its source path means it does not collide with ``packages`` above.
+# NuminaProver resolves it at runtime (open_afps/vendor/numina in a wheel, repo-root
+# vendor/numina in a source checkout).
+[tool.hatch.build.targets.wheel.force-include]
+"vendor/numina" = "open_afps/vendor/numina"
+
 [tool.ruff]
 line-length = 88
+# Vendored third-party code keeps its upstream style; lint only our own sources.
+extend-exclude = ["vendor"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
@@ -54,10 +64,11 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Exclude the live (billable) credentialed tests by default; opt in by marker.
-addopts = "-m 'not aristotle_api and not agent_api'"
+addopts = "-m 'not aristotle_api and not agent_api and not numina_api'"
 markers = [
     "docker: tests that require the open-afps Docker image (opt-out: -m 'not docker')",
     "modal: tests that launch a Modal sandbox (opt-out: -m 'not modal')",
     "aristotle_api: live Aristotle API test (opt-in: run with -m aristotle_api)",
     "agent_api: live agent CLI test, billable + needs creds (opt-in: -m agent_api)",
+    "numina_api: live NuminaProver test, billable + needs creds (opt-in: -m numina_api)",
 ]

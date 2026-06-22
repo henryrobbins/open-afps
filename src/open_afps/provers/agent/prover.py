@@ -26,7 +26,7 @@ from open_afps.core.prover import AutomatedProver, AutomatedProverConfig
 from open_afps.core.result import GenerationOutput
 from open_afps.core.task import ProofTask
 from open_afps.provers.agent.cost import compute_cost_usd
-from open_afps.provers.agent.harness import HARNESSES, Harness
+from open_afps.provers.agent.harness import HARNESSES, Harness, resolve_bundle
 
 _DEFAULT_PROMPT = (
     "Complete every `sorry` in this Lean project. Make the project compile and be "
@@ -76,9 +76,13 @@ class AgentProver(AutomatedProver):
             if ".lake" not in p.parts
         }
 
-        # 3. Configure the workdir for the chosen harness.
-        harness = HARNESSES[self.config.harness](self.config.model, self.config.effort)
-        prompt = task.instructions or _DEFAULT_PROMPT
+        # 3. Configure the workdir for the chosen harness + asset bundle.
+        bundle = resolve_bundle(self.config.assets)
+        harness = HARNESSES[self.config.harness](
+            self.config.model, self.config.effort, assets=bundle
+        )
+        # Prompt precedence: explicit task instructions > bundle default > generic.
+        prompt = task.instructions or bundle.default_prompt() or _DEFAULT_PROMPT
         harness.configure_wd(workdir, prompt)
 
         # 4. Run the agent and collect its streamed output.

@@ -3,10 +3,12 @@ pre-commit:
   commands:
     lint:
       glob: "*.py"
-      run: uv run ruff check {staged_files}
+      # --force-exclude so the pyproject `extend-exclude` (vendored third-party
+      # code) is honored even when explicit file paths are passed.
+      run: uv run ruff check --force-exclude {staged_files}
     format:
       glob: "*.py"
-      run: uv run ruff format --check {staged_files}
+      run: uv run ruff format --check --force-exclude {staged_files}
     typecheck:
       glob: "*.py"
       run: uv run mypy
