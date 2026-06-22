@@ -1,0 +1,7 @@
+/* Wrap long lines in literal blocks tagged with :class: wrap */
+.highlight-wrap pre,
+div.literal-block-wrapper.wrap pre,
+.wrap pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+}

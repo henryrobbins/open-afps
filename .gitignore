@@ -1,6 +1,9 @@
 # Reference symlinks — for development context only, never committed.
 refs/
 
+# Sphinx docs build
+docs/_build/
+
 # Python
 __pycache__/
 *.py[cod]

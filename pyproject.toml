@@ -16,6 +16,15 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["mypy", "pytest", "pytest-cov", "ruff", "python-dotenv"]
+docs = [
+    "sphinx>=7",
+    "myst-parser>=3",
+    "furo",
+    "sphinx-autodoc-typehints",
+    "sphinx-autobuild",
+    "sphinx-design",
+    "numpydoc",
+]
 
 [build-system]
 requires = ["hatchling"]
