@@ -1,0 +1,20 @@
+# Reference symlinks — for development context only, never committed.
+refs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Env / secrets
+.env
+
+# OS
+.DS_Store

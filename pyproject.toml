@@ -1,0 +1,22 @@
+[project]
+name = "open-afps"
+version = "0.0.1"
+description = "Open Automated Formal Proof Synthesis: upload Lean files with sorrys, get verified completed proofs across multiple proving backends."
+requires-python = ">=3.12"
+dependencies = [
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+modal = ["modal>=1.5"]
+aristotle = ["aristotlelib"]
+# Numina helper skills call out to these providers; only needed when running NuminaProver.
+numina = ["lean-explore>=1.2.1", "google-genai>=1.44.0", "openai>=2.7.1", "anthropic>=0.75.0"]
+dev = ["mypy", "pytest", "pytest-cov", "ruff", "python-dotenv"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/open_afps"]
