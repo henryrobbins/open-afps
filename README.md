@@ -39,9 +39,9 @@ verifier **rejects** projects whose toolchain doesn't match the sandbox image's 
 provers end-to-end against the Mathlib image; the AristotleProver, AgentProver
 (claude/codex/opencode + lean-lsp-mcp), and NuminaProver (claude_code + vendored
 Numina assets + round loop) are implemented. Docker bind-mounts the workdir; Modal
-pushes/pulls it around an isolated Sandbox filesystem. A single `images/Dockerfile`
-(Lean/pipx installed globally) serves both: Docker runs as the `agent` user, Modal
-ignores `USER` and runs as root.
+pushes/pulls it around an isolated Sandbox filesystem. Docker uses `images/Dockerfile`
+(runs as the `agent` user); Modal runs as root, so its image is built
+programmatically with the same toolchain installed globally (`build-modal-image`).
 
 ```bash
 # Build the Mathlib base image (pins Lean/Mathlib v4.28.0).
@@ -71,9 +71,10 @@ print(report.verified, report.sorry_free, report.axioms)
 ### Build order
 
 1. ~~**Backend + verifier (the spine).**~~ ✅ Done: `DockerBackend` and `ModalBackend`
-   both ported from milp_flare, `images/Dockerfile` builds Mathlib with a warm olean
-   cache (and installs Lean globally so the one image serves both backends), `Verifier`
-   compiles file-by-file and checks sorry/axioms.
+   both ported from milp_flare. `images/Dockerfile` builds the Docker (agent-user)
+   image with a warm olean cache; `build-modal-image` builds the root/global Modal
+   image programmatically from the same skeleton. `Verifier` compiles file-by-file
+   and checks sorry/axioms.
 2. ~~**AristotleProver.**~~ ✅ Done: submits the lake project via `aristotlelib`
    (submit → wait → download), unpacks the result over the workdir, and funnels it
    through the shared Docker verifier. Needs `ARISTOTLE_API_KEY` for real runs; tests

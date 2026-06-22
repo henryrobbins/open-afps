@@ -73,11 +73,19 @@ def _build_image(args: argparse.Namespace) -> int:
 
 
 def _build_modal_image(args: argparse.Namespace) -> int:
-    """Build the sandbox image on Modal from images/Dockerfile and publish it.
+    """Build and publish the sandbox image on Modal via Modal's builder methods.
 
-    Reuses the single Dockerfile (Lean/pipx installed globally so root finds them)
-    via ``modal.Image.from_dockerfile``, then publishes a named image the
-    ``ModalBackend`` looks up with ``modal.Image.from_name(name)``.
+    Built programmatically (rather than from images/Dockerfile) so the Modal image
+    can install the Lean toolchain + tools *globally as root*: Modal ignores a
+    container ``USER`` and runs everything as root, so the agent-user layout the
+    Docker image uses doesn't apply. Installing globally keeps `lake`/`lean`/`uvx` on
+    root's PATH and -- crucially -- leaves the baked Mathlib package git repos
+    root-owned, so `lake` reads them cleanly instead of re-cloning (which would wipe
+    the warm cache). Kept in sync with images/Dockerfile; the two notable differences
+    are exactly "global/root install" and "no ENTRYPOINT/agent user".
+
+    Publishes a named image the ``ModalBackend`` looks up with
+    ``modal.Image.from_name(name)``.
     """
     try:
         import modal
@@ -89,16 +97,68 @@ def _build_modal_image(args: argparse.Namespace) -> int:
         )
         return 1
 
-    images_dir = Path(__file__).resolve().parents[2] / "images"
-    dockerfile = images_dir / "Dockerfile"
-    if not dockerfile.is_file():
-        print(f"No Dockerfile at {dockerfile}", file=sys.stderr)
+    lean_dir = Path(__file__).resolve().parents[2] / "images" / "lean"
+    if not (lean_dir / "lakefile.toml").is_file():
+        print(f"No Lean skeleton at {lean_dir}", file=sys.stderr)
         return 1
 
     app = modal.App.lookup(name=args.app, create_if_missing=True)
-    # context_dir is images/ so the Dockerfile's `COPY lean/ ...` resolves.
-    image = modal.Image.from_dockerfile(
-        str(dockerfile), context_dir=images_dir, force_build=args.force
+    image = (
+        modal.Image.from_registry("ubuntu:24.04")
+        .env({"DEBIAN_FRONTEND": "noninteractive"})
+        # ripgrep is recommended for lean-lsp-mcp's local search. force_build on the
+        # base layer so --force cascades through every subsequent (cached) layer.
+        .run_commands(
+            "apt-get update && apt-get install -y --no-install-recommends "
+            "ca-certificates curl git unzip build-essential python3 python3-pip "
+            "pipx ripgrep procps && rm -rf /var/lib/apt/lists/*",
+            force_build=args.force,
+        )
+        # Node 20 + agent CLIs (Claude Code, Codex, OpenCode), installed globally.
+        .run_commands(
+            "curl -fsSL https://deb.nodesource.com/setup_20.x | bash - "
+            "&& apt-get install -y --no-install-recommends nodejs "
+            "&& npm install -g @anthropic-ai/claude-code @openai/codex opencode-ai "
+            "&& rm -rf /var/lib/apt/lists/*"
+        )
+        # elan + Lean toolchain in a global ELAN_HOME so `lake`/`lean` are on root's
+        # PATH. --default-toolchain none lets images/lean/lean-toolchain pin it.
+        .env({"ELAN_HOME": "/opt/elan"})
+        .run_commands(
+            "curl https://raw.githubusercontent.com/leanprover/elan/master/"
+            "elan-init.sh -sSf | sh -s -- -y --default-toolchain none "
+            "--no-modify-path"
+        )
+        # pipx tools (lean-lsp-mcp, uv) to global dirs so their entrypoints land on
+        # PATH. Shared uv cache for the Numina skills' `uv run` deps.
+        .env({"PIPX_HOME": "/opt/pipx", "PIPX_BIN_DIR": "/usr/local/bin"})
+        .env({"UV_CACHE_DIR": "/opt/uv-cache"})
+        .run_commands("pipx install lean-lsp-mcp && pipx install uv")
+        # Modal's .env() sets literal values (no ${PATH} expansion like Dockerfile
+        # ENV), so set an explicit PATH with /opt/elan/bin ahead of the standard dirs.
+        .env(
+            {
+                "PATH": "/opt/elan/bin:/usr/local/sbin:/usr/local/bin:"
+                "/usr/sbin:/usr/bin:/sbin:/bin"
+            }
+        )
+        .workdir("/workspace")
+        # copy=True bakes the skeleton into a build layer so the lake steps can read
+        # it. lake update resolves the manifest + clones mathlib (installing the
+        # pinned toolchain); cache get downloads its oleans for a warm cache.
+        .add_local_dir(str(lean_dir), "/workspace", copy=True)
+        .run_commands("lake update && lake exe cache get")
+        # Pre-warm the uv cache with the Numina skills' PEP 723 deps (matches the
+        # Docker image), so the first `uv run` in the sandbox resolves from cache.
+        .run_commands(
+            "printf '%s\\n' "
+            "'# /// script' '# requires-python = \">=3.11\"' "
+            '\'# dependencies = ["requests", "google-genai", "openai", '
+            "\"anthropic\"]' '# ///' 'print(\"warmed\")' > /tmp/warm_skills.py "
+            "&& uv run --no-project /tmp/warm_skills.py && rm /tmp/warm_skills.py"
+        )
+        # No ENTRYPOINT: the ModalBackend execs the wrapped command directly after
+        # pushing the workdir.
     )
     with modal.enable_output():
         built = image.build(app)

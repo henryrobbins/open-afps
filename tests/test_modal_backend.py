@@ -68,7 +68,7 @@ def test_tar_dir_round_trips(tmp_path: Path) -> None:
         tmp.write(blob)
         tmp.flush()
         with tarfile.open(tmp.name, mode="r:gz") as tf:
-            tf.extractall(out)
+            tf.extractall(out, filter="data")
 
     assert (out / "MILExample.lean").read_text() == "import Mathlib\n"
     assert (out / "sub" / "note.txt").read_text() == "hello\n"

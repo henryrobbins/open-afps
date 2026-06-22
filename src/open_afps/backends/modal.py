@@ -172,7 +172,7 @@ def _pull_wd(sb: modal.Sandbox, wd: Path) -> None:
         with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmp:
             sb.filesystem.copy_to_local("/tmp/out.tar.gz", tmp.name)
             with tarfile.open(tmp.name, mode="r:gz") as tf:
-                tf.extractall(wd)
+                tf.extractall(wd, filter="data")
     except Exception:
         log.warning("pull_wd: failed to pull artifacts (Sandbox unavailable)")
 
@@ -180,8 +180,9 @@ def _pull_wd(sb: modal.Sandbox, wd: Path) -> None:
 def _pull_stderr(sb: modal.Sandbox) -> str:
     """Read back the captured ``modal_stderr.txt`` (empty if unavailable)."""
     try:
-        with sb.open(f"{REMOTE_WD}/modal_stderr.txt", "r") as f:
-            return str(f.read())
+        with tempfile.NamedTemporaryFile(suffix=".txt") as tmp:
+            sb.filesystem.copy_to_local(f"{REMOTE_WD}/modal_stderr.txt", tmp.name)
+            return Path(tmp.name).read_text(errors="replace")
     except Exception:
         return ""
 
