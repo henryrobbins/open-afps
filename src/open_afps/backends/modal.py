@@ -93,6 +93,9 @@ class ModalConfig(BackendConfig):
     #: Modal app the Sandbox is associated with (also the publish target of
     #: ``open-afps build-modal-image``).
     app: str = "open-afps"
+    #: GPU to attach to the Sandbox (e.g. ``"A100"``, ``"H100"``). ``None`` -> CPU
+    #: only. Used by GPU-served provers (Kimina); the verify path leaves it unset.
+    gpu: str | None = None
 
 
 @dataclass
@@ -235,6 +238,7 @@ class ModalBackend(ComputeBackend):
             image=image,
             secrets=[secret],
             cpu=cpu,
+            gpu=self.config.gpu,
             memory=self.config.memory_mib,
             timeout=timeout_s or self.config.timeout_s,
         )

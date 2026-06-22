@@ -10,8 +10,9 @@ then verify in the sandbox — so every prover gets the same final check for fre
 | [AgentProver](agent.md) | coding agent + lean-lsp-mcp in a sandbox | harness credential |
 | [NuminaProver](numina.md) | AgentProver (Claude) + Numina assets + round loop | harness + helper API keys |
 | [AristotleProver](aristotle.md) | Harmonic's hosted Aristotle API | `ARISTOTLE_API_KEY` |
+| [KiminaProver](kimina.md) | self-served whole-proof model (vLLM on GPU) | GPU backend |
 
-All three subclass {class}`~open_afps.core.prover.AutomatedProver` and funnel their
+They all subclass {class}`~open_afps.core.prover.AutomatedProver` and funnel their
 output through the shared {class}`~open_afps.core.verifier.Verifier`.
 
 ```{toctree}
@@ -20,4 +21,5 @@ output through the shared {class}`~open_afps.core.verifier.Verifier`.
 agent
 numina
 aristotle
+kimina
 ```

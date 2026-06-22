@@ -1,0 +1,211 @@
+"""KiminaProver tests.
+
+Generation (``_generate``) is stubbed with canned candidates, so the splice / pass@k
+selection / statement-guard logic runs fully offline -- no GPU, model, or network.
+The pure splice helpers are tested directly; the selection tests swap in a fake
+verifier so they need no Docker. One Docker-marked end-to-end exercises the *real*
+shared verifier over a canned proof (mocked generation, real local check) -- the path
+every prover shares.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from open_afps.backends.docker import DockerBackend, DockerConfig
+from open_afps.core.result import VerificationReport
+from open_afps.core.task import LeanProject, ProofTask
+from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_afps.provers._lean_splice import extract_theorems, splice_proof
+from open_afps.provers.kimina import KiminaProver, KiminaProverConfig
+
+FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
+
+GOOD_BODY = "\n  rw [mul_comm a b, mul_assoc b a c]"
+BAD_BODY = "\n  BROKEN_TACTIC"
+# A body that smuggles a column-0 redefinition of the target under a weaker statement;
+# the statement guard must reject it even though it carries no `sorry`.
+MALICIOUS_BODY = (
+    "\n  rw [mul_comm a b, mul_assoc b a c]"
+    "\n\ntheorem mul_comm_assoc (a b : ℝ) : a = a := by rfl"
+)
+
+
+# --- pure helpers: extract_theorems / splice_proof --------------------------
+
+
+def test_extract_theorems_finds_sorry_target() -> None:
+    text = (FIXTURE / "MILExample.lean").read_text()
+    thms = extract_theorems(text)
+
+    assert len(thms) == 1
+    th = thms[0]
+    assert th.name == "mul_comm_assoc"
+    assert th.statement.endswith(":= by")
+    assert "a * b * c = b * (a * c)" in th.statement
+    # The body span covers the proof after `by` (the `sorry`), not the signature.
+    start, end = th.body_span
+    assert text[start:end].strip() == "sorry"
+
+
+def test_extract_theorems_skips_already_proved_and_handles_multiple() -> None:
+    text = (
+        "import Mathlib\n\n"
+        "theorem done : 1 = 1 := by rfl\n\n"
+        "theorem todo (n : ℕ) : n = n := by\n  sorry\n\n"
+        "lemma also_todo : True := by sorry\n"
+    )
+    thms = extract_theorems(text)
+
+    names = [t.name for t in thms]
+    assert names == ["todo", "also_todo"]  # `done` is already proved -> skipped
+
+
+def test_extract_theorems_ignores_assign_inside_signature() -> None:
+    # A `:=` in a default-valued binder must not be mistaken for the proof delimiter.
+    text = "theorem t (h : Nat := by exact 0) : True := by\n  sorry\n"
+    (th,) = extract_theorems(text)
+
+    assert th.statement.endswith(":= by")
+    assert "True" in th.statement
+    assert text[th.body_span[0] : th.body_span[1]].strip() == "sorry"
+
+
+def test_splice_proof_replaces_only_the_body() -> None:
+    text = (FIXTURE / "MILExample.lean").read_text()
+    (th,) = extract_theorems(text)
+
+    spliced = splice_proof(text, th.body_span, GOOD_BODY)
+
+    # The proof `sorry` is gone (the word still appears in the file's doc comment).
+    assert not extract_theorems(spliced)
+    assert "rw [mul_comm a b, mul_assoc b a c]" in spliced
+    # The signature survives untouched.
+    assert "theorem mul_comm_assoc (a b c : ℝ)" in spliced
+
+
+# --- selection / guard with a fake verifier (offline) -----------------------
+
+
+class _FakeVerifier:
+    """Stand-in for the shared verifier: a file "compiles" unless it says BROKEN."""
+
+    def verify(self, project: LeanProject) -> VerificationReport:
+        per_file = {
+            p.relative_to(project.root).as_posix(): "BROKEN" not in p.read_text()
+            for p in project.lean_files()
+        }
+        return VerificationReport(
+            compiles=all(per_file.values()),
+            sorry_free=True,
+            per_file=per_file,
+        )
+
+
+def _make_prover(candidates: dict[str, list[str]]) -> KiminaProver:
+    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    config = KiminaProverConfig(
+        image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN, pass_k=4
+    )
+    prover = KiminaProver(config, backend)
+    prover._generate = lambda statements, workdir: candidates  # type: ignore[assignment]
+    prover.verifier = _FakeVerifier()  # type: ignore[assignment]
+    return prover
+
+
+def test_passk_selection_skips_failing_candidate(tmp_path: Path) -> None:
+    """A non-compiling first candidate is skipped; the next verifying one wins."""
+    prover = _make_prover({"mul_comm_assoc": [BAD_BODY, GOOD_BODY]})
+    workdir = tmp_path / "wd"
+
+    output = prover.prove(ProofTask(LeanProject(FIXTURE)), workdir)
+
+    assert output.metadata["winning_index"] == {"MILExample.lean:mul_comm_assoc": 1}
+    assert output.metadata["samples_tried"] == 2
+    assert "MILExample.lean" in output.completed_files
+    final = (workdir / "MILExample.lean").read_text()
+    assert not extract_theorems(final)  # the proof `sorry` was filled
+    assert "rw [mul_comm a b, mul_assoc b a c]" in final
+
+
+def test_no_verifying_candidate_leaves_original(tmp_path: Path) -> None:
+    """When nothing verifies, the file is left on the original (still sorry'd)."""
+    prover = _make_prover({"mul_comm_assoc": [BAD_BODY]})
+    workdir = tmp_path / "wd"
+
+    output = prover.prove(ProofTask(LeanProject(FIXTURE)), workdir)
+
+    assert output.metadata["winning_index"] == {"MILExample.lean:mul_comm_assoc": None}
+    assert output.completed_files == {}  # unchanged from the staged original
+    # The target is still unproved (a sorry'd theorem remains).
+    assert extract_theorems((workdir / "MILExample.lean").read_text())
+
+
+def test_statement_guard_rejects_signature_change(tmp_path: Path) -> None:
+    """A candidate that smuggles a weakened restatement is rejected by the guard."""
+    prover = _make_prover({"mul_comm_assoc": [MALICIOUS_BODY]})
+    workdir = tmp_path / "wd"
+
+    output = prover.prove(ProofTask(LeanProject(FIXTURE)), workdir)
+
+    assert output.metadata["winning_index"] == {"MILExample.lean:mul_comm_assoc": None}
+    # Rejected and reverted: the target is back to its sorry'd original.
+    assert extract_theorems((workdir / "MILExample.lean").read_text())
+
+
+def test_guard_disabled_accepts_signature_change(tmp_path: Path) -> None:
+    """With the guard off, the same candidate is accepted (compiles per fake)."""
+    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    config = KiminaProverConfig(
+        image=DEFAULT_IMAGE,
+        supported_toolchain=DEFAULT_TOOLCHAIN,
+        guard_statements=False,
+    )
+    prover = KiminaProver(config, backend)
+    prover._generate = lambda statements, workdir: {  # type: ignore[assignment]
+        "mul_comm_assoc": [MALICIOUS_BODY]
+    }
+    prover.verifier = _FakeVerifier()  # type: ignore[assignment]
+
+    output = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+
+    assert output.metadata["winning_index"] == {"MILExample.lean:mul_comm_assoc": 0}
+
+
+def test_generate_without_backend_raises(tmp_path: Path) -> None:
+    """The real generation seam errors clearly when no GPU backend is wired."""
+    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    config = KiminaProverConfig(
+        image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN
+    )
+    prover = KiminaProver(config, backend)  # no generation backend
+
+    with pytest.raises(RuntimeError, match="GPU generation backend"):
+        prover._generate({"t": "theorem t : True := by"}, tmp_path)
+
+
+# --- end-to-end with the real shared verifier (Docker) ----------------------
+
+
+@pytest.mark.docker
+def test_run_end_to_end_verifies_winning_candidate(tmp_path: Path) -> None:
+    """Full run(): stubbed generation, real Docker verifier confirms the proof."""
+    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    config = KiminaProverConfig(
+        image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN
+    )
+    prover = KiminaProver(config, backend)
+    # First candidate is a real tactic that fails to close the goal; second is the
+    # genuine proof -- so selection must skip the first and land on the second.
+    prover._generate = lambda statements, workdir: {  # type: ignore[assignment]
+        "mul_comm_assoc": ["\n  rfl", GOOD_BODY]
+    }
+
+    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+
+    assert result.success, result.verification and result.verification.compile_log
+    assert result.verification is not None and result.verification.verified
+    assert result.prover == "kimina"
+    assert result.cost_usd is None  # self-served on GPU; no per-run dollar cost
