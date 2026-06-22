@@ -16,6 +16,7 @@ Everything else is a candidate generator
 are then funnelled through the shared verifier.
 """
 
+from open_afps.api import Platform, SolveResult, build_prover
 from open_afps.core.prover import AutomatedProver, AutomatedProverConfig
 from open_afps.core.result import ProofResult, VerificationReport
 from open_afps.core.task import LeanProject, ProofTask
@@ -27,4 +28,7 @@ __all__ = [
     "VerificationReport",
     "LeanProject",
     "ProofTask",
+    "Platform",
+    "SolveResult",
+    "build_prover",
 ]

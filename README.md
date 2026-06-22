@@ -79,13 +79,22 @@ print(report.verified, report.sorry_free, report.axioms)
    theorems. Helper-skill API keys (Gemini/OpenAI/Leandex/Anthropic) forward into the
    sandbox; the image pre-warms a uv cache for the skills' PEP 723 deps. Needs
    `CLAUDE_CODE_OAUTH_TOKEN` + `GEMINI_API_KEY` for real runs (`pytest -m numina_api`).
-5. **Common API surface** (`api.py`): files + chosen provers + configs → `ProofResult`s;
-   concurrency/job tracking last.
+5. ~~**Common API surface**~~ ✅ Done (`api.py`): a `Platform` + prover registry that
+   takes a lake project (or bare `.lean` files, staged into the pinned skeleton) and a
+   list of provers, builds each from `name → (ProverClass, ConfigClass)` with the
+   shared image/backends, fans them out concurrently (`ThreadPoolExecutor`, isolated
+   `runs/<id>/<prover>/` workdirs), isolates per-prover failures, and returns a
+   `SolveResult` with `verified()`/`best()` (verified → cheapest → fastest) +
+   `total_cost_usd` and `to_dict()` JSON. Driven by the `open-afps solve <project>
+   --provers aristotle,agent,numina [--json]` CLI. The verify/generation backend split
+   is wired (Docker now; `backend="modal"` blocks on the still-stubbed `ModalBackend`).
 
 ## Layout
 
 ```
 src/open_afps/
+  api.py     Platform + prover registry (the dispatch/orchestration layer)
+  __main__.py  `open-afps solve` / `build-image` CLI
   core/      task.py result.py prover.py verifier.py
   backends/  base.py docker.py modal.py
   provers/   agent.py numina.py aristotle.py

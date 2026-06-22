@@ -26,6 +26,9 @@ docs = [
     "numpydoc",
 ]
 
+[project.scripts]
+open-afps = "open_afps.__main__:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

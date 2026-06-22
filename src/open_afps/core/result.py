@@ -33,6 +33,17 @@ class VerificationReport:
         """True iff the project compiles, has no sorry, and no foreign axioms."""
         return self.compiles and self.sorry_free and not self.non_standard_axioms
 
+    def to_dict(self) -> dict[str, object]:
+        """JSON-ready summary (the full ``compile_log`` is intentionally omitted)."""
+        return {
+            "verified": self.verified,
+            "compiles": self.compiles,
+            "sorry_free": self.sorry_free,
+            "axioms": list(self.axioms),
+            "non_standard_axioms": list(self.non_standard_axioms),
+            "per_file": dict(self.per_file),
+        }
+
 
 @dataclass
 class GenerationOutput:
@@ -61,7 +72,33 @@ class ProofResult:
     logs: str = ""
     artifacts_dir: Path | None = None
     metadata: dict[str, object] = field(default_factory=dict)
+    # Set when the prover raised before producing a result (Docker down, API error,
+    # toolchain mismatch). ``verification`` is ``None`` and ``success`` is ``False``.
+    error: str | None = None
 
     @property
     def success(self) -> bool:
         return bool(self.verification and self.verification.verified)
+
+    def to_dict(self, *, log_limit: int = 4000) -> dict[str, object]:
+        """JSON-ready view: inline files, verification, cost, and truncated logs."""
+        return {
+            "prover": self.prover,
+            "success": self.success,
+            "error": self.error,
+            "verification": self.verification.to_dict() if self.verification else None,
+            "completed_files": dict(self.completed_files),
+            "cost_usd": self.cost_usd,
+            "duration_s": self.duration_s,
+            "logs": _truncate(self.logs, log_limit),
+            "artifacts_dir": str(self.artifacts_dir) if self.artifacts_dir else None,
+            "metadata": dict(self.metadata),
+        }
+
+
+def _truncate(text: str, limit: int) -> str:
+    """Keep the tail of ``text`` (where a run's outcome lives) under ``limit`` chars."""
+    if limit <= 0 or len(text) <= limit:
+        return text
+    omitted = len(text) - limit
+    return f"...[{omitted} chars truncated]...\n{text[-limit:]}"
