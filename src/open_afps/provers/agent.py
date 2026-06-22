@@ -18,6 +18,7 @@ from pathlib import Path
 
 from open_afps.backends.base import ComputeBackend
 from open_afps.core.prover import AutomatedProver, AutomatedProverConfig
+from open_afps.core.result import GenerationOutput
 from open_afps.core.task import ProofTask
 
 
@@ -47,7 +48,7 @@ class AgentProver(AutomatedProver):
         # the agent, local Docker for the cheap final check) -- but defaults to shared.
         self.agent_backend = agent_backend or verification_backend
 
-    def prove(self, task: ProofTask, workdir: Path) -> dict[str, str]:
+    def prove(self, task: ProofTask, workdir: Path) -> GenerationOutput:
         # TODO(phase 3):
         #   1. Stage project into workdir; drop in assets (skills, .mcp.json, agent.sh)
         #      for self.config.harness. Port Harness.configure_wd from milp_flare.

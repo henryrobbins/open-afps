@@ -34,6 +34,11 @@ select = ["E", "F", "I", "UP"]
 strict = true
 files = ["src/open_afps"]
 
+# Third-party deps that ship no type information (no py.typed).
+[[tool.mypy.overrides]]
+module = ["aristotlelib.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

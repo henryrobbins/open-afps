@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from open_afps.core.result import GenerationOutput
 from open_afps.core.task import ProofTask
 from open_afps.provers.agent import AgentProver, AgentProverConfig
 
@@ -44,7 +45,7 @@ class NuminaProver(AgentProver):
 
     config: NuminaProverConfig
 
-    def prove(self, task: ProofTask, workdir: Path) -> dict[str, str]:
+    def prove(self, task: ProofTask, workdir: Path) -> GenerationOutput:
         # TODO(phase 4):
         #   1. Stage project + vendored Numina assets into workdir.
         #   2. Snapshot statements (statement_tracker) if guard_statements.

@@ -35,6 +35,21 @@ class VerificationReport:
 
 
 @dataclass
+class GenerationOutput:
+    """What a prover's ``prove()`` produces, before the shared verification step.
+
+    ``run()`` merges this with the :class:`VerificationReport` into a
+    :class:`ProofResult`. Cost/logs/metadata are optional so a prover can surface
+    whatever it knows (agent token cost, Aristotle's run summary, ...).
+    """
+
+    completed_files: dict[str, str] = field(default_factory=dict)
+    cost_usd: float | None = None
+    logs: str = ""
+    metadata: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass
 class ProofResult:
     """What a prover returns for one :class:`~open_afps.core.task.ProofTask`."""
 

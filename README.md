@@ -60,7 +60,10 @@ print(report.verified, report.sorry_free, report.axioms)
 1. ~~**Backend + verifier (the spine).**~~ ✅ Docker done: `DockerBackend` ported from
    milp_flare, `images/Dockerfile` builds Mathlib with a warm olean cache, `Verifier`
    compiles file-by-file and checks sorry/axioms. (Modal backend still to port.)
-2. **AristotleProver.** Cheapest end-to-end slice: wrap the CLI, unpack the tar.gz, verify.
+2. ~~**AristotleProver.**~~ ✅ Done: submits the lake project via `aristotlelib`
+   (submit → wait → download), unpacks the result over the workdir, and funnels it
+   through the shared Docker verifier. Needs `ARISTOTLE_API_KEY` for real runs; tests
+   stub the remote call and verify a real proof locally.
 3. **AgentProver.** Port milp_flare's `harness/` (claude/opencode/codex + lean-lsp-mcp,
    `cost.py`) onto the backend; generic "fill the sorrys" prompt.
 4. **NuminaProver.** Vendor Numina's `skills/`+`prompts/` (see `vendor/numina/VENDOR.md`),

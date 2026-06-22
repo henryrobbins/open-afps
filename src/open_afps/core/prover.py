@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from open_afps.backends.base import ComputeBackend
-from open_afps.core.result import ProofResult
+from open_afps.core.result import GenerationOutput, ProofResult
 from open_afps.core.task import ProofTask
 from open_afps.core.verifier import Verifier
 
@@ -56,12 +56,12 @@ class AutomatedProver(abc.ABC):
         )
 
     @abc.abstractmethod
-    def prove(self, task: ProofTask, workdir: Path) -> dict[str, str]:
+    def prove(self, task: ProofTask, workdir: Path) -> GenerationOutput:
         """Produce completed files for ``task`` inside ``workdir``.
 
-        Returns a mapping of project-relative path -> file contents for the files the
-        prover modified. Implementations should leave ``workdir`` containing the full
-        completed project so the verifier can compile it in place.
+        Implementations must leave ``workdir`` containing the full completed project
+        so the verifier can compile it in place, and return a
+        :class:`GenerationOutput` describing what was produced.
         """
 
     def run(self, task: ProofTask, workdir: Path) -> ProofResult:
@@ -69,7 +69,7 @@ class AutomatedProver(abc.ABC):
         self.verifier.check_compatible(task.project)
 
         start = time.monotonic()
-        completed = self.prove(task, workdir)
+        output = self.prove(task, workdir)
         duration = time.monotonic() - start
 
         # Verify the project now living in workdir (subclasses sync results there).
@@ -80,7 +80,10 @@ class AutomatedProver(abc.ABC):
         return ProofResult(
             prover=self.name,
             verification=report,
-            completed_files=completed,
+            completed_files=output.completed_files,
+            cost_usd=output.cost_usd,
             duration_s=duration,
+            logs=output.logs,
             artifacts_dir=workdir,
+            metadata=output.metadata,
         )
