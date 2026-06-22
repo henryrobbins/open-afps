@@ -44,12 +44,15 @@ class Theorem:
     is prompted with. ``body_span`` is the ``(start, end)`` half-open character range
     of the proof body that :func:`splice_proof` replaces; it covers everything after
     the delimiter (the leading whitespace/newline included), so a generated body that
-    carries its own indentation drops in cleanly.
+    carries its own indentation drops in cleanly. ``docstring`` is the informal text
+    of the doc/block comment immediately preceding the declaration (``""`` if none) --
+    useful as informal-problem context for a model prompt.
     """
 
     name: str
     statement: str
     body_span: tuple[int, int]
+    docstring: str = ""
 
 
 def _find_top_level_assign(text: str) -> int | None:
@@ -67,6 +70,24 @@ def _find_top_level_assign(text: str) -> int | None:
         elif ch == ":" and depth == 0 and i + 1 < len(text) and text[i + 1] == "=":
             return i
     return None
+
+
+def _preceding_docstring(lean_text: str, decl_start: int) -> str:
+    """Informal text of the comment immediately preceding the decl at ``decl_start``.
+
+    Returns the inner text of a ``/-- ... -/`` doc comment (or a plain ``/- ... -/``
+    block) that sits, separated only by whitespace, right before the declaration --
+    the informal problem statement in miniF2F-style files. ``""`` if there is none.
+    Leading doc-comment markers (``-``/``!``) and surrounding whitespace are stripped.
+    """
+    head = lean_text[:decl_start].rstrip()
+    if not head.endswith("-/"):
+        return ""
+    open_idx = head.rfind("/-")
+    if open_idx == -1 or open_idx >= len(head) - 2:
+        return ""
+    inner = head[open_idx + 2 : len(head) - 2]
+    return inner.lstrip("-!").strip()
 
 
 def extract_theorems(lean_text: str) -> list[Theorem]:
@@ -104,6 +125,7 @@ def extract_theorems(lean_text: str) -> list[Theorem]:
                 name=m.group(2),
                 statement=block[:body_start_rel].strip(),
                 body_span=(start + body_start_rel, start + body_end_rel),
+                docstring=_preceding_docstring(lean_text, start),
             )
         )
     return out

@@ -67,8 +67,20 @@ REGISTRY: dict[str, _Entry] = {
     "numina": _Entry(NuminaProver, NuminaProverConfig),
     # Kimina runs on the standard toolchain (no toolchain-gate change), but serves its
     # model on GPU compute: the platform's agent_backend doubles as its generation
-    # backend (see ``build_prover``). Phase B publishes a dedicated GPU image.
+    # backend (see ``build_prover``). Phase B publishes a dedicated GPU image. The bare
+    # ``kimina`` uses the config default (7B distill); ``kimina:<size>`` selects a
+    # distilled checkpoint.
     "kimina": _Entry(KiminaProver, KiminaProverConfig),
+    "kimina:7b": _Entry(
+        KiminaProver,
+        KiminaProverConfig,
+        {"model": "AI-MO/Kimina-Prover-Preview-Distill-7B"},
+    ),
+    "kimina:1.5b": _Entry(
+        KiminaProver,
+        KiminaProverConfig,
+        {"model": "AI-MO/Kimina-Prover-Preview-Distill-1.5B"},
+    ),
 }
 
 

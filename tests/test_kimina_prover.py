@@ -76,6 +76,19 @@ def test_extract_theorems_ignores_assign_inside_signature() -> None:
     assert text[th.body_span[0] : th.body_span[1]].strip() == "sorry"
 
 
+def test_extract_theorems_captures_preceding_docstring() -> None:
+    text = (FIXTURE / "MILExample.lean").read_text()
+    (th,) = extract_theorems(text)
+
+    # The fixture's `/-! ... -/` comment becomes informal-problem context.
+    assert "trivial exercise" in th.docstring.lower()
+
+
+def test_docstring_empty_when_no_comment() -> None:
+    (th,) = extract_theorems("theorem t : True := by\n  sorry\n")
+    assert th.docstring == ""
+
+
 def test_splice_proof_replaces_only_the_body() -> None:
     text = (FIXTURE / "MILExample.lean").read_text()
     (th,) = extract_theorems(text)
@@ -177,6 +190,71 @@ def test_guard_disabled_accepts_signature_change(tmp_path: Path) -> None:
     assert output.metadata["winning_index"] == {"MILExample.lean:mul_comm_assoc": 0}
 
 
+def test_problem_context_threaded_from_docstring(tmp_path: Path) -> None:
+    """The target's doc comment is forwarded to generation as informal context."""
+    prover = _make_prover({"mul_comm_assoc": [GOOD_BODY]})
+    captured: dict[str, object] = {}
+
+    def fake_gen(statements: object, workdir: Path) -> dict[str, list[str]]:
+        captured["statements"] = statements
+        return {"mul_comm_assoc": [GOOD_BODY]}
+
+    prover._generate = fake_gen  # type: ignore[assignment]
+
+    prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+
+    payloads = captured["statements"]
+    assert isinstance(payloads, list)
+    assert payloads[0]["name"] == "mul_comm_assoc"
+    assert "trivial exercise" in payloads[0]["problem"].lower()
+
+
+def test_instructions_used_as_problem_fallback(tmp_path: Path) -> None:
+    """With no doc comment, the task instructions become the informal context."""
+    prover = _make_prover({"t": [GOOD_BODY]})
+    captured: dict[str, object] = {}
+
+    def fake_gen(statements: object, workdir: Path) -> dict[str, list[str]]:
+        captured["statements"] = statements
+        return {}
+
+    prover._generate = fake_gen  # type: ignore[assignment]
+
+    # Stage a project whose lone target carries no doc comment.
+    proj = tmp_path / "proj"
+    import shutil
+
+    shutil.copytree(FIXTURE, proj)
+    (proj / "MILExample.lean").write_text(
+        "import Mathlib\n\ntheorem t : True := by\n  sorry\n"
+    )
+
+    prover.prove(
+        ProofTask(LeanProject(proj), instructions="prove it is trivially true"),
+        tmp_path / "wd",
+    )
+
+    payloads = captured["statements"]
+    assert isinstance(payloads, list)
+    assert payloads[0]["problem"] == "prove it is trivially true"
+
+
+def test_model_size_registry_variants() -> None:
+    """`kimina:<size>` selects a distilled checkpoint; bare `kimina` is the default."""
+    from open_afps.api import available_provers, build_prover
+
+    assert {"kimina", "kimina:7b", "kimina:1.5b"} <= set(available_provers())
+
+    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    small = build_prover(
+        "kimina:1.5b",
+        image=DEFAULT_IMAGE,
+        toolchain=DEFAULT_TOOLCHAIN,
+        verification_backend=backend,
+    )
+    assert "1.5B" in small.config.model  # type: ignore[attr-defined]
+
+
 def test_generate_without_backend_raises(tmp_path: Path) -> None:
     """The real generation seam errors clearly when no GPU backend is wired."""
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
@@ -186,7 +264,9 @@ def test_generate_without_backend_raises(tmp_path: Path) -> None:
     prover = KiminaProver(config, backend)  # no generation backend
 
     with pytest.raises(RuntimeError, match="GPU generation backend"):
-        prover._generate({"t": "theorem t : True := by"}, tmp_path)
+        prover._generate(
+            [{"name": "t", "statement": "theorem t : True := by"}], tmp_path
+        )
 
 
 # --- end-to-end with the real shared verifier (Docker) ----------------------

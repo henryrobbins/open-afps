@@ -20,7 +20,9 @@ toolchain gate — so `kimina` can share one `solve()` call with the other prove
    ({func}`~open_afps.provers._lean_splice.extract_theorems`), yielding its formal
    statement (ending in `by`) and the character span of the proof body to fill.
 2. **Generate** — {meth}`~open_afps.provers.kimina.KiminaProver._generate` produces
-   `pass_k` candidate proof bodies per target on the GPU generation backend.
+   `pass_k` candidate proof bodies per target on the GPU generation backend. Each
+   target's preceding doc comment (else the task `instructions`) is forwarded as
+   informal-problem context in the prompt.
 3. **Select by verifying** — each candidate is spliced over the `sorry` and compiled;
    the **first that compiles, is `sorry`-free, and leaves the signature intact** wins
    (this is how `pass@k` is cashed in honestly — our compile is the source of truth,
@@ -82,6 +84,22 @@ prover = KiminaProver(config, verification_backend=verify, generation_backend=ge
 
 See {class}`~open_afps.provers.kimina.KiminaProverConfig` in the {doc}`../api/provers`
 reference for all configuration knobs.
+
+### Model size
+
+The bare `kimina` prover uses the 7B distill. Registry variants select a checkpoint
+without hand-wiring config: `kimina:7b` and `kimina:1.5b` (the smaller, faster
+distill). Or set `model` on the config directly to any HF id / mounted path.
+
+```python
+platform.solve(task, ["kimina:1.5b", "kimina:7b"])  # compare both
+```
+
+:::{note}
+**Roadmap.** Per-task model load dominates latency today; a persistent vLLM server and
+the Kimina Lean Server (for fast in-sandbox pass@k pre-filtering before the
+authoritative compile) are planned optimizations.
+:::
 
 :::{note}
 Kimina is self-served on your own GPU compute, so {class}`~open_afps.core.result.ProofResult`

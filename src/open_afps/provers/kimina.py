@@ -89,10 +89,19 @@ class KiminaProver(AutomatedProver):
         # 3. Extract targets: each sorry'd theorem -> (file, Theorem). A name may
         #    repeat across files, so key selection state by (file, name).
         targets = self._extract_targets(task, workdir)
-        statements = {th.name: th.statement for _, th in targets}
+        # Informal-problem context: the theorem's own doc comment, else the task's
+        # instructions, else nothing. Quality improves when the model sees it.
+        payloads = [
+            {
+                "name": th.name,
+                "statement": th.statement,
+                "problem": th.docstring or (task.instructions or ""),
+            }
+            for _, th in targets
+        ]
 
         # 4. Generate K candidate proof bodies per target name.
-        candidates = self._generate(statements, workdir) if statements else {}
+        candidates = self._generate(payloads, workdir) if payloads else {}
 
         # 5. Statement-change guard: snapshot target files before any splice.
         tracked = sorted({workdir / f for f, _ in targets})
@@ -232,15 +241,18 @@ class KiminaProver(AutomatedProver):
     # -- generation seam ------------------------------------------------------
 
     def _generate(
-        self, statements: dict[str, str], workdir: Path
+        self, statements: list[dict[str, str]], workdir: Path
     ) -> dict[str, list[str]]:
         """Generate ``pass_k`` candidate proof bodies per statement on GPU compute.
+
+        ``statements`` is one ``{"name", "statement", "problem"}`` payload per target
+        (``problem`` is optional informal context). Returns ``{name: [proof_body]}``.
 
         Test seam: stub this to return canned candidates and exercise the
         splice/select/guard path with no GPU/model/network (mirrors Aristotle's
         ``_submit_and_download``).
 
-        The real path writes the statements as jsonl into ``workdir``, runs the
+        The real path writes the payloads as jsonl into ``workdir``, runs the
         one-shot ``kimina_generate.py`` entrypoint in the generation backend (which
         loads the model once via vLLM and writes a candidates jsonl), and reads the
         results back. Requires a GPU generation backend; CPU Docker cannot serve the
@@ -254,10 +266,7 @@ class KiminaProver(AutomatedProver):
             )
 
         (workdir / _STATEMENTS_FILE).write_text(
-            "\n".join(
-                json.dumps({"name": n, "statement": s}) for n, s in statements.items()
-            )
-            + "\n"
+            "\n".join(json.dumps(s) for s in statements) + "\n"
         )
 
         command = (
