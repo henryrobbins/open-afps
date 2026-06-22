@@ -278,23 +278,29 @@ class KiminaProver(AutomatedProver):
             f" --temperature {self.config.temperature}"
             f" --max-tokens {self.config.max_tokens}"
         )
-        self.generation_backend.run(
+        res = self.generation_backend.run(
             workdir, command, env=self.config.extra_env, timeout_s=self.config.timeout_s
         )
 
         out_path = workdir / _CANDIDATES_FILE
-        if not out_path.is_file():
-            raise RuntimeError(
-                f"kimina generation produced no {_CANDIDATES_FILE}; "
-                "check the generation backend logs."
-            )
         candidates: dict[str, list[str]] = {}
-        for line in out_path.read_text().splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            row = json.loads(line)
-            candidates[row["name"]] = list(row.get("candidates", []))
+        if out_path.is_file():
+            for line in out_path.read_text().splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                row = json.loads(line)
+                candidates[row["name"]] = list(row.get("candidates", []))
+
+        # No usable candidates is a generation failure, not "nothing proved" -- surface
+        # the entrypoint's exit code + stderr tail (finish reasons, extraction misses)
+        # so the cause is visible without re-running blind.
+        if sum(len(v) for v in candidates.values()) == 0:
+            tail = (res.stderr or res.stdout or "")[-3000:]
+            raise RuntimeError(
+                f"kimina generation produced no candidates "
+                f"(exit={res.exit_code}). Generation log tail:\n{tail}"
+            )
         return candidates
 
     # -- helpers --------------------------------------------------------------

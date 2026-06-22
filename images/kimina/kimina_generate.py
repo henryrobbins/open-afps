@@ -125,12 +125,27 @@ def generate(
 
     results: list[dict[str, object]] = []
     for stmt, out in zip(statements, llm.generate(prompts, sampling_params=sampling)):
-        bodies = [
-            body
-            for completion in out.outputs
-            if (body := extract_proof_body(completion.text)) is not None
-        ]
-        results.append({"name": stmt["name"], "candidates": bodies})
+        name = stmt["name"]
+        bodies: list[str] = []
+        for i, completion in enumerate(out.outputs):
+            body = extract_proof_body(completion.text)
+            if body is not None:
+                bodies.append(body)
+                continue
+            # Diagnose the miss on stderr (pulled back even if the workdir isn't):
+            # finish_reason="length" means the model ran out of tokens mid-reasoning.
+            finish = getattr(completion, "finish_reason", "?")
+            print(
+                f"[kimina] {name} sample {i}: no proof extracted "
+                f"(finish={finish}, len={len(completion.text)} chars). Tail:",
+                file=sys.stderr,
+            )
+            print(completion.text[-600:], file=sys.stderr)
+        print(
+            f"[kimina] {name}: {len(bodies)}/{len(out.outputs)} candidates extracted",
+            file=sys.stderr,
+        )
+        results.append({"name": name, "candidates": bodies})
     return results
 
 

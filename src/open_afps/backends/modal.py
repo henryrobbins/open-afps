@@ -100,6 +100,10 @@ class ModalConfig(BackendConfig):
     #: persist large model weights / the HF cache across runs (Kimina) rather than
     #: baking multi-GB into the image. Empty -> no volumes (the verify path).
     volumes: Mapping[str, str] = field(default_factory=dict)
+    #: Warm the Lean olean cache (``lake build``) before running the command. On for
+    #: verify/agent work; turn OFF for a pure-generation (GPU) sandbox, where the Lean
+    #: build is wasted CPU work billed at GPU rates.
+    warm_lean: bool = True
 
 
 @dataclass
@@ -263,12 +267,15 @@ class ModalBackend(ComputeBackend):
 
             # Warm the Lean cache (and wire the .lake symlink) before timing real
             # work: Modal pages image layers in lazily, so the first build is slow.
-            sb.exec(
-                "bash",
-                "-c",
-                f"ln -sfn {BAKED_LAKE} {REMOTE_WD}/.lake && lake build",
-                workdir=REMOTE_WD,
-            ).wait()
+            # Skipped for pure-generation sandboxes (no Lean needed) to avoid burning
+            # GPU-billed time on a CPU build.
+            if self.config.warm_lean:
+                sb.exec(
+                    "bash",
+                    "-c",
+                    f"ln -sfn {BAKED_LAKE} {REMOTE_WD}/.lake && lake build",
+                    workdir=REMOTE_WD,
+                ).wait()
 
             started_at = time.time()
             # Redirect stdin from /dev/null (Modal leaves it an open pipe with no EOF,

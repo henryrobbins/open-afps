@@ -381,6 +381,7 @@ def test_real_generation_verifies_on_modal_gpu(tmp_path: Path) -> None:
             gpu="A100",
             timeout_s=3600,
             volumes={"kimina-hf-cache": "/root/.cache/huggingface"},
+            warm_lean=False,  # vLLM generation needs no Lean build
         )
     )
     config = KiminaProverConfig(
