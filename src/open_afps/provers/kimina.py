@@ -261,7 +261,7 @@ class KiminaProver(AutomatedProver):
         )
 
         command = (
-            "python /opt/kimina/kimina_generate.py"
+            "python3 /opt/kimina/kimina_generate.py"
             f" --statements {_STATEMENTS_FILE}"
             f" --out {_CANDIDATES_FILE}"
             f" --model {self.config.model}"

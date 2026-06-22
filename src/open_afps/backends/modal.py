@@ -96,6 +96,10 @@ class ModalConfig(BackendConfig):
     #: GPU to attach to the Sandbox (e.g. ``"A100"``, ``"H100"``). ``None`` -> CPU
     #: only. Used by GPU-served provers (Kimina); the verify path leaves it unset.
     gpu: str | None = None
+    #: Named Modal Volumes to mount, ``{volume_name: container_mount_path}``. Used to
+    #: persist large model weights / the HF cache across runs (Kimina) rather than
+    #: baking multi-GB into the image. Empty -> no volumes (the verify path).
+    volumes: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -232,6 +236,11 @@ class ModalBackend(ComputeBackend):
         }
         secret = modal.Secret.from_dict(secret_dict)
 
+        volumes = {
+            mount: modal.Volume.from_name(name, create_if_missing=True)
+            for name, mount in self.config.volumes.items()
+        }
+
         # Idle Sandbox with no main process: we must push the workdir before exec.
         sb = modal.Sandbox.create(
             app=app,
@@ -239,6 +248,9 @@ class ModalBackend(ComputeBackend):
             secrets=[secret],
             cpu=cpu,
             gpu=self.config.gpu,
+            # Modal's stub types ``volumes`` with invariant key/value unions; our
+            # plain ``{str: Volume}`` is a valid subset.
+            volumes=volumes,  # type: ignore[arg-type]
             memory=self.config.memory_mib,
             timeout=timeout_s or self.config.timeout_s,
         )

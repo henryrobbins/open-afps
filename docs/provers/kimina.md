@@ -35,9 +35,23 @@ toolchain gate — so `kimina` can share one `solve()` call with the other prove
 Generation requires a **GPU backend** (the 7B distill fits on one modern GPU); the
 generation step is isolated behind `_generate`, which runs a one-shot
 `kimina_generate.py` entrypoint in the backend (loads the model once via vLLM, writes
-candidate proofs). CPU Docker cannot serve the model — point `kimina` at a Modal GPU
-backend. {class}`~open_afps.backends.modal.ModalConfig` exposes a `gpu` knob
-(`"A100"`, `"H100"`, …) passed to the Sandbox.
+candidate proofs). The prompt format and sampling defaults are pinned to the
+[model card](https://huggingface.co/AI-MO/Kimina-Prover-Preview-Distill-7B) recipe
+(system prompt, `# Problem:` / `# Formal statement:` user template,
+`temperature=0.6, top_p=0.95`). CPU Docker cannot serve the model — point `kimina` at
+a Modal GPU backend. {class}`~open_afps.backends.modal.ModalConfig` exposes a `gpu`
+knob (`"A100"`, `"H100"`, …) and a `volumes` map (to persist the model weights / HF
+cache across runs rather than baking multi-GB into the image), both passed to the
+Sandbox.
+
+### Building the GPU image
+
+The image (`images/kimina.Dockerfile`) bases on the official vLLM image and layers
+the platform's standard Lean toolchain + Mathlib cache on top. Publish it to Modal:
+
+```bash
+open-afps build-kimina-image          # publishes a Modal image named "kimina"
+```
 
 ## Usage
 
@@ -48,7 +62,14 @@ from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 from open_afps.provers.kimina import KiminaProver, KiminaProverConfig
 
 verify = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-generate = ModalBackend(ModalConfig(image="kimina", gpu="A100"))  # Phase B GPU image
+generate = ModalBackend(
+    ModalConfig(
+        image="kimina",  # the published GPU image
+        gpu="A100",
+        timeout_s=3600,
+        volumes={"kimina-hf-cache": "/root/.cache/huggingface"},  # persist weights
+    )
+)
 config = KiminaProverConfig(
     image=DEFAULT_IMAGE,
     supported_toolchain=DEFAULT_TOOLCHAIN,

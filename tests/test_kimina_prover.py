@@ -10,7 +10,10 @@ every prover shares.
 
 from __future__ import annotations
 
+import importlib.util
+import os
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -209,3 +212,104 @@ def test_run_end_to_end_verifies_winning_candidate(tmp_path: Path) -> None:
     assert result.verification is not None and result.verification.verified
     assert result.prover == "kimina"
     assert result.cost_usd is None  # self-served on GPU; no per-run dollar cost
+
+
+# --- generation entrypoint helpers (images/kimina/kimina_generate.py) --------
+#
+# Loaded by path: it ships in the GPU image, not the package. Its vLLM/transformers
+# imports are deferred into generate(), so the prompt/extraction helpers import with
+# no GPU or those deps.
+
+_GEN_PATH = (
+    Path(__file__).resolve().parents[1] / "images" / "kimina" / "kimina_generate.py"
+)
+
+
+def _load_gen() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("kimina_generate", _GEN_PATH)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_build_prompt_follows_model_card_recipe() -> None:
+    gen = _load_gen()
+    prompt = gen.build_prompt("theorem t : True := by", problem="show True")
+
+    assert "step by step in Lean 4" in prompt
+    assert "# Problem:show True" in prompt
+    assert "```lean4\n" in prompt and "theorem t : True := by" in prompt
+    # A statement without an import is given Mathlib context.
+    assert "import Mathlib" in prompt
+
+
+def test_build_prompt_keeps_existing_imports() -> None:
+    gen = _load_gen()
+    prompt = gen.build_prompt("import Mathlib\n\ntheorem t : True := by")
+
+    assert prompt.count("import Mathlib") == 1
+
+
+def test_extract_proof_body_takes_last_complete_block() -> None:
+    gen = _load_gen()
+    output = (
+        "Here is my reasoning...\n"
+        "```lean4\ntheorem t : True := by\n  sorry\n```\n"
+        "Wait, let me finish it:\n"
+        "```lean4\ntheorem t : True := by\n  trivial\n```\n"
+    )
+    assert gen.extract_proof_body(output) == "\n  trivial"
+
+
+def test_extract_proof_body_handles_inline_and_missing() -> None:
+    gen = _load_gen()
+    assert gen.extract_proof_body("```lean\ntheorem t : True := by rfl\n```") == " rfl"
+    assert gen.extract_proof_body("no code here at all") is None
+    # A block with no proof delimiter yields nothing usable.
+    assert gen.extract_proof_body("```lean\n#check Nat\n```") is None
+
+
+# --- real generation end-to-end on a Modal GPU (slow, opt-in) ---------------
+
+
+def _modal_configured() -> bool:
+    if os.environ.get("MODAL_TOKEN_ID") and os.environ.get("MODAL_TOKEN_SECRET"):
+        return True
+    return (Path.home() / ".modal.toml").is_file()
+
+
+@pytest.mark.slow
+@pytest.mark.modal
+@pytest.mark.skipif(
+    not _modal_configured(),
+    reason="Modal not configured; also needs the published `kimina` GPU image",
+)
+def test_real_generation_verifies_on_modal_gpu(tmp_path: Path) -> None:
+    """Real Kimina generation on a Modal GPU -> the shared verifier confirms it.
+
+    Requires Modal credentials and the image published via `open-afps
+    build-kimina-image`. Verify runs on the same image (no GPU); generation gets a
+    GPU and an HF-cache volume so weights persist across runs.
+    """
+    from open_afps.backends.modal import ModalBackend, ModalConfig
+
+    verify = ModalBackend(ModalConfig(image="kimina"))
+    generate = ModalBackend(
+        ModalConfig(
+            image="kimina",
+            gpu="A100",
+            timeout_s=3600,
+            volumes={"kimina-hf-cache": "/root/.cache/huggingface"},
+        )
+    )
+    config = KiminaProverConfig(
+        image="kimina", supported_toolchain=DEFAULT_TOOLCHAIN, pass_k=8
+    )
+    prover = KiminaProver(config, verify, generate)
+
+    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+
+    assert result.success, result.verification and result.verification.compile_log
+    assert result.verification is not None and result.verification.verified
+    assert result.metadata["samples_tried"] >= 1

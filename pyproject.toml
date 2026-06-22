@@ -74,4 +74,5 @@ markers = [
     "aristotle_api: live Aristotle API test (opt-in: run with -m aristotle_api)",
     "agent_api: live agent CLI test, billable + needs creds (opt-in: -m agent_api)",
     "numina_api: live NuminaProver test, billable + needs creds (opt-in: -m numina_api)",
+    "slow: slow tests, e.g. a real GPU generation run (opt-out: -m 'not slow')",
 ]

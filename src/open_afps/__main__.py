@@ -72,11 +72,11 @@ def _build_image(args: argparse.Namespace) -> int:
     return subprocess.run(cmd).returncode
 
 
-def _build_modal_image(args: argparse.Namespace) -> int:
-    """Build the sandbox image on Modal from images/Dockerfile and publish it.
+def _publish_modal_image(dockerfile: Path, args: argparse.Namespace) -> int:
+    """Build ``dockerfile`` on Modal (context = images/) and publish it by name.
 
-    Reuses the single Dockerfile (Lean/pipx installed globally so root finds them)
-    via ``modal.Image.from_dockerfile``, then publishes a named image the
+    Both sandbox images install their tools globally so root finds them; this builds
+    via ``modal.Image.from_dockerfile`` and publishes a named image the
     ``ModalBackend`` looks up with ``modal.Image.from_name(name)``.
     """
     try:
@@ -89,8 +89,6 @@ def _build_modal_image(args: argparse.Namespace) -> int:
         )
         return 1
 
-    images_dir = Path(__file__).resolve().parents[2] / "images"
-    dockerfile = images_dir / "Dockerfile"
     if not dockerfile.is_file():
         print(f"No Dockerfile at {dockerfile}", file=sys.stderr)
         return 1
@@ -98,7 +96,7 @@ def _build_modal_image(args: argparse.Namespace) -> int:
     app = modal.App.lookup(name=args.app, create_if_missing=True)
     # context_dir is images/ so the Dockerfile's `COPY lean/ ...` resolves.
     image = modal.Image.from_dockerfile(
-        str(dockerfile), context_dir=images_dir, force_build=args.force
+        str(dockerfile), context_dir=dockerfile.parent, force_build=args.force
     )
     with modal.enable_output():
         built = image.build(app)
@@ -108,6 +106,18 @@ def _build_modal_image(args: argparse.Namespace) -> int:
     print("Reference it from a Sandbox with:")
     print(f"    modal.Image.from_name({args.name!r})")
     return 0
+
+
+def _build_modal_image(args: argparse.Namespace) -> int:
+    """Build + publish the CPU verify/agent image (images/Dockerfile) on Modal."""
+    images_dir = Path(__file__).resolve().parents[2] / "images"
+    return _publish_modal_image(images_dir / "Dockerfile", args)
+
+
+def _build_kimina_image(args: argparse.Namespace) -> int:
+    """Build + publish the Kimina GPU image (images/kimina.Dockerfile) on Modal."""
+    images_dir = Path(__file__).resolve().parents[2] / "images"
+    return _publish_modal_image(images_dir / "kimina.Dockerfile", args)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -182,6 +192,27 @@ def main(argv: list[str] | None = None) -> int:
         help="Force a rebuild even if Modal has cached layers.",
     )
 
+    build_kimina = sub.add_parser(
+        "build-kimina-image",
+        help="Build the Kimina GPU image on Modal (vLLM + Lean) and publish.",
+    )
+    build_kimina.add_argument(
+        "--name",
+        default="kimina",
+        help="Name to publish the Modal image under (default: kimina). The "
+        "KiminaProver generation backend's ModalConfig.image (sans :tag) must match.",
+    )
+    build_kimina.add_argument(
+        "--app",
+        default="open-afps",
+        help="Modal app to associate the image build with (default: open-afps).",
+    )
+    build_kimina.add_argument(
+        "--force",
+        action="store_true",
+        help="Force a rebuild even if Modal has cached layers.",
+    )
+
     args = parser.parse_args(argv)
     if args.command == "solve":
         return _solve(args)
@@ -189,6 +220,8 @@ def main(argv: list[str] | None = None) -> int:
         return _build_image(args)
     if args.command == "build-modal-image":
         return _build_modal_image(args)
+    if args.command == "build-kimina-image":
+        return _build_kimina_image(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 
