@@ -17,11 +17,21 @@ from __future__ import annotations
 import re
 
 from open_afps.backends.base import ComputeBackend
+from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.core.result import VerificationReport
 from open_afps.core.task import LeanProject, ToolchainMismatch
+from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 
 _SORRY_RE = re.compile(r"declaration uses 'sorry'|uses `sorry`")
 _AXIOMS_RE = re.compile(r"depends on axioms: \[([^\]]*)\]")
+
+
+def docker_verifier(
+    image: str = DEFAULT_IMAGE, toolchain: str = DEFAULT_TOOLCHAIN
+) -> Verifier:
+    """A :class:`Verifier` backed by a local Docker sandbox running ``image``."""
+    backend = DockerBackend(DockerConfig(image=image))
+    return Verifier(backend, supported_toolchain=toolchain)
 
 
 class Verifier:
@@ -47,29 +57,58 @@ class Verifier:
         """Compile ``project`` and return a :class:`VerificationReport`."""
         self.check_compatible(project)
 
-        targets = project.lean_files()
-        rel = [t.relative_to(project.root).as_posix() for t in targets]
-        # Compile every file; capture a combined log. (A later optimisation can build
-        # the whole project once via `lake build` instead of file-by-file.)
-        cmd = " && ".join(f"lake env lean {f}" for f in rel) if rel else "true"
-        result = self.backend.run(project.root, cmd)
+        rel = [t.relative_to(project.root).as_posix() for t in project.lean_files()]
+        if not rel:
+            return VerificationReport(compiles=True, sorry_free=True)
 
-        log = result.stdout + "\n" + result.stderr
-        compiles = result.exit_code == 0
-        sorry_free = not _SORRY_RE.search(log)
-        axioms = self._parse_axioms(log)
+        result = self.backend.run(project.root, self._compile_script(rel))
+        log = result.stdout + ("\n" + result.stderr if result.stderr else "")
 
-        # Per-file pass/fail is coarse in phase 1 (overall compile gate); refine when
-        # the backend reports per-command exit codes.
-        per_file = {f: compiles for f in rel}
-
+        per_file = self._parse_per_file(log, rel)
+        compiles = result.exit_code == 0 and all(per_file.values())
         return VerificationReport(
             compiles=compiles,
-            sorry_free=sorry_free,
-            axioms=axioms,
+            sorry_free=not _SORRY_RE.search(log),
+            axioms=self._parse_axioms(log),
             compile_log=log,
             per_file=per_file,
         )
+
+    @staticmethod
+    def _compile_script(rel: list[str]) -> str:
+        """Compile each file, bracketing it with markers so we can read exit codes.
+
+        Mirrors milp_flare's ``entrypoint.sh``: every file runs (``;`` not ``&&``) so
+        one failure doesn't mask the rest, and the overall status is the OR of the
+        per-file exit codes.
+        """
+        lines = ["fail=0"]
+        for f in rel:
+            lines += [
+                f'echo "=== FILE {f} ==="',
+                f'lake env lean "{f}" 2>&1',
+                "rc=$?",
+                'echo "=== EXIT $rc ==="',
+                '[ "$rc" -ne 0 ] && fail=1',
+            ]
+        lines.append("exit $fail")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _parse_per_file(log: str, rel: list[str]) -> dict[str, bool]:
+        # Walk the FILE/EXIT markers in order; a file passes iff its exit code is 0.
+        per_file: dict[str, bool] = {}
+        current: str | None = None
+        for line in log.splitlines():
+            if line.startswith("=== FILE "):
+                current = line[len("=== FILE ") : -len(" ===")]
+            elif line.startswith("=== EXIT ") and current is not None:
+                per_file[current] = line[len("=== EXIT ") : -len(" ===")].strip() == "0"
+                current = None
+        # Files with no recorded marker (shouldn't happen) default to failing.
+        for f in rel:
+            per_file.setdefault(f, False)
+        return per_file
 
     @staticmethod
     def _parse_axioms(log: str) -> tuple[str, ...]:

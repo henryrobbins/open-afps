@@ -33,3 +33,10 @@ select = ["E", "F", "I", "UP"]
 [tool.mypy]
 strict = true
 files = ["src/open_afps"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "docker: tests that require the open-afps Docker image (opt-out: -m 'not docker')",
+    "modal: tests that launch a Modal sandbox (opt-out: -m 'not modal')",
+]

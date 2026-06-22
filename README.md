@@ -33,16 +33,33 @@ verifier **rejects** projects whose toolchain doesn't match the sandbox image's 
 (`ToolchainMismatch`) rather than failing deep in a build. One Mathlib image to start;
 `image` is a config field so more can be added without refactoring.
 
-## Status: phase-1 skeleton
+## Status: phase 1 done (Docker spine)
 
-The abstractions and wiring exist and import cleanly; backend/prover bodies are stubs
-with `TODO`s pointing at the milp_flare / numina source to port from.
+`DockerBackend` + `Verifier` work end-to-end against the Mathlib image; the Modal
+backend and the three provers are still stubs with `TODO`s pointing at the
+milp_flare / numina source to port from.
+
+```bash
+# Build the Mathlib base image (pins Lean/Mathlib v4.28.0).
+docker build -t open-afps:latest images/
+
+# Run the phase-1 verifier test (compiles a trivial Mathematics-in-Lean file).
+uv run pytest -m docker
+```
+
+```python
+from open_afps.core.task import LeanProject
+from open_afps.core.verifier import docker_verifier
+
+report = docker_verifier().verify(LeanProject("path/to/lake/project"))
+print(report.verified, report.sorry_free, report.axioms)
+```
 
 ### Build order
 
-1. **Backend + verifier (the spine).** Port milp_flare `runner/{docker,modal}.py` into
-   `ComputeBackend`; build the Mathlib `images/Dockerfile`; finish `Verifier`. Test on a
-   known-good and a known-sorry project across both backends.
+1. ~~**Backend + verifier (the spine).**~~ ✅ Docker done: `DockerBackend` ported from
+   milp_flare, `images/Dockerfile` builds Mathlib with a warm olean cache, `Verifier`
+   compiles file-by-file and checks sorry/axioms. (Modal backend still to port.)
 2. **AristotleProver.** Cheapest end-to-end slice: wrap the CLI, unpack the tar.gz, verify.
 3. **AgentProver.** Port milp_flare's `harness/` (claude/opencode/codex + lean-lsp-mcp,
    `cost.py`) onto the backend; generic "fill the sorrys" prompt.

@@ -13,8 +13,14 @@ dist/
 .pytest_cache/
 .ruff_cache/
 
+# Lean build artifacts (e.g. created by an editor opening a fixture project)
+.lake/
+
 # Env / secrets
 .env
 
 # OS
 .DS_Store
+
+# Claude Code transient state
+.claude/scheduled_tasks.lock
