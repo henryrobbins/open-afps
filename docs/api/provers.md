@@ -43,6 +43,29 @@ and funnels its output through the shared {class}`~open_afps.core.verifier.Verif
    :no-members:
 ```
 
+## KiminaProver
+
+```{eval-rst}
+.. autoclass:: open_afps.provers.kimina.KiminaProver
+   :show-inheritance:
+   :exclude-members: name
+
+.. autoclass:: open_afps.provers.kimina.KiminaProverConfig
+   :show-inheritance:
+   :no-members:
+```
+
+### Splice helpers
+
+```{eval-rst}
+.. autofunction:: open_afps.provers._lean_splice.extract_theorems
+
+.. autofunction:: open_afps.provers._lean_splice.splice_proof
+
+.. autoclass:: open_afps.provers._lean_splice.Theorem
+   :no-members:
+```
+
 (agent-harnesses)=
 ## Agent harnesses
 

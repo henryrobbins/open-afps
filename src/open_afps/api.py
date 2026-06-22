@@ -16,8 +16,9 @@ The public surface is:
 
 Backends: the verifier (cheap final check) and the agent (generation) backends are
 kept separate -- the split already exists in ``AgentProver`` -- so a job can run
-generation on Modal and the check on local Docker. Today only Docker is wired;
-``backend="modal"`` is accepted but blocks on the still-stubbed ``ModalBackend``.
+generation on Modal and the check on local Docker. Both ``backend="docker"`` and
+``backend="modal"`` are wired (Modal needs a published image; see
+``open-afps build-modal-image``).
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ from open_afps.core.task import LeanProject, ProofTask, ToolchainMismatch
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN, SKELETON_DIR
 from open_afps.provers.agent import AgentProver, AgentProverConfig
 from open_afps.provers.aristotle import AristotleProver, AristotleProverConfig
+from open_afps.provers.kimina import KiminaProver, KiminaProverConfig
 from open_afps.provers.numina import NuminaProver, NuminaProverConfig
 
 # --- prover registry / factory ---------------------------------------------
@@ -63,6 +65,22 @@ REGISTRY: dict[str, _Entry] = {
     "agent:codex": _Entry(AgentProver, AgentProverConfig, {"harness": "codex"}),
     "agent:opencode": _Entry(AgentProver, AgentProverConfig, {"harness": "opencode"}),
     "numina": _Entry(NuminaProver, NuminaProverConfig),
+    # Kimina runs on the standard toolchain (no toolchain-gate change), but serves its
+    # model on GPU compute: the platform's agent_backend doubles as its generation
+    # backend (see ``build_prover``). Phase B publishes a dedicated GPU image. The bare
+    # ``kimina`` uses the config default (7B distill); ``kimina:<size>`` selects a
+    # distilled checkpoint.
+    "kimina": _Entry(KiminaProver, KiminaProverConfig),
+    "kimina:7b": _Entry(
+        KiminaProver,
+        KiminaProverConfig,
+        {"model": "AI-MO/Kimina-Prover-Preview-Distill-7B"},
+    ),
+    "kimina:1.5b": _Entry(
+        KiminaProver,
+        KiminaProverConfig,
+        {"model": "AI-MO/Kimina-Prover-Preview-Distill-1.5B"},
+    ),
 }
 
 
@@ -100,9 +118,11 @@ def build_prover(
         kwargs.update(overrides)
     config = entry.config_cls(**kwargs)  # type: ignore[arg-type]
 
-    # Agentic provers take (config, verify_backend, agent_backend); Aristotle does
-    # its generation over the network and takes only the verify backend.
-    if isinstance(config, AgentProverConfig):
+    # Agentic provers take (config, verify_backend, agent_backend); Kimina takes
+    # (config, verify_backend, generation_backend) -- the agent backend doubles as its
+    # GPU generation backend. Aristotle does its generation over the network and takes
+    # only the verify backend.
+    if isinstance(config, (AgentProverConfig, KiminaProverConfig)):
         return entry.prover_cls(config, verification_backend, agent_backend)  # type: ignore[call-arg]
     return entry.prover_cls(config, verification_backend)
 

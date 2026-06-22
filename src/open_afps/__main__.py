@@ -72,6 +72,54 @@ def _build_image(args: argparse.Namespace) -> int:
     return subprocess.run(cmd).returncode
 
 
+def _publish_modal_image(dockerfile: Path, args: argparse.Namespace) -> int:
+    """Build ``dockerfile`` on Modal (context = images/) and publish it by name.
+
+    Both sandbox images install their tools globally so root finds them; this builds
+    via ``modal.Image.from_dockerfile`` and publishes a named image the
+    ``ModalBackend`` looks up with ``modal.Image.from_name(name)``.
+    """
+    try:
+        import modal
+    except ModuleNotFoundError:
+        print(
+            "the modal compute backend requires the `modal` package; "
+            "install it with `pip install open-afps`.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not dockerfile.is_file():
+        print(f"No Dockerfile at {dockerfile}", file=sys.stderr)
+        return 1
+
+    app = modal.App.lookup(name=args.app, create_if_missing=True)
+    # context_dir is images/ so the Dockerfile's `COPY lean/ ...` resolves.
+    image = modal.Image.from_dockerfile(
+        str(dockerfile), context_dir=dockerfile.parent, force_build=args.force
+    )
+    with modal.enable_output():
+        built = image.build(app)
+    built.publish(args.name)
+
+    print(f"Published Modal image {args.name!r} (app {args.app!r}).")
+    print("Reference it from a Sandbox with:")
+    print(f"    modal.Image.from_name({args.name!r})")
+    return 0
+
+
+def _build_modal_image(args: argparse.Namespace) -> int:
+    """Build + publish the CPU verify/agent image (images/Dockerfile) on Modal."""
+    images_dir = Path(__file__).resolve().parents[2] / "images"
+    return _publish_modal_image(images_dir / "Dockerfile", args)
+
+
+def _build_kimina_image(args: argparse.Namespace) -> int:
+    """Build + publish the Kimina GPU image (images/kimina.Dockerfile) on Modal."""
+    images_dir = Path(__file__).resolve().parents[2] / "images"
+    return _publish_modal_image(images_dir / "kimina.Dockerfile", args)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="open-afps")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -123,11 +171,57 @@ def main(argv: list[str] | None = None) -> int:
         "--no-cache", action="store_true", help="Pass --no-cache to docker build."
     )
 
+    build_modal = sub.add_parser(
+        "build-modal-image",
+        help="Build the sandbox image on Modal (from images/Dockerfile) and publish.",
+    )
+    build_modal.add_argument(
+        "--name",
+        default="open-afps",
+        help="Name to publish the Modal image under (default: open-afps). "
+        "ModalConfig.image (sans :tag) must match this.",
+    )
+    build_modal.add_argument(
+        "--app",
+        default="open-afps",
+        help="Modal app to associate the image build with (default: open-afps).",
+    )
+    build_modal.add_argument(
+        "--force",
+        action="store_true",
+        help="Force a rebuild even if Modal has cached layers.",
+    )
+
+    build_kimina = sub.add_parser(
+        "build-kimina-image",
+        help="Build the Kimina GPU image on Modal (vLLM + Lean) and publish.",
+    )
+    build_kimina.add_argument(
+        "--name",
+        default="kimina",
+        help="Name to publish the Modal image under (default: kimina). The "
+        "KiminaProver generation backend's ModalConfig.image (sans :tag) must match.",
+    )
+    build_kimina.add_argument(
+        "--app",
+        default="open-afps",
+        help="Modal app to associate the image build with (default: open-afps).",
+    )
+    build_kimina.add_argument(
+        "--force",
+        action="store_true",
+        help="Force a rebuild even if Modal has cached layers.",
+    )
+
     args = parser.parse_args(argv)
     if args.command == "solve":
         return _solve(args)
     if args.command == "build-image":
         return _build_image(args)
+    if args.command == "build-modal-image":
+        return _build_modal_image(args)
+    if args.command == "build-kimina-image":
+        return _build_kimina_image(args)
     parser.error(f"unknown command: {args.command}")
     return 2
 
