@@ -45,6 +45,15 @@ from open_afps.provers.numina import NuminaProver, NuminaProverConfig
 
 # --- prover registry / factory ---------------------------------------------
 
+#: The Modal image Kimina serves its model from (published by
+#: ``open-afps build-kimina-image``). Distinct from ``DEFAULT_IMAGE``: it carries
+#: the vLLM/CUDA stack and ``/opt/kimina/kimina_generate.py``, which the CPU image
+#: lacks.
+KIMINA_IMAGE = "kimina"
+#: Modal Volume persisting Kimina's HF weight cache (multi-GB, not baked into the
+#: image) across runs; mounted at the HF default cache path. Created on first use.
+KIMINA_HF_CACHE_VOLUME = "kimina-hf-cache"
+
 
 @dataclass(frozen=True)
 class _Entry:
@@ -118,11 +127,25 @@ def build_prover(
         kwargs.update(overrides)
     config = entry.config_cls(**kwargs)  # type: ignore[arg-type]
 
-    # Agentic provers take (config, verify_backend, agent_backend); Kimina takes
-    # (config, verify_backend, generation_backend) -- the agent backend doubles as its
-    # GPU generation backend. Aristotle does its generation over the network and takes
+    # Kimina takes (config, verify_backend, generation_backend) and serves its model
+    # on a *dedicated* Modal GPU backend -- NOT the shared agent_backend, which carries
+    # the CPU ``DEFAULT_IMAGE`` (no ``/opt/kimina/kimina_generate.py``) and no GPU.
+    # Pin the published ``kimina`` image + requested GPU + a persistent HF-cache volume
+    # (weights aren't baked); warm_lean=False since generation is pure GPU work.
+    if isinstance(config, KiminaProverConfig):
+        gen_backend = ModalBackend(
+            ModalConfig(
+                image=KIMINA_IMAGE,
+                gpu=config.gpu,
+                volumes={KIMINA_HF_CACHE_VOLUME: "/root/.cache/huggingface"},
+                warm_lean=False,
+            )
+        )
+        return entry.prover_cls(config, verification_backend, gen_backend)  # type: ignore[call-arg]
+    # Agentic provers take (config, verify_backend, agent_backend); the agent backend
+    # doubles as generation compute. Aristotle generates over the network and takes
     # only the verify backend.
-    if isinstance(config, (AgentProverConfig, KiminaProverConfig)):
+    if isinstance(config, AgentProverConfig):
         return entry.prover_cls(config, verification_backend, agent_backend)  # type: ignore[call-arg]
     return entry.prover_cls(config, verification_backend)
 
