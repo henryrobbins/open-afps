@@ -2,9 +2,8 @@
 
 An ``AgentProver`` composes:
 
-* a :class:`~open_afps.provers.agent.harness.Harness` (claude_code / codex /
-  opencode) -- the *agent* concern: launch script, auth forwarding, output
-  parsing; and
+* a :class:`~open_afps.harness.Harness` (claude_code / codex / opencode) -- the
+  *agent* concern: launch script, auth forwarding, output parsing; and
 * a :class:`~open_afps.backends.base.ComputeBackend` -- the *compute* concern:
   where the agent runs, with Lean+Mathlib and the lean-lsp MCP server.
 
@@ -25,8 +24,7 @@ from open_afps.backends.base import ComputeBackend
 from open_afps.core.prover import AutomatedProver, AutomatedProverConfig
 from open_afps.core.result import GenerationOutput
 from open_afps.core.task import ProofTask
-from open_afps.provers.agent.cost import compute_cost_usd
-from open_afps.provers.agent.harness import HARNESSES, Harness, resolve_bundle
+from open_afps.harness import HARNESSES, Harness, compute_cost_usd, resolve_bundle
 
 _DEFAULT_PROMPT = (
     "Complete every `sorry` in this Lean project. Make the project compile and be "

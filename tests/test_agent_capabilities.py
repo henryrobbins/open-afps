@@ -48,8 +48,8 @@ from pathlib import Path
 import pytest
 
 from open_afps.backends.base import ComputeBackend
+from open_afps.harness import HARNESSES, Harness, VibeHarness
 from open_afps.images import DEFAULT_IMAGE
-from open_afps.provers.agent.harness import HARNESSES, Harness, VibeHarness
 
 pytestmark = pytest.mark.agent_api
 

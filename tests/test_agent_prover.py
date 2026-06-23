@@ -18,14 +18,14 @@ import pytest
 
 from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.core.task import LeanProject, ProofTask
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers.agent import AgentProver, AgentProverConfig
-from open_afps.provers.agent.cost import compute_cost_usd
-from open_afps.provers.agent.harness import (
+from open_afps.harness import (
     HARNESSES,
     ClaudeCodeHarness,
     Harness,
+    compute_cost_usd,
 )
+from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
 STREAM = Path(__file__).parent / "fixtures" / "agent_streams" / "claude_code.jsonl"

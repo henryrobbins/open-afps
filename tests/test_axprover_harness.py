@@ -25,9 +25,9 @@ import pytest
 
 from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.core.task import LeanProject, ProofTask
+from open_afps.harness import HARNESSES, AxProverHarness, Harness
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers.agent import AgentProver, AgentProverConfig
-from open_afps.provers.agent.harness import HARNESSES, AxProverHarness, Harness
+from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
 

@@ -21,8 +21,8 @@ import pytest
 
 from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.core.task import LeanProject, ProofTask
+from open_afps.harness import Harness
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers.agent.harness import Harness
 from open_afps.provers.numina import NuminaProver, NuminaProverConfig
 from open_afps.provers.numina_tracker import (
     StatementTracker,

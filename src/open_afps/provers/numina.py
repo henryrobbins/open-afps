@@ -35,14 +35,14 @@ from typing import Any, Literal
 
 from open_afps.core.result import GenerationOutput
 from open_afps.core.task import ProofTask
-from open_afps.provers.agent import AgentProver, AgentProverConfig
-from open_afps.provers.agent.cost import compute_cost_usd
-from open_afps.provers.agent.harness import (
+from open_afps.harness import (
     HARNESSES,
     Harness,
     HarnessRunResult,
+    compute_cost_usd,
     resolve_bundle,
 )
+from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
 from open_afps.provers.numina_tracker import StatementTracker
 
 # Directories never worth copying into the agent workdir (mirrors AgentProver).
