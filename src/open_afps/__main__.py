@@ -23,9 +23,15 @@ from open_afps.api import (
 from open_afps.core.task import ProofTask
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 
-#: ax-prover PyPI version baked into the Modal image (mirrors the images/Dockerfile
-#: ARG AX_PROVER_VERSION). Bump to a release that emits token usage to report cost.
-AX_PROVER_VERSION = "0.1.1"
+#: ax-prover git commit baked into the Modal image (mirrors the images/Dockerfile
+#: ARG AX_PROVER_REF). Pinned past the 0.1.1 PyPI release to a commit with the
+#: lean_interact-based target discovery: 0.1.1 lists `import Mathlib` as a theorem
+#: named ``Mathlib`` and flags it "unproven" whenever a nearby docstring contains the
+#: word ``sorry`` (regex discovery), wasting a full prove loop on a phantom target.
+#: The rewrite asks the Lean server for real declarations + ``Sorry`` terms instead.
+#: Repo is public; HTTPS clone needs no credentials in the image build.
+AX_PROVER_REF = "822d598c8fb2c99e694bc88de0eb89391e7f1a88"
+AX_PROVER_SPEC = f"git+https://github.com/Axiomatic-AI/ax-prover-base@{AX_PROVER_REF}"
 
 
 def _solve(args: argparse.Namespace) -> int:
@@ -142,10 +148,10 @@ def _build_modal_image(args: argparse.Namespace) -> int:
             "pipx install lean-lsp-mcp && pipx install uv && pipx install mistral-vibe"
         )
         # ax-prover (LangGraph Lean agent) backing the AxProverHarness, pipx-isolated
-        # from open-afps and the CLIs. Keep AX_PROVER_VERSION in sync with the
-        # images/Dockerfile ARG; bump to a release that emits token usage so cost is
-        # reported (AX_PROVER_HARNESS_PLAN.md step 3).
-        .run_commands(f"pipx install 'ax-prover=={AX_PROVER_VERSION}'")
+        # from open-afps and the CLIs. Keep AX_PROVER_REF in sync with the
+        # images/Dockerfile ARG. Pinned to a git commit (not a PyPI release) for the
+        # lean_interact target discovery -- see AX_PROVER_SPEC above.
+        .run_commands(f"pipx install '{AX_PROVER_SPEC}'")
         # Modal's .env() sets literal values (no ${PATH} expansion like Dockerfile
         # ENV), so set an explicit PATH with /opt/elan/bin ahead of the standard dirs.
         .env(

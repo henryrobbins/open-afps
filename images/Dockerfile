@@ -64,11 +64,14 @@ RUN pipx install lean-lsp-mcp \
 
 # ax-prover (LangGraph Lean agent) backing the AxProverHarness. pipx keeps its heavy
 # stack (langgraph, langchain-*, lean-interact, omegaconf, tavily) fully isolated
-# from open-afps and the other CLIs. Bump AX_PROVER_VERSION to a release that emits
-# token usage so AxProverHarness.parse can report cost (AX_PROVER_HARNESS_PLAN.md
-# step 3); until then cost is unreported.
-ARG AX_PROVER_VERSION=0.1.1
-RUN pipx install "ax-prover==${AX_PROVER_VERSION}"
+# from open-afps and the other CLIs. Pinned to a git commit past the 0.1.1 PyPI
+# release for the lean_interact-based target discovery: 0.1.1's regex discovery lists
+# `import Mathlib` as a theorem `Mathlib` and flags it unproven when a nearby docstring
+# mentions the word `sorry`, burning a prove loop on a phantom target. Keep
+# AX_PROVER_REF in sync with src/open_afps/__main__.py. Repo is public; the HTTPS
+# clone needs no credentials.
+ARG AX_PROVER_REF=822d598c8fb2c99e694bc88de0eb89391e7f1a88
+RUN pipx install "git+https://github.com/Axiomatic-AI/ax-prover-base@${AX_PROVER_REF}"
 
 WORKDIR /workspace
 
