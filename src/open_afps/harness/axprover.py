@@ -11,6 +11,14 @@ from open_afps.harness._paths import _SCRIPTS
 from open_afps.harness.base import AuthSpec, Harness, HarnessRunResult, _infer_provider
 from open_afps.harness.bundles import AssetBundle
 
+#: Cap on ax-prover's per-call LLM retries (its ``DEFAULT_LLM_RETRY_CONFIG`` ships
+#: ``stop_after_attempt=10000`` -- ~8h20m). That ``with_retry`` fires on *any* exception
+#: and ignores Anthropic's ``x-should-retry: false``, so a non-retryable ``400`` (e.g. a
+#: bad request from a model/langchain-anthropic mismatch) gets retried 10k times and the
+#: run silently hangs for hours instead of failing fast. Three is plenty to ride out a
+#: transient blip while turning any hard error into a prompt, visible failure.
+_LLM_MAX_RETRIES = 3
+
 
 class AxProverHarness(Harness):
     """ax-prover-base (LangGraph Lean agent), driven by ``ax-prover prove`` in-sandbox.
@@ -130,11 +138,16 @@ class AxProverHarness(Harness):
         The bundled ``proposer_tools`` (lean + web search) are left untouched -- a
         missing TAVILY_API_KEY or blocked egress degrades a tool to a no-op rather
         than failing the run.
+
+        ``retry_config`` overrides only ``stop_after_attempt`` (see
+        :data:`_LLM_MAX_RETRIES`); OmegaConf merges it over ax-prover's default so the
+        exponential-jitter wait is preserved -- we just refuse to retry 10k times.
         """
         prover: dict[str, Any] = {
             "prover_llm": {
                 "model": self._ax_model(),
                 "provider_config": self._provider_config(),
+                "retry_config": {"stop_after_attempt": _LLM_MAX_RETRIES},
             }
         }
         if self.max_iterations is not None:
