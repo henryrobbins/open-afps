@@ -58,6 +58,10 @@ class GenerationOutput:
     cost_usd: float | None = None
     logs: str = ""
     metadata: dict[str, object] = field(default_factory=dict)
+    # Set when ``prove()`` already verified the candidate in its own (live) sandbox --
+    # the agent/verify backend-reuse path. ``run()`` then skips the standalone verify
+    # rather than spinning a second sandbox. ``None`` means "not yet verified".
+    verification: VerificationReport | None = None
 
 
 @dataclass

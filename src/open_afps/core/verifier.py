@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import re
 
-from open_afps.backends.base import ComputeBackend
+from open_afps.backends.base import ComputeBackend, ComputeSession
 from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.backends.modal import ModalBackend, ModalConfig
 from open_afps.core.result import VerificationReport
@@ -66,15 +66,28 @@ class Verifier:
                 f"{self.supported_toolchain!r}. Re-submit against a matching image."
             )
 
-    def verify(self, project: LeanProject) -> VerificationReport:
-        """Compile ``project`` and return a :class:`VerificationReport`."""
+    def verify(
+        self, project: LeanProject, *, session: ComputeSession | None = None
+    ) -> VerificationReport:
+        """Compile ``project`` and return a :class:`VerificationReport`.
+
+        Standalone (``session is None``) the compile spins up its own sandbox via
+        ``backend.run`` -- the path Aristotle and the split-backend case take. When a
+        caller passes a live ``session`` (the agent/verify backend-reuse path), the
+        compile runs in that already-hot sandbox instead, avoiding a second spin-up.
+        """
         self.check_compatible(project)
 
         rel = [t.relative_to(project.root).as_posix() for t in project.lean_files()]
         if not rel:
             return VerificationReport(compiles=True, sorry_free=True)
 
-        result = self.backend.run(project.root, self._compile_script(rel))
+        script = self._compile_script(rel)
+        if session is None:
+            result = self.backend.run(project.root, script)
+        else:
+            with session.exec(script) as handle:
+                result = handle.wait()
         log = result.stdout + ("\n" + result.stderr if result.stderr else "")
 
         per_file = self._parse_per_file(log, rel)

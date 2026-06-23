@@ -143,3 +143,26 @@ def test_toolchain_mismatch_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ToolchainMismatch):
         modal_verifier().verify(LeanProject(proj))
+
+
+@_live
+def test_session_runs_many_commands_in_one_sandbox(tmp_path: Path) -> None:
+    """One Sandbox, two execs: an edit then an in-session verify, terminated once."""
+    from open_afps.backends.modal import ModalBackend, ModalConfig
+    from open_afps.core.verifier import Verifier
+    from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+
+    proj = _stage(tmp_path)
+    (proj / "MILExample.lean").write_text("import Mathlib\n\n" + SOLVED_PROOF)
+    backend = ModalBackend(ModalConfig(image=DEFAULT_IMAGE))
+    verifier = Verifier(backend, supported_toolchain=DEFAULT_TOOLCHAIN)
+
+    with backend.session(proj) as session:
+        # A first exec (stands in for the agent run) then an in-session verify -- both
+        # in one Sandbox, terminated once on close.
+        assert session.exec("true").wait().exit_code == 0
+        report = verifier.verify(LeanProject(proj), session=session)
+
+    assert report.compiles, report.compile_log
+    assert report.sorry_free
+    assert report.verified

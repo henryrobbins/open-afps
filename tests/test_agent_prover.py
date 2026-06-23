@@ -38,12 +38,18 @@ theorem mul_comm_assoc (a b c : ℝ) : a * b * c = b * (a * c) := by
 """
 
 
-def _make_prover() -> AgentProver:
+def _make_prover(*, reuse: bool = False) -> AgentProver:
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     config = AgentProverConfig(
         image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN
     )
-    return AgentProver(config, backend)
+    # reuse=True shares one backend so prove() runs the agent and the final verify in
+    # a single sandbox; reuse=False (the default here) gives generation its own
+    # backend so the pure prove()-diff unit tests never touch a live backend.
+    agent_backend = (
+        backend if reuse else DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    )
+    return AgentProver(config, backend, agent_backend)
 
 
 # --- stream parsing + cost -------------------------------------------------
@@ -183,4 +189,38 @@ def test_run_end_to_end_verifies_mocked_agent_result(
     assert result.success, result.verification and result.verification.compile_log
     assert result.verification is not None and result.verification.verified
     assert result.prover == "agent"
+    assert result.cost_usd == pytest.approx(0.4231)
+
+
+@pytest.mark.docker
+def test_run_reuses_one_sandbox_for_generation_and_verify(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """reuse=True: generation and the final verify run in ONE live sandbox.
+
+    A stubbed agent writes a real proof and auth is stubbed (no creds/credential
+    mounts); the shared verifier then compiles in the *same* session the agent ran
+    in -- the no-second-spin-up path -- and confirms it.
+    """
+
+    def _fake_run_agent(
+        self: AgentProver,
+        workdir: Path,
+        harness: Harness,
+        session: object | None = None,
+    ) -> list[str]:
+        # The reuse path hands the live session through to the agent run.
+        assert session is not None
+        (workdir / "MILExample.lean").write_text(SOLVED_FILE)
+        return STREAM.read_text().splitlines()
+
+    monkeypatch.setattr(AgentProver, "_run_agent", _fake_run_agent)
+    # No real credential resolution/mounts -- keeps the session sandbox dependency-free.
+    monkeypatch.setattr(AgentProver, "_auth", lambda self, harness: ({}, []))
+    prover = _make_prover(reuse=True)
+
+    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+
+    assert result.success, result.verification and result.verification.compile_log
+    assert result.verification is not None and result.verification.verified
     assert result.cost_usd == pytest.approx(0.4231)

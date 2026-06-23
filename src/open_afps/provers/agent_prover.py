@@ -20,10 +20,10 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from open_afps.backends.base import ComputeBackend
+from open_afps.backends.base import ComputeBackend, ComputeSession
 from open_afps.core.prover import AutomatedProver, AutomatedProverConfig
 from open_afps.core.result import GenerationOutput
-from open_afps.core.task import ProofTask
+from open_afps.core.task import LeanProject, ProofTask
 from open_afps.harness import HARNESSES, Harness, compute_cost_usd, resolve_bundle
 
 _DEFAULT_PROMPT = (
@@ -90,10 +90,36 @@ class AgentProver(AutomatedProver):
         prompt = task.instructions or bundle.default_prompt() or _DEFAULT_PROMPT
         harness.configure_wd(workdir, prompt)
 
-        # 4. Run the agent and collect its streamed output.
-        lines = self._run_agent(workdir, harness)
+        # 4. Run the agent. When generation and verification share a backend, keep the
+        #    sandbox alive and run the final check in it -- no second spin-up.
+        if self.agent_backend is self.verifier.backend:
+            # Mounts (credential dirs) must be pinned when the session sandbox is
+            # created; per-command env is forwarded by _run_agent's exec.
+            _, mounts = self._auth(harness)
+            with self.agent_backend.session(
+                workdir, mounts=mounts, timeout_s=self.config.timeout_s
+            ) as session:
+                lines = self._run_agent(workdir, harness, session=session)
+                # Bring the agent's edits back to the host so the diff sees them
+                # (no-op for bind-mounted Docker; a tar pull for Modal).
+                session.sync_out()
+                output = self._build_output(workdir, harness, lines, original)
+                output.verification = self.verifier.verify(
+                    LeanProject(workdir), session=session
+                )
+                return output
 
-        # 5. Token totals -> cost (self-reported, else estimated from the table).
+        lines = self._run_agent(workdir, harness)
+        return self._build_output(workdir, harness, lines, original)
+
+    def _build_output(
+        self,
+        workdir: Path,
+        harness: Harness,
+        lines: list[str],
+        original: dict[str, str],
+    ) -> GenerationOutput:
+        """Token totals -> cost, then diff the workdir against the staged originals."""
         parsed = harness.parse(lines)
         cost = parsed.cost_usd
         if cost is None:
@@ -101,7 +127,6 @@ class AgentProver(AutomatedProver):
                 self.config.model, parsed.input_tokens, parsed.output_tokens
             )
 
-        # 6. Diff the workdir's .lean files against the staged originals.
         completed: dict[str, str] = {}
         for path in sorted(workdir.rglob("*.lean")):
             if ".lake" in path.parts:
@@ -140,15 +165,27 @@ class AgentProver(AutomatedProver):
         mounts = [(str(src), f"{home}/{dest}") for src, dest in spec.home_dirs]
         return env, mounts
 
-    def _run_agent(self, workdir: Path, harness: Harness) -> list[str]:
+    def _run_agent(
+        self, workdir: Path, harness: Harness, session: ComputeSession | None = None
+    ) -> list[str]:
         """Resolve auth, launch the agent in the backend, and drain its stdout.
 
         Isolated (it owns credential resolution + the backend call) so tests can
         stand in a fake run -- write a solved file, return a captured stream --
         without Docker or credentials.
+
+        ``session`` given (the backend-reuse path): exec the agent in that live
+        sandbox, which stays up for the verifier afterwards. ``None``: the one-shot
+        path, a fresh sandbox via ``start`` that tears down on exit.
         """
         env, mounts = self._auth(harness)
         lines: list[str] = []
+        if session is not None:
+            # Mounts were pinned at session creation; only per-command env here.
+            handle = session.exec(harness.command, env=env)
+            lines.extend(handle.stream())
+            handle.wait()
+            return lines
         with self.agent_backend.start(
             workdir,
             harness.command,

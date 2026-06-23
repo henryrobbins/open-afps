@@ -128,12 +128,18 @@ def _result_line(reason: str | None, *, subtype: str = "success") -> str:
     )
 
 
-def _make_prover(**overrides: object) -> NuminaProver:
+def _make_prover(*, reuse: bool = False, **overrides: object) -> NuminaProver:
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     config = NuminaProverConfig(
         image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN, **overrides
     )
-    return NuminaProver(config, backend)
+    # reuse=True runs the whole round loop + final verify in one sandbox; reuse=False
+    # (default) gives generation its own backend so the round-loop unit tests (which
+    # stub _run_agent) never touch a live backend.
+    agent_backend = (
+        backend if reuse else DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    )
+    return NuminaProver(config, backend, agent_backend)
 
 
 def _scripted_run_agent(
@@ -142,7 +148,12 @@ def _scripted_run_agent(
     """A ``_run_agent`` stub that emits one scripted END_REASON per round."""
     calls: list[int] = []
 
-    def _stub(self: NuminaProver, workdir: Path, harness: Harness) -> list[str]:
+    def _stub(
+        self: NuminaProver,
+        workdir: Path,
+        harness: Harness,
+        session: object | None = None,
+    ) -> list[str]:
         i = len(calls)
         calls.append(i)
         reason = reasons[i] if i < len(reasons) else reasons[-1]
@@ -175,7 +186,12 @@ def test_helper_cost_is_folded_into_total(
 ) -> None:
     """discussion_partner usage in the workdir ledger bills into cost_usd."""
 
-    def _stub(self: NuminaProver, workdir: Path, harness: Harness) -> list[str]:
+    def _stub(
+        self: NuminaProver,
+        workdir: Path,
+        harness: Harness,
+        session: object | None = None,
+    ) -> list[str]:
         # Simulate the in-sandbox skill appending usage across two rounds' calls.
         ledger = workdir / ".claude" / "helper_usage.jsonl"
         ledger.parent.mkdir(parents=True, exist_ok=True)
@@ -211,7 +227,12 @@ def test_helper_cost_flags_unpriced_model(
 ) -> None:
     """An unknown helper model is flagged, not silently billed at zero."""
 
-    def _stub(self: NuminaProver, workdir: Path, harness: Harness) -> list[str]:
+    def _stub(
+        self: NuminaProver,
+        workdir: Path,
+        harness: Harness,
+        session: object | None = None,
+    ) -> list[str]:
         ledger = workdir / ".claude" / "helper_usage.jsonl"
         ledger.parent.mkdir(parents=True, exist_ok=True)
         ledger.write_text(
@@ -270,7 +291,12 @@ def test_round_loop_falls_back_to_subtype_when_no_marker(
     """No END_REASON marker: success subtype -> COMPLETE (stop)."""
     calls: list[int] = []
 
-    def _stub(self: NuminaProver, workdir: Path, harness: Harness) -> list[str]:
+    def _stub(
+        self: NuminaProver,
+        workdir: Path,
+        harness: Harness,
+        session: object | None = None,
+    ) -> list[str]:
         calls.append(1)
         return [_result_line(None, subtype="success")]
 
@@ -290,7 +316,12 @@ def test_guard_error_stops_and_restores_weakened_theorem(
 ) -> None:
     """A round that guts the theorem is rejected; the original is restored."""
 
-    def _weaken(self: NuminaProver, workdir: Path, harness: Harness) -> list[str]:
+    def _weaken(
+        self: NuminaProver,
+        workdir: Path,
+        harness: Harness,
+        session: object | None = None,
+    ) -> list[str]:
         target = workdir / "MILExample.lean"
         target.write_text(
             "import Mathlib\n\n"
@@ -336,7 +367,12 @@ def test_run_end_to_end_verifies_mocked_numina_result(
     verifier -- with no creds.
     """
 
-    def _solve(self: NuminaProver, workdir: Path, harness: Harness) -> list[str]:
+    def _solve(
+        self: NuminaProver,
+        workdir: Path,
+        harness: Harness,
+        session: object | None = None,
+    ) -> list[str]:
         (workdir / "MILExample.lean").write_text(_SOLVED_FILE)
         return [_result_line("COMPLETE")]
 
@@ -349,5 +385,38 @@ def test_run_end_to_end_verifies_mocked_numina_result(
     assert result.verification is not None and result.verification.verified
     assert result.prover == "numina"
     assert result.metadata["end_reason"] == "COMPLETE"
+    assert result.metadata["statement_changed"] is False
+    assert list(result.completed_files) == ["MILExample.lean"]
+
+
+@pytest.mark.docker
+def test_run_reuses_one_sandbox_across_rounds_and_verify(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """reuse=True: the whole round loop + final verify run in one live sandbox.
+
+    Exercises ``_run_rounds`` exec'ing into the persistent session, the per-round
+    ``sync_out`` feeding the host-side statement guard, and the in-session verify.
+    """
+
+    def _solve(
+        self: NuminaProver,
+        workdir: Path,
+        harness: Harness,
+        session: object | None = None,
+    ) -> list[str]:
+        assert session is not None  # rounds exec in the live session
+        (workdir / "MILExample.lean").write_text(_SOLVED_FILE)
+        return [_result_line("COMPLETE")]
+
+    monkeypatch.setattr(NuminaProver, "_run_agent", _solve)
+    # Keep the session sandbox dependency-free (no real credential mounts).
+    monkeypatch.setattr(NuminaProver, "_auth", lambda self, harness: ({}, []))
+    prover = _make_prover(reuse=True, max_rounds=4)
+
+    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+
+    assert result.success, result.verification and result.verification.compile_log
+    assert result.verification is not None and result.verification.verified
     assert result.metadata["statement_changed"] is False
     assert list(result.completed_files) == ["MILExample.lean"]

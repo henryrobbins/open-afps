@@ -83,7 +83,10 @@ def _make_prover() -> AgentProver:
         agent="lean-devstral",
         model="devstral-medium-latest",
     )
-    return AgentProver(config, backend)
+    # Distinct agent backend so prove() takes the non-reuse path (no live session) --
+    # the diff unit test stubs _run_agent and must not touch a real backend.
+    agent_backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    return AgentProver(config, backend, agent_backend)
 
 
 # --- construction / config -------------------------------------------------

@@ -26,6 +26,7 @@ from open_afps.backends.base import (
     CommandHandle,
     CommandResult,
     ComputeBackend,
+    ComputeSession,
     wrap_command,
 )
 
@@ -75,6 +76,20 @@ class DockerCommandHandle(CommandHandle):
         )
 
 
+@dataclass
+class DockerSessionHandle(DockerCommandHandle):
+    """A command ``docker exec``'d into a live :class:`DockerSession`.
+
+    Identical streaming/wait to the one-shot handle, but :meth:`cancel` is a no-op:
+    the session owns the container's lifecycle (``close`` -> ``docker kill``), so one
+    exec finishing -- or its context-manager ``__exit__`` -- must not tear the
+    container down out from under the next command.
+    """
+
+    def cancel(self) -> None:
+        pass
+
+
 class DockerBackend(ComputeBackend):
     config: DockerConfig
 
@@ -99,8 +114,14 @@ class DockerBackend(ComputeBackend):
         container: str,
         env: Mapping[str, str],
         mounts: Sequence[tuple[str, str]],
+        *,
+        detach: bool = False,
     ) -> list[str]:
-        cmd = ["docker", "run", "--rm", "--name", container]
+        cmd = ["docker", "run", "--rm"]
+        if detach:
+            # Keep-alive container for a session; commands land via ``docker exec``.
+            cmd.append("-d")
+        cmd += ["--name", container]
         cmd += ["-v", f"{workdir.resolve()}:{self.config.workdir_mount}"]
         # Config-level mounts (baked in) then per-call mounts (e.g. credential dirs).
         for host, dest in (*self.config.volumes, *mounts):
@@ -131,4 +152,75 @@ class DockerBackend(ComputeBackend):
         )
         return DockerCommandHandle(
             popen=popen, container=container, started_at=time.time()
+        )
+
+    def session(
+        self,
+        workdir: Path,
+        *,
+        env: Mapping[str, str] | None = None,
+        mounts: Sequence[tuple[str, str]] | None = None,
+        timeout_s: int | None = None,
+    ) -> ComputeSession:
+        # A detached keep-alive container (the workdir bind-mounted, all mounts wired
+        # at run time since Docker can't add them per-exec); commands land via
+        # ``docker exec`` until close() kills it.
+        container = f"afps-{uuid.uuid4().hex[:12]}"
+        argv = self._build_cmd(workdir, container, env or {}, mounts or (), detach=True)
+        argv += ["sleep", "infinity"]
+        proc = subprocess.run(
+            argv, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"failed to start docker session container: {proc.stderr.strip()}"
+            )
+        return DockerSession(backend=self, container=container)
+
+
+@dataclass
+class DockerSession(ComputeSession):
+    """A live ``docker run -d`` container; exec many commands, ``docker kill`` once.
+
+    The workdir is bind-mounted, so :meth:`sync_out`/:meth:`sync_in` are no-ops --
+    edits already live on the host.
+    """
+
+    backend: DockerBackend
+    container: str
+
+    def exec(
+        self,
+        command: str,
+        *,
+        env: Mapping[str, str] | None = None,
+        timeout_s: int | None = None,
+    ) -> CommandHandle:
+        argv = ["docker", "exec"]
+        for key, value in (env or {}).items():
+            argv += ["-e", f"{key}={value}"]
+        argv += [self.container, "bash", "-lc", self.backend._wrap(command)]
+        popen = subprocess.Popen(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        return DockerSessionHandle(
+            popen=popen, container=self.container, started_at=time.time()
+        )
+
+    def sync_out(self) -> None:
+        pass  # bind mount: edits are already on the host
+
+    def sync_in(self) -> None:
+        pass  # bind mount: host edits are already visible in the container
+
+    def close(self) -> None:
+        # Idempotent: killing an already-gone container just errors out quietly.
+        subprocess.run(
+            ["docker", "kill", self.container],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )

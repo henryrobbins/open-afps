@@ -56,6 +56,45 @@ class CommandHandle(AbstractContextManager["CommandHandle"]):
         self.cancel()
 
 
+class ComputeSession(AbstractContextManager["ComputeSession"]):
+    """A persistent sandbox over a workdir, exec'd many times, torn down once.
+
+    The one-shot :meth:`ComputeBackend.start`/:meth:`ComputeBackend.run` pair creates
+    a sandbox, runs a *single* command, and tears it down. A session keeps the sandbox
+    alive so several commands can run against the same hot filesystem -- the agent's
+    generation *then* the verifier's compile -- without paying a second spin-up.
+
+    Lifecycle invariant: teardown lives in :meth:`close` (not in the handle's
+    ``wait``), so a session MUST be used as a context manager and :meth:`close` MUST be
+    idempotent -- otherwise an error between exec and close leaks the sandbox.
+    """
+
+    def exec(
+        self,
+        command: str,
+        *,
+        env: Mapping[str, str] | None = None,
+        timeout_s: int | None = None,
+    ) -> CommandHandle:
+        """Run ``command`` in the live sandbox; the handle does NOT tear it down."""
+        raise NotImplementedError
+
+    def sync_out(self) -> None:
+        """Pull the sandbox workdir back to the host (no-op when bind-mounted)."""
+        raise NotImplementedError
+
+    def sync_in(self) -> None:
+        """Push the host workdir into the sandbox (no-op when bind-mounted)."""
+        raise NotImplementedError
+
+    def close(self) -> None:
+        """Tear the sandbox down (pull artifacts first where needed). Idempotent."""
+        raise NotImplementedError
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+
 @dataclass
 class BackendConfig:
     """Shared backend knobs. Subclasses add their own (Docker mounts, Modal CPU…)."""
@@ -113,6 +152,26 @@ class ComputeBackend(abc.ABC):
         ``mounts`` are extra ``(host_path, container_path)`` bind mounts beyond the
         workdir -- used to forward agent credential dirs (e.g. Codex's ``~/.codex``)
         per run, without baking them into the backend config.
+        """
+
+    @abc.abstractmethod
+    def session(
+        self,
+        workdir: Path,
+        *,
+        env: Mapping[str, str] | None = None,
+        mounts: Sequence[tuple[str, str]] | None = None,
+        timeout_s: int | None = None,
+    ) -> ComputeSession:
+        """Open a persistent sandbox over ``workdir`` for multiple :meth:`exec` calls.
+
+        Unlike :meth:`start` (one command, then teardown), the returned
+        :class:`ComputeSession` stays alive until :meth:`ComputeSession.close`, so the
+        same hot sandbox can run generation *and* verification back to back.
+
+        ``env``/``mounts`` here pin the long-lived sandbox at creation (Docker bind
+        mounts can only be set at ``docker run``); per-command credentials go to
+        :meth:`ComputeSession.exec`'s own ``env``.
         """
 
     def run(

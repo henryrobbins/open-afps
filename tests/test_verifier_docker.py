@@ -11,8 +11,10 @@ from pathlib import Path
 
 import pytest
 
+from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.core.task import LeanProject, ToolchainMismatch
-from open_afps.core.verifier import docker_verifier
+from open_afps.core.verifier import Verifier, docker_verifier
+from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
 
@@ -60,3 +62,35 @@ def test_toolchain_mismatch_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ToolchainMismatch):
         docker_verifier().verify(LeanProject(proj))
+
+
+# --- session primitive ------------------------------------------------------
+
+
+def test_session_persists_state_across_execs(tmp_path: Path) -> None:
+    """One live container: a file written by one exec is visible to the next."""
+    proj = _stage(tmp_path)
+    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    with backend.session(proj) as session:
+        session.exec("echo hello > marker.txt").wait()
+        result = session.exec("cat marker.txt").wait()
+
+    assert result.exit_code == 0, result.stdout + result.stderr
+    assert "hello" in result.stdout
+    # Bind mount: the write also landed on the host workdir.
+    assert (proj / "marker.txt").read_text().strip() == "hello"
+
+
+def test_verify_in_session_matches_standalone(tmp_path: Path) -> None:
+    """A solved project verifies the same whether checked in a session or standalone."""
+    proj = _stage(tmp_path)
+    (proj / "MILExample.lean").write_text("import Mathlib\n\n" + SOLVED_PROOF)
+
+    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    verifier = Verifier(backend, supported_toolchain=DEFAULT_TOOLCHAIN)
+    with backend.session(proj) as session:
+        report = verifier.verify(LeanProject(proj), session=session)
+
+    assert report.compiles, report.compile_log
+    assert report.sorry_free
+    assert report.verified
