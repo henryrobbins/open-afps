@@ -53,8 +53,8 @@ from open_afps.images import DEFAULT_IMAGE
 
 pytestmark = pytest.mark.agent_api
 
-FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
-RUNS_DIR = Path(__file__).resolve().parent / ".runs"
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
+RUNS_DIR = Path(__file__).resolve().parents[1] / ".runs"
 
 #: A complete project the size of one tool call: edit in place, build, inspect.
 #:

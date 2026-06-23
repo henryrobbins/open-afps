@@ -29,7 +29,7 @@ from open_afps.harness import HARNESSES, Harness, VibeHarness
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
 
-FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 
 SOLVED_FILE = """\
 import Mathlib

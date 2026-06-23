@@ -4,7 +4,7 @@ The live tests are marked ``modal`` and skip unless Modal credentials are presen
 (``MODAL_TOKEN_ID`` / ``MODAL_TOKEN_SECRET`` in the env -- read from ``.env`` by
 ``conftest`` -- or a ``~/.modal.toml`` profile from ``modal token set``) and require
 the image published via ``open-afps build-modal-image``. They mirror
-``test_verifier_docker.py`` so the shared ``Verifier`` is exercised on Modal exactly
+``core/test_verifier.py`` so the shared ``Verifier`` is exercised on Modal exactly
 as on Docker. The tar round-trip test needs no Sandbox and always runs.
 """
 
@@ -21,7 +21,7 @@ import pytest
 from open_afps.backends.modal import _modal_image_name, _tar_dir
 from open_afps.core.task import LeanProject, ToolchainMismatch
 
-FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 
 SOLVED_PROOF = """\
 theorem mul_comm_assoc (a b c : ℝ) : a * b * c = b * (a * c) := by

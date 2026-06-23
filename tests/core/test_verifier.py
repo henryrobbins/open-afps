@@ -16,7 +16,7 @@ from open_afps.core.task import LeanProject, ToolchainMismatch
 from open_afps.core.verifier import Verifier, docker_verifier
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 
-FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 
 SOLVED_PROOF = """\
 theorem mul_comm_assoc (a b c : ℝ) : a * b * c = b * (a * c) := by

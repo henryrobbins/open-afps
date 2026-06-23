@@ -32,7 +32,7 @@ from open_afps.provers.numina_tracker import (
     normalize_statement,
 )
 
-FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 
 _SRC = """\
 import Mathlib

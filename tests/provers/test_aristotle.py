@@ -18,7 +18,7 @@ from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 from open_afps.provers.aristotle import AristotleProver, AristotleProverConfig
 
-FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 
 SOLVED_FILE = """\
 import Mathlib

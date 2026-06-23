@@ -27,8 +27,8 @@ from open_afps.harness import (
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
 
-FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
-STREAM = Path(__file__).parent / "fixtures" / "agent_streams" / "claude_code.jsonl"
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
+STREAM = Path(__file__).parents[1] / "fixtures" / "agent_streams" / "claude_code.jsonl"
 
 SOLVED_FILE = """\
 import Mathlib

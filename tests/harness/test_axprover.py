@@ -29,7 +29,7 @@ from open_afps.harness import HARNESSES, AxProverHarness, Harness
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
 
-FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
+FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 
 SOLVED_FILE = """\
 import Mathlib
@@ -207,7 +207,7 @@ def test_prove_reports_changes_and_token_cost(
 
 # Backend dimension: each value carries its own opt-out marker so a run can pick
 # one with ``-m 'agent_api and docker'`` / ``-m 'agent_api and modal'`` (mirrors
-# test_agent_capabilities.py).
+# harness/test_capabilities.py).
 BACKENDS = [
     pytest.param("docker", marks=pytest.mark.docker),
     pytest.param("modal", marks=pytest.mark.modal),
