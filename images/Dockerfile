@@ -56,8 +56,11 @@ ENV PATH="/home/agent/.elan/bin:/home/agent/.local/bin:${PATH}"
 
 # lean-lsp MCP server (invoked directly as `lean-lsp-mcp` by the harnesses) + uv.
 # https://github.com/oOo0oOo/lean-lsp-mcp
+# mistral-vibe provides the `vibe` CLI the VibeHarness drives (Leanstral's `lean`
+# agent). https://github.com/mistralai/mistral-vibe
 RUN pipx install lean-lsp-mcp \
- && pipx install uv
+ && pipx install uv \
+ && pipx install mistral-vibe
 
 WORKDIR /workspace
 

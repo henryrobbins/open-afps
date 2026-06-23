@@ -1,0 +1,31 @@
+# Stand-in for the real Leanstral `lean` agent while `labs-leanstral-2603` is
+# Labs-gated (403 until a Mistral org admin enables Labs models). This mirrors
+# vibe's builtin `lean` agent profile -- same Lean system prompt and bash-driven
+# Lean workflow -- but points active_model at a non-Labs Mistral coding model
+# that any La Plateforme key can reach today. Selected via the `leanstral:devstral`
+# registry name. Switch back to the real model by using `--agent lean` (registry
+# name `leanstral`) once Labs is enabled.
+display_name = "Lean (Devstral)"
+description = "Lean agent scaffold on a non-Labs Devstral model (Leanstral stand-in until Labs is enabled)"
+safety = "neutral"
+agent_type = "agent"
+system_prompt_id = "lean"
+active_model = "leanstral-standin"
+
+[[providers]]
+name = "mistral-standin"
+api_base = "https://api.mistral.ai/v1"
+api_key_env_var = "MISTRAL_API_KEY"
+api_style = "reasoning"
+backend = "generic"
+
+[[models]]
+name = "devstral-medium-latest"
+provider = "mistral-standin"
+alias = "leanstral-standin"
+temperature = 0.2
+thinking = "off"
+auto_compact_threshold = 168000
+
+[tools.bash]
+default_timeout = 1200
