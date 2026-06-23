@@ -1,5 +1,12 @@
 # open-afps
 
+[![CI](https://github.com/henryrobbins/open-afps/actions/workflows/ci-python.yml/badge.svg)](https://github.com/henryrobbins/open-afps/actions/workflows/ci-python.yml)
+[![codecov](https://codecov.io/gh/henryrobbins/open-afps/branch/main/graph/badge.svg?flag=src)](https://codecov.io/gh/henryrobbins/open-afps)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Docs](https://readthedocs.org/projects/open-afps/badge/?version=latest)](https://open-afps.readthedocs.io/en/latest/)
+
 **Open Automated Formal Proof Synthesis.** Upload one or more Lean files containing
 `sorry`, run them through leading proof-synthesis backends, and get back verified
 completed proofs with metadata (verification status, cost, duration).

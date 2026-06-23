@@ -387,7 +387,7 @@ class OpenCodeHarness(Harness):
             "mcp": {
                 "lean-lsp": {
                     "type": "local",
-                    "command": ["uvx", "lean-lsp-mcp"],
+                    "command": ["lean-lsp-mcp"],
                     "enabled": True,
                 }
             },
