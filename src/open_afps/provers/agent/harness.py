@@ -520,9 +520,12 @@ class VibeHarness(Harness):
         (vibe_home / "config.toml").write_text(
             'installed_agents = ["lean"]\n\n[session_logging]\nenabled = true\n'
         )
-        shutil.copy2(
-            _VIBE_ASSETS / "lean-devstral.toml", agents_dir / "lean-devstral.toml"
-        )
+        # Vendored stand-in profiles live as ``<agent>.toml`` (e.g. ``lean-devstral``,
+        # ``lean-magistral``). The builtin ``lean`` agent (real Leanstral) ships with
+        # vibe, so it needs no profile copied.
+        if self.agent != "lean":
+            profile = _VIBE_ASSETS / f"{self.agent}.toml"
+            shutil.copy2(profile, agents_dir / profile.name)
         self._session_log_dir = vibe_home / "logs" / "session"
 
     def _agent_command(self) -> str:

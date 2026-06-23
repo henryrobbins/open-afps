@@ -83,6 +83,17 @@ REGISTRY: dict[str, _Entry] = {
             "model": "devstral-medium-latest",
         },
     ),
+    # Same Lean scaffold on Magistral, a non-Labs *reasoning* model -- a stronger
+    # stand-in than Devstral for long structured proofs until Labs is enabled.
+    "leanstral:magistral": _Entry(
+        AgentProver,
+        AgentProverConfig,
+        {
+            "harness": "vibe",
+            "agent": "lean-magistral",
+            "model": "magistral-medium-latest",
+        },
+    ),
 }
 
 
