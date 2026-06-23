@@ -12,8 +12,10 @@ A :class:`Harness` knows, for one agent CLI (Claude Code / Codex / OpenCode):
 The *compute* concern (where that command runs, with Lean+Mathlib and a warm
 cache) lives in the injected :class:`~open_afps.backends.base.ComputeBackend`.
 
-Ported from milp_flare's ``harness/`` package; the MILP-specific skills are
-replaced by a single generic ``filling-sorrys`` skill.
+Ported from milp_flare's ``harness/`` package; skills/plugins to mount are
+carried by the injected :class:`~open_afps.harness.bundles.AssetBundle` (the
+default mounts the vendored ``lean-proof`` skill, plus the ``lean4`` plugin for
+the Claude harness).
 """
 
 from __future__ import annotations
@@ -127,10 +129,30 @@ class Harness(ABC):
         return self._parse_lines(lines)
 
     def _copy_skills(self, wd: Path, dest: str) -> None:
-        """Copy the selected bundle's skills into ``wd/<dest>``."""
+        """Copy the selected bundle's skills into ``wd/<dest>``.
+
+        Two mount modes (a bundle may use either or both):
+
+        * each dir in ``skills`` -> ``wd/<dest>/<dir-name>/`` (ordinary named
+          skills; an upstream ``tests/`` fixture dir is dropped); and
+        * the legacy ``skills_dir`` -> its *contents* to ``wd/<dest>/`` (a single
+          root-mounted skill bundle, e.g. Numina).
+
+        A no-op when the bundle mounts no skills.
+        """
+        if self.assets.skills_dir is None and not self.assets.skills:
+            return
         target = wd / dest
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(self.assets.skills_dir, target, dirs_exist_ok=True)
+        target.mkdir(parents=True, exist_ok=True)
+        if self.assets.skills_dir is not None:
+            shutil.copytree(self.assets.skills_dir, target, dirs_exist_ok=True)
+        for skill in self.assets.skills:
+            shutil.copytree(
+                skill,
+                target / skill.name,
+                ignore=shutil.ignore_patterns("tests"),
+                dirs_exist_ok=True,
+            )
 
     def _render(self, template: str) -> str:
         """Substitute ``<<MODEL>>``/``<<EFFORT>>`` into a launch-script template."""

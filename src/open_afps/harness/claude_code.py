@@ -16,15 +16,49 @@ class ClaudeCodeHarness(Harness):
 
     name = "claude_code"
 
+    #: Where plugin dirs are staged in the workdir (the launch script's
+    #: ``--plugin-dir`` flags reference this, so the two must agree).
+    PLUGINS_DIR = ".plugins"
+
     def configure_wd(self, wd: Path, prompt: str) -> None:
         super().configure_wd(wd, prompt)
-        # Project-scope MCP config (passed via --mcp-config) and skills.
+        # Project-scope MCP config (passed via --mcp-config), skills, and plugins.
         shutil.copy2(_MCP_JSON, wd / ".mcp.json")
         self._copy_skills(wd, ".claude/skills")
+        self._copy_plugins(wd)
+
+    def _copy_plugins(self, wd: Path) -> None:
+        """Stage each bundle plugin under ``wd/.plugins/<name>``.
+
+        Claude is the only harness that consumes plugins; the launch script loads
+        them with ``--plugin-dir`` (see :meth:`_plugin_flags`). Plugins are copied
+        *into* the workdir (not referenced from the host vendor tree) so they sync
+        into the sandbox with everything else.
+        """
+        for plugin in self.assets.plugins:
+            shutil.copytree(
+                plugin, wd / self.PLUGINS_DIR / plugin.name, dirs_exist_ok=True
+            )
+
+    def _plugin_flags(self) -> str:
+        """``--plugin-dir`` flags (one per plugin) appended to the launch command.
+
+        Empty when no plugins; otherwise a leading line-continuation so it grafts
+        onto the end of the ``claude -p ...`` invocation.
+        """
+        return "".join(
+            f" \\\n    --plugin-dir {self.PLUGINS_DIR}/{p.name}"
+            for p in self.assets.plugins
+        )
 
     def static_env(self) -> dict[str, str]:
         # Lets bypassPermissions run non-interactively in the container.
-        return {"IS_SANDBOX": "1"}
+        env = {"IS_SANDBOX": "1"}
+        # Plugin-provided subagents (e.g. lean4's sorry-filler-deep) are only
+        # dispatchable in a headless `-p` run with subagent forking enabled.
+        if self.assets.plugins:
+            env["CLAUDE_CODE_FORK_SUBAGENT"] = "1"
+        return env
 
     def auth_spec(self) -> AuthSpec:
         # A long-lived token (from `claude setup-token`) bills against a Claude
@@ -37,7 +71,8 @@ class ClaudeCodeHarness(Harness):
         return AuthSpec(env=["CLAUDE_CODE_OAUTH_TOKEN"])
 
     def _agent_command(self) -> str:
-        return self._render((_SCRIPTS / "claude_code_agent.sh").read_text())
+        template = self._render((_SCRIPTS / "claude_code_agent.sh").read_text())
+        return template.replace("<<PLUGIN_FLAGS>>", self._plugin_flags())
 
     def _parse_lines(self, lines: list[str]) -> HarnessRunResult:
         """Parse ``claude -p --output-format stream-json`` output."""

@@ -15,16 +15,19 @@ changed. The shared :class:`~open_afps.core.verifier.Verifier` (owned by the bas
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from open_afps.backends.base import ComputeBackend, ComputeSession
+from open_afps.backends.base import CommandResult, ComputeBackend, ComputeSession
 from open_afps.core.prover import AutomatedProver, AutomatedProverConfig
 from open_afps.core.result import GenerationOutput
 from open_afps.core.task import LeanProject, ProofTask
-from open_afps.harness import HARNESSES, Harness, compute_cost_usd, resolve_bundle
+from open_afps.harness import HARNESSES, Harness, bundle_for_config, compute_cost_usd
+
+log = logging.getLogger(__name__)
 
 _DEFAULT_PROMPT = (
     "Complete every `sorry` in this Lean project. Make the project compile and be "
@@ -44,6 +47,12 @@ class AgentProverConfig(AutomatedProverConfig):
     effort: str = "high"
     # Vendored skill/prompt/MCP asset bundle to mount into the workdir.
     assets: str = "default"
+    # Per-run overrides of the bundle's assets, each a list of names (resolved from
+    # a vendored catalog) or full paths. ``None`` keeps the bundle's own assets; an
+    # empty list mounts none. ``skills`` apply to every harness; ``plugins`` are
+    # Claude-only (ignored by the others).
+    skills: list[str] | None = None
+    plugins: list[str] | None = None
     extra_env: dict[str, str] = field(default_factory=dict)
     # Vibe-only knobs (ignored by the other harnesses): which vibe agent profile to
     # drive (``lean`` is Leanstral; ``lean-devstral`` the non-Labs stand-in) and the
@@ -84,7 +93,7 @@ class AgentProver(AutomatedProver):
         }
 
         # 3. Configure the workdir for the chosen harness + asset bundle.
-        bundle = resolve_bundle(self.config.assets)
+        bundle = bundle_for_config(self.config)
         harness = HARNESSES[self.config.harness].from_config(self.config, assets=bundle)
         # Prompt precedence: explicit task instructions > bundle default > generic.
         prompt = task.instructions or bundle.default_prompt() or _DEFAULT_PROMPT
@@ -184,7 +193,7 @@ class AgentProver(AutomatedProver):
             # Mounts were pinned at session creation; only per-command env here.
             handle = session.exec(harness.command, env=env)
             lines.extend(handle.stream())
-            handle.wait()
+            self._log_agent_result(harness, handle.wait(), lines)
             return lines
         with self.agent_backend.start(
             workdir,
@@ -194,5 +203,26 @@ class AgentProver(AutomatedProver):
             timeout_s=self.config.timeout_s,
         ) as handle:
             lines.extend(handle.stream())
-            handle.wait()
+            self._log_agent_result(harness, handle.wait(), lines)
         return lines
+
+    def _log_agent_result(
+        self, harness: Harness, result: CommandResult, lines: list[str]
+    ) -> None:
+        """Surface a silent/failed agent run -- its stderr is otherwise discarded.
+
+        The agent's stderr (captured by the backend) is the only clue when an agent
+        emits no parseable stdout (e.g. a launch/auth failure that leaves 0 tokens and
+        no edits). Without this a silent run is invisible short of re-running the whole
+        sandbox job, so log a warning whenever the agent exits non-zero or produces no
+        output at all.
+        """
+        if result.exit_code != 0 or not lines:
+            stderr = result.stderr.strip()
+            log.warning(
+                "agent harness %r exited %s with %d stdout line(s)%s",
+                harness.name,
+                result.exit_code,
+                len(lines),
+                f"; stderr:\n{stderr}" if stderr else " and no stderr",
+            )

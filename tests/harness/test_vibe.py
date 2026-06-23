@@ -164,9 +164,9 @@ def test_configure_wd_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None
     assert standin.is_file()
     assert 'system_prompt_id = "lean"' in standin.read_text()
 
-    # The filling-sorrys skill is staged under VIBE_HOME/skills (vibe's user skills
-    # dir, loaded without project-folder trust), matching the other harnesses.
-    assert (tmp_path / ".vibe" / "skills" / "filling-sorrys" / "SKILL.md").is_file()
+    # The default skill (lean-proof) is staged under VIBE_HOME/skills (vibe's user
+    # skills dir, loaded without project-folder trust), matching the other harnesses.
+    assert (tmp_path / ".vibe" / "skills" / "lean-proof" / "SKILL.md").is_file()
 
     # parse() looks here for the session log written back from the sandbox.
     assert harness._session_log_dir == tmp_path / ".vibe" / "logs" / "session"

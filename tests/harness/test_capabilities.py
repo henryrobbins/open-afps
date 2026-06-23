@@ -10,16 +10,16 @@ actually works inside the sandbox -- not merely that the harness *configured* it
 The four capabilities the :class:`AgentProver` design depends on:
 
 * **shell + Lean toolchain** -- the agent can ``lake build`` a fresh module;
-* **skills** -- the ``filling-sorrys`` skill ``configure_wd`` mounts is invocable
+* **skills** -- the default ``lean-proof`` skill ``configure_wd`` mounts is invocable
   from the harness-specific location (``.claude/skills`` vs ``.agents/skills``);
 * **lean-lsp MCP** -- the ``mcp__lean-lsp__*`` tools the default prompt leans on
   are wired up; and
 * **edit sync-back** -- a file the agent writes lands on the *host* workdir after
   the run completes (Docker bind-mounts it live; Modal pulls it on completion).
 
-All four harnesses, ``vibe`` included, mount the ``filling-sorrys`` skill and run
-every probe; vibe stages it under ``VIBE_HOME/skills`` (its trust-independent user
-skills dir) rather than the project ``.agents/skills`` the others use.
+All four harnesses, ``vibe`` included, mount the default ``lean-proof`` skill and
+run every probe; vibe stages it under ``VIBE_HOME/skills`` (its trust-independent
+user skills dir) rather than the project ``.agents/skills`` the others use.
 
 Every test is marked ``agent_api`` (billable, needs agent creds) and excluded by
 default via ``addopts``; the backend dimension carries the ``docker`` / ``modal``
@@ -585,10 +585,10 @@ def test_bash_lake_build_fresh_module(harness: str, backend: str) -> None:
 @pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("harness", HARNESS_NAMES)
 def test_skill_invocable(harness: str, backend: str) -> None:
-    """Agent invokes the ``filling-sorrys`` skill configure_wd mounted for it."""
+    """Agent invokes the ``lean-proof`` skill configure_wd mounted for it."""
     run_dir = _make_run_dir(backend, f"skill_invocable_{harness}")
     _stage(run_dir)
-    action, classifier, tool, matcher = _skill_check(harness, "filling-sorrys")
+    action, classifier, tool, matcher = _skill_check(harness, "lean-proof")
     jsonl = _run(harness, backend, run_dir, action)
     events = _load_events(jsonl)
     outcome, evidence = classifier(events, tool, matcher)

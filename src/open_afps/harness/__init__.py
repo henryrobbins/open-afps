@@ -18,7 +18,10 @@ from open_afps.harness.bundles import (
     BUNDLES,
     DEFAULT_BUNDLE,
     AssetBundle,
+    bundle_for_config,
     resolve_bundle,
+    resolve_plugin,
+    resolve_skill,
 )
 from open_afps.harness.claude_code import ClaudeCodeHarness
 from open_afps.harness.codex import CodexHarness
@@ -48,6 +51,9 @@ __all__ = [
     "BUNDLES",
     "DEFAULT_BUNDLE",
     "resolve_bundle",
+    "bundle_for_config",
+    "resolve_skill",
+    "resolve_plugin",
     "ClaudeCodeHarness",
     "CodexHarness",
     "OpenCodeHarness",

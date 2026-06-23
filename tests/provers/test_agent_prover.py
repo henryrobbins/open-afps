@@ -20,9 +20,13 @@ from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.harness import (
     HARNESSES,
+    AssetBundle,
     ClaudeCodeHarness,
     Harness,
+    bundle_for_config,
     compute_cost_usd,
+    resolve_plugin,
+    resolve_skill,
 )
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
@@ -107,10 +111,93 @@ def test_claude_code_configure_wd_writes_assets(tmp_path: Path) -> None:
     # Model/effort templated into the launch script.
     script = (tmp_path / "agent.sh").read_text()
     assert "claude-opus-4-8" in script and "high" in script
-    assert "<<MODEL>>" not in script
+    assert "<<MODEL>>" not in script and "<<PLUGIN_FLAGS>>" not in script
     assert (tmp_path / "agent_prompt.txt").read_text() == "fill the sorrys"
     assert (tmp_path / ".mcp.json").is_file()
-    assert (tmp_path / ".claude" / "skills" / "filling-sorrys" / "SKILL.md").is_file()
+    # The default bundle: the vendored lean-proof skill, plus the lean4 plugin
+    # mounted under .plugins/ and loaded via a --plugin-dir flag.
+    assert (tmp_path / ".claude" / "skills" / "lean-proof" / "SKILL.md").is_file()
+    # Upstream skill `tests/` fixtures are dropped at mount time.
+    assert not (tmp_path / ".claude" / "skills" / "lean-proof" / "tests").exists()
+    plugin_json = tmp_path / ".plugins" / "lean4" / ".claude-plugin" / "plugin.json"
+    assert plugin_json.is_file()
+    assert "--plugin-dir .plugins/lean4" in script
+    assert harness.static_env().get("CLAUDE_CODE_FORK_SUBAGENT") == "1"
+
+
+def test_skills_resolve_by_name_and_path(tmp_path: Path) -> None:
+    # By catalog name (package `filling-sorrys` and vendored `lean-proof`).
+    assert resolve_skill("lean-proof").name == "lean-proof"
+    assert resolve_skill("filling-sorrys").name == "filling-sorrys"
+    assert resolve_plugin("lean4").name == "lean4"
+    # By full path: a local skill dir resolves to itself.
+    local = tmp_path / "my-skill"
+    local.mkdir()
+    (local / "SKILL.md").write_text("---\nname: my-skill\n---\n")
+    assert resolve_skill(str(local)) == local.resolve()
+    # Unknown names are a clear error, not a silent miss.
+    with pytest.raises(ValueError, match="unknown skill"):
+        resolve_skill("no-such-skill")
+    with pytest.raises(ValueError, match="unknown plugin"):
+        resolve_plugin("no-such-plugin")
+
+
+def test_config_overrides_select_skills_and_plugins() -> None:
+    # Explicit lists override the bundle's defaults (names or paths).
+    bundle = bundle_for_config(
+        AgentProverConfig(
+            image=DEFAULT_IMAGE,
+            supported_toolchain=DEFAULT_TOOLCHAIN,
+            skills=["lean-proof", "lean-setup"],
+            plugins=[],
+        )
+    )
+    assert [p.name for p in bundle.skills] == ["lean-proof", "lean-setup"]
+    assert bundle.plugins == ()
+    # Unset (None) keeps the default bundle's assets.
+    default = bundle_for_config(
+        AgentProverConfig(image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN)
+    )
+    assert [p.name for p in default.skills] == ["lean-proof"]
+    assert [p.name for p in default.plugins] == ["lean4"]
+
+
+def test_empty_plugins_mount_nothing_for_claude(tmp_path: Path) -> None:
+    bundle = AssetBundle(name="t", skills=(resolve_skill("lean-proof"),), plugins=())
+    harness = ClaudeCodeHarness(model="claude-opus-4-8", effort="high", assets=bundle)
+    harness.configure_wd(tmp_path, "x")
+    assert not (tmp_path / ".plugins").exists()
+    assert harness._plugin_flags() == ""
+    # No plugin flag is appended: the launch command ends at the model/effort line
+    # (the header comment may mention the flag generically; the command must not).
+    script = (tmp_path / "agent.sh").read_text()
+    assert script.rstrip().endswith("--effort 'high'")
+    assert "CLAUDE_CODE_FORK_SUBAGENT" not in harness.static_env()
+
+
+@pytest.mark.parametrize(
+    "harness_name,dest",
+    [
+        ("codex", ".agents/skills"),
+        ("opencode", ".agents/skills"),
+        ("vibe", ".vibe/skills"),
+    ],
+)
+def test_non_claude_harnesses_mount_skills_not_plugins(
+    tmp_path: Path, harness_name: str, dest: str
+) -> None:
+    """Skills mount into every harness; plugins are Claude-only and ignored."""
+    bundle = AssetBundle(
+        name="t",
+        skills=(resolve_skill("lean-proof"),),
+        plugins=(resolve_plugin("lean4"),),
+    )
+    harness = HARNESSES[harness_name](
+        model="claude-opus-4-8", effort="high", assets=bundle
+    )
+    harness.configure_wd(tmp_path, "x")
+    assert (tmp_path / dest / "lean-proof" / "SKILL.md").is_file()
+    assert not (tmp_path / ".plugins").exists()
 
 
 # --- prove() diff logic (no Docker) ----------------------------------------

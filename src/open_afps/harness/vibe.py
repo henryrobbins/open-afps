@@ -113,11 +113,12 @@ class VibeHarness(Harness):
         if self.agent != "lean":
             profile = _VIBE_ASSETS / f"{self.agent}.toml"
             shutil.copy2(profile, agents_dir / profile.name)
-        # Mount the selected bundle's skills (the generic ``filling-sorrys`` skill)
-        # under VIBE_HOME/skills -- vibe's *user* skills dir, which loads regardless
-        # of project-folder trust. The other harnesses copy into ``.claude/skills`` /
-        # ``.agents/skills`` (project dirs); those are gated behind ``--trust`` in
-        # ``vibe -p``, so the VIBE_HOME-relative location is the parity-preserving spot.
+        # Mount the selected bundle's skills (by default the vendored ``lean-proof``
+        # skill) under VIBE_HOME/skills -- vibe's *user* skills dir, which loads
+        # regardless of project-folder trust. The other harnesses copy into
+        # ``.claude/skills`` / ``.agents/skills`` (project dirs); those are gated
+        # behind ``--trust`` in ``vibe -p``, so the VIBE_HOME-relative location is
+        # the parity-preserving spot.
         self._copy_skills(wd, f"{self.VIBE_HOME_DIR}/skills")
         self._session_log_dir = vibe_home / "logs" / "session"
 
