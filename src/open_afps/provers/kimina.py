@@ -89,12 +89,19 @@ class KiminaProver(AutomatedProver):
         # 3. Extract targets: each sorry'd theorem -> (file, Theorem). A name may
         #    repeat across files, so key selection state by (file, name).
         targets = self._extract_targets(task, workdir)
-        # Informal-problem context: the theorem's own doc comment, else the task's
-        # instructions, else nothing. Quality improves when the model sees it.
+        # Each payload carries three things the model needs to build the proof:
+        #  * ``statement`` -- the formal theorem header (the goal to discharge);
+        #  * ``context``   -- the file's preamble (imports + the inlined ``Common``
+        #    structures and formulation definitions). Without this the model sees only
+        #    type *names* (``MILPReformulation``, ``P6.a.formulation``) and cannot know
+        #    the shape of the witness it must construct;
+        #  * ``problem``   -- informal context: the theorem's own doc comment, else the
+        #    task's instructions, else nothing.
         payloads = [
             {
                 "name": th.name,
                 "statement": th.statement,
+                "context": th.preamble,
                 "problem": th.docstring or (task.instructions or ""),
             }
             for _, th in targets
@@ -245,8 +252,10 @@ class KiminaProver(AutomatedProver):
     ) -> dict[str, list[str]]:
         """Generate ``pass_k`` candidate proof bodies per statement on GPU compute.
 
-        ``statements`` is one ``{"name", "statement", "problem"}`` payload per target
-        (``problem`` is optional informal context). Returns ``{name: [proof_body]}``.
+        ``statements`` is one ``{"name", "statement", "context", "problem"}`` payload
+        per target (``context`` is the formal preamble -- imports + supporting defs --
+        and ``problem`` is optional informal context, both optional). Returns
+        ``{name: [proof_body]}``.
 
         Test seam: stub this to return canned candidates and exercise the
         splice/select/guard path with no GPU/model/network (mirrors Aristotle's

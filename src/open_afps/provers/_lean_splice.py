@@ -46,13 +46,17 @@ class Theorem:
     the delimiter (the leading whitespace/newline included), so a generated body that
     carries its own indentation drops in cleanly. ``docstring`` is the informal text
     of the doc/block comment immediately preceding the declaration (``""`` if none) --
-    useful as informal-problem context for a model prompt.
+    useful as informal-problem context for a model prompt. ``preamble`` is the source
+    text preceding the declaration (imports + supporting definitions/structures; ``""``
+    if none) -- the surrounding context a model needs to construct a witness whose
+    shape is defined elsewhere in the file, not just from the bare signature.
     """
 
     name: str
     statement: str
     body_span: tuple[int, int]
     docstring: str = ""
+    preamble: str = ""
 
 
 def _find_top_level_assign(text: str) -> int | None:
@@ -126,6 +130,7 @@ def extract_theorems(lean_text: str) -> list[Theorem]:
                 statement=block[:body_start_rel].strip(),
                 body_span=(start + body_start_rel, start + body_end_rel),
                 docstring=_preceding_docstring(lean_text, start),
+                preamble=lean_text[:start].strip(),
             )
         )
     return out

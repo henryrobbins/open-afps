@@ -12,9 +12,11 @@ The prompt format and sampling defaults are pinned to the recipe on the
 
 I/O contract (must match ``open_afps.provers.kimina``):
 
-* in  : ``{"name": str, "statement": str, "problem"?: str}`` per line. ``statement``
-        is the formal Lean header ending in ``by``; ``problem`` is optional informal
-        context.
+* in  : ``{"name": str, "statement": str, "context"?: str, "problem"?: str}`` per
+        line. ``statement`` is the formal Lean header ending in ``by``; ``context`` is
+        the formal preamble (imports + the supporting definitions/structures the
+        statement refers to) the model needs to construct the witness; ``problem`` is
+        optional informal context.
 * out : ``{"name": str, "candidates": [str, ...]}`` per line. Each candidate is a
         **proof body** -- the tactic block after ``by`` -- ready to splice over a
         ``sorry``.
@@ -40,13 +42,17 @@ _OPENERS = {"(": ")", "[": "]", "{": "}"}
 _CLOSERS = {")", "]", "}"}
 
 
-def build_prompt(statement: str, problem: str = "") -> str:
+def build_prompt(statement: str, problem: str = "", context: str = "") -> str:
     """Render the user prompt for one statement, per the model card recipe.
 
-    The formal statement is given ``import Mathlib`` context if it lacks an import,
-    so the model sees a self-contained block (it is trained on full statements).
+    ``context`` is the formal preamble (imports + the supporting definitions and
+    structures the statement refers to); prepending it gives the model a
+    self-contained block where every type the goal names is actually defined, instead
+    of a bare signature it cannot unfold. The combined block is given ``import
+    Mathlib`` only if it lacks an import (the preamble normally carries its own).
     """
-    formal = statement if "import " in statement else f"import Mathlib\n\n{statement}"
+    formal = f"{context}\n\n{statement}" if context.strip() else statement
+    formal = formal if "import " in formal else f"import Mathlib\n\n{formal}"
     prompt = "Think about and solve the following problem step by step in Lean 4."
     prompt += f"\n# Problem:{problem}"
     prompt += f"\n# Formal statement:\n```lean4\n{formal}\n```\n"
@@ -129,7 +135,9 @@ def generate(
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": build_prompt(s["statement"], s.get("problem", "")),
+                    "content": build_prompt(
+                        s["statement"], s.get("problem", ""), s.get("context", "")
+                    ),
                 },
             ],
             tokenize=False,

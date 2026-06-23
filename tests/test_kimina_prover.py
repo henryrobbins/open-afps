@@ -89,6 +89,25 @@ def test_docstring_empty_when_no_comment() -> None:
     assert th.docstring == ""
 
 
+def test_extract_theorems_captures_preamble_context() -> None:
+    """The source above the target (imports + supporting defs) is captured verbatim."""
+    text = (
+        "import Mathlib\n\n"
+        "structure Widget where\n  n : Nat\n\n"
+        "theorem t (w : Widget) : w.n = w.n := by\n  sorry\n"
+    )
+    (th,) = extract_theorems(text)
+    assert "import Mathlib" in th.preamble
+    assert "structure Widget where" in th.preamble
+    # The preamble stops before the declaration itself.
+    assert "theorem t" not in th.preamble
+
+
+def test_preamble_empty_when_no_context() -> None:
+    (th,) = extract_theorems("theorem t : True := by\n  sorry\n")
+    assert th.preamble == ""
+
+
 def test_splice_proof_replaces_only_the_body() -> None:
     text = (FIXTURE / "MILExample.lean").read_text()
     (th,) = extract_theorems(text)
@@ -207,6 +226,8 @@ def test_problem_context_threaded_from_docstring(tmp_path: Path) -> None:
     assert isinstance(payloads, list)
     assert payloads[0]["name"] == "mul_comm_assoc"
     assert "trivial exercise" in payloads[0]["problem"].lower()
+    # The formal preamble (imports + supporting defs) rides along as `context`.
+    assert "import Mathlib" in payloads[0]["context"]
 
 
 def test_instructions_used_as_problem_fallback(tmp_path: Path) -> None:
@@ -328,6 +349,19 @@ def test_build_prompt_keeps_existing_imports() -> None:
     gen = _load_gen()
     prompt = gen.build_prompt("import Mathlib\n\ntheorem t : True := by")
 
+    assert prompt.count("import Mathlib") == 1
+
+
+def test_build_prompt_prepends_formal_context() -> None:
+    gen = _load_gen()
+    context = "import Mathlib\n\nstructure Widget where\n  n : Nat"
+    prompt = gen.build_prompt(
+        "theorem t (w : Widget) : w.n = w.n := by", context=context
+    )
+
+    # The supporting definition appears before the theorem header, single import.
+    assert "structure Widget where" in prompt
+    assert prompt.index("structure Widget") < prompt.index("theorem t")
     assert prompt.count("import Mathlib") == 1
 
 
