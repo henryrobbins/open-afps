@@ -64,6 +64,25 @@ REGISTRY: dict[str, _Entry] = {
     "agent:codex": _Entry(AgentProver, AgentProverConfig, {"harness": "codex"}),
     "agent:opencode": _Entry(AgentProver, AgentProverConfig, {"harness": "opencode"}),
     "numina": _Entry(NuminaProver, NuminaProverConfig),
+    # Leanstral runs as an AgentProver on the ``vibe`` harness: Mistral Vibe's
+    # builtin ``lean`` agent *is* Leanstral (api-hosted, no GPU). The bare model id
+    # ``labs-leanstral-2603`` is Labs-gated, so ``leanstral:devstral`` drives the same
+    # Lean scaffold on a non-Labs model until Labs is enabled. The ``model`` field is
+    # informational here -- vibe picks the model from the agent profile.
+    "leanstral": _Entry(
+        AgentProver,
+        AgentProverConfig,
+        {"harness": "vibe", "agent": "lean", "model": "labs-leanstral-2603"},
+    ),
+    "leanstral:devstral": _Entry(
+        AgentProver,
+        AgentProverConfig,
+        {
+            "harness": "vibe",
+            "agent": "lean-devstral",
+            "model": "devstral-medium-latest",
+        },
+    ),
 }
 
 

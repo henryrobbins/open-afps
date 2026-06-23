@@ -11,6 +11,7 @@ from open_afps.provers.agent.harness import (
     Harness,
     HarnessRunResult,
     OpenCodeHarness,
+    VibeHarness,
     resolve_bundle,
 )
 from open_afps.provers.agent.prover import AgentProver, AgentProverConfig
@@ -28,5 +29,6 @@ __all__ = [
     "ClaudeCodeHarness",
     "CodexHarness",
     "OpenCodeHarness",
+    "VibeHarness",
     "HARNESSES",
 ]

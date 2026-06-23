@@ -41,12 +41,18 @@ _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
 
 @dataclass
 class AgentProverConfig(AutomatedProverConfig):
-    harness: str = "claude_code"  # one of: claude_code | opencode | codex
+    harness: str = "claude_code"  # one of: claude_code | opencode | codex | vibe
     model: str = "claude-opus-4-8"
     effort: str = "high"
     # Vendored skill/prompt/MCP asset bundle to mount into the workdir.
     assets: str = "default"
     extra_env: dict[str, str] = field(default_factory=dict)
+    # Vibe-only knobs (ignored by the other harnesses): which vibe agent profile to
+    # drive (``lean`` is Leanstral; ``lean-devstral`` the non-Labs stand-in) and the
+    # programmatic-run guards passed straight to ``vibe -p``.
+    agent: str = "lean"
+    max_turns: int | None = None
+    max_price: float | None = None
 
 
 class AgentProver(AutomatedProver):
@@ -78,9 +84,7 @@ class AgentProver(AutomatedProver):
 
         # 3. Configure the workdir for the chosen harness + asset bundle.
         bundle = resolve_bundle(self.config.assets)
-        harness = HARNESSES[self.config.harness](
-            self.config.model, self.config.effort, assets=bundle
-        )
+        harness = HARNESSES[self.config.harness].from_config(self.config, assets=bundle)
         # Prompt precedence: explicit task instructions > bundle default > generic.
         prompt = task.instructions or bundle.default_prompt() or _DEFAULT_PROMPT
         harness.configure_wd(workdir, prompt)
