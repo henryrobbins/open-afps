@@ -1,13 +1,13 @@
 """AgentProver tests.
 
-Two layers, mirroring the Aristotle tests:
-
 * **Fast unit** (no Docker, no creds): parse a captured stream-json fixture into
   token totals + cost, and exercise the ``prove`` diff logic by stubbing the agent
   launch (``_run_agent``) to write a solved file into the workdir.
-* **Credentialed integration** (``agent_api`` marker, opt-in): run the real Claude
-  Code CLI on the trivial fixture and confirm the shared Docker verifier accepts the
-  result. Excluded by default via ``addopts``; needs ``CLAUDE_CODE_OAUTH_TOKEN``.
+* **Mocked agent + real Docker verify** (``docker`` marker): a stubbed agent writes a
+  real proof and the shared verifier confirms it -- no creds.
+
+The credentialed live path (real CLI on the trivial fixture) lives in the single
+parametrized ``test_e2e_provers.py`` suite, alongside every other prover/backend.
 """
 
 from __future__ import annotations
@@ -184,31 +184,3 @@ def test_run_end_to_end_verifies_mocked_agent_result(
     assert result.verification is not None and result.verification.verified
     assert result.prover == "agent"
     assert result.cost_usd == pytest.approx(0.4231)
-
-
-# --- credentialed integration (opt-in) -------------------------------------
-
-
-@pytest.mark.agent_api
-@pytest.mark.docker
-def test_live_agent_solves_trivial_theorem(tmp_path: Path) -> None:
-    import os
-
-    if not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
-        pytest.skip("CLAUDE_CODE_OAUTH_TOKEN not set (add it to .env)")
-
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    config = AgentProverConfig(
-        image=DEFAULT_IMAGE,
-        supported_toolchain=DEFAULT_TOOLCHAIN,
-        harness="claude_code",
-        model="claude-opus-4-8",
-        effort="high",
-    )
-    prover = AgentProver(config, backend)
-
-    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
-
-    assert result.completed_files, "agent returned no changed files"
-    assert result.success, result.verification and result.verification.compile_log
-    assert result.prover == "agent"

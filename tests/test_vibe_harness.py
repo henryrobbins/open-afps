@@ -11,8 +11,9 @@ Fast unit layer (no Docker, no creds, no API):
 * ``prove`` diffs the workdir after a stubbed run that writes a solved file and a
   synthetic session log, with no Docker.
 
-The live path reuses the ``agent_api`` marker (opt-in, billable, needs
-``MISTRAL_API_KEY``) and runs the non-Labs ``leanstral:devstral`` stand-in.
+The live path (the non-Labs ``leanstral:devstral`` / ``leanstral:magistral`` stand-ins
+on the real Mistral Vibe CLI) lives in the single parametrized ``test_e2e_provers.py``
+suite, alongside every other prover.
 """
 
 from __future__ import annotations
@@ -221,34 +222,3 @@ def test_prove_reports_changes_and_session_cost(
     assert output.metadata["harness"] == "vibe"
     assert output.metadata["model"] == "devstral-medium-latest"
     assert output.metadata["input_tokens"] == 26951
-
-
-# --- live integration (opt-in) ---------------------------------------------
-
-
-@pytest.mark.agent_api
-@pytest.mark.docker
-def test_live_vibe_solves_trivial_theorem(tmp_path: Path) -> None:
-    import os
-
-    if not os.environ.get("MISTRAL_API_KEY"):
-        pytest.skip("MISTRAL_API_KEY not set (add it to .env)")
-
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    # Stand-in profile: non-Labs model, runnable today. Switch agent="lean"
-    # (model labs-leanstral-2603) once Labs is enabled.
-    config = AgentProverConfig(
-        image=DEFAULT_IMAGE,
-        supported_toolchain=DEFAULT_TOOLCHAIN,
-        harness="vibe",
-        agent="lean-devstral",
-        model="devstral-medium-latest",
-        max_price=0.5,
-    )
-    prover = AgentProver(config, backend)
-
-    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
-
-    assert result.completed_files, "vibe returned no changed files"
-    assert result.success, result.verification and result.verification.compile_log
-    assert result.prover == "agent"

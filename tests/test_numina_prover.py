@@ -7,9 +7,11 @@ Three layers, mirroring the Aristotle/Agent tests:
   as a statement change" case.
 * **Round-loop unit** (no Docker, no creds): stub ``_run_agent`` to emit scripted
   ``END_REASON`` sequences and assert the continue/stop/reset control flow.
-* **Credentialed integration** (``numina_api`` marker, opt-in): run the real Numina
-  stack on the trivial fixture. Excluded by default; needs ``CLAUDE_CODE_OAUTH_TOKEN``
-  + ``GEMINI_API_KEY``.
+* **Mocked agent + real Docker verify** (``docker`` marker): a stubbed round writes a
+  real proof and the shared verifier confirms it -- no creds.
+
+The credentialed live path (real Numina stack on the trivial fixture) lives in the
+single parametrized ``test_e2e_provers.py`` suite, alongside every other prover.
 """
 
 from __future__ import annotations
@@ -349,33 +351,3 @@ def test_run_end_to_end_verifies_mocked_numina_result(
     assert result.metadata["end_reason"] == "COMPLETE"
     assert result.metadata["statement_changed"] is False
     assert list(result.completed_files) == ["MILExample.lean"]
-
-
-# --- credentialed integration (opt-in) -------------------------------------
-
-
-@pytest.mark.numina_api
-@pytest.mark.docker
-def test_live_numina_solves_trivial_theorem(tmp_path: Path) -> None:
-    import os
-
-    if not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
-        pytest.skip("CLAUDE_CODE_OAUTH_TOKEN not set (add it to .env)")
-    if not os.environ.get("GEMINI_API_KEY"):
-        pytest.skip("GEMINI_API_KEY not set (add it to .env)")
-
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    config = NuminaProverConfig(
-        image=DEFAULT_IMAGE,
-        supported_toolchain=DEFAULT_TOOLCHAIN,
-        model="claude-opus-4-8",
-        effort="high",
-        max_rounds=4,
-    )
-    prover = NuminaProver(config, backend)
-
-    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
-
-    assert result.completed_files, "numina returned no changed files"
-    assert result.success, result.verification and result.verification.compile_log
-    assert result.prover == "numina"
