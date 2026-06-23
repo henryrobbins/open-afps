@@ -727,16 +727,33 @@ class AxProverHarness(Harness):
         The bundled ``proposer_tools`` (lean + web search) are left untouched -- a
         missing TAVILY_API_KEY or blocked egress degrades a tool to a no-op rather
         than failing the run.
+
+        The LLM is defined under a *fresh* ``llm_configs.open_afps`` key and
+        ``prover_llm`` points at it via interpolation, rather than inlining the dict.
+        ax-prover's ``--config`` argparse flag *appends* to its ``["default.yaml"]``
+        default (it does not replace it), so default.yaml's
+        ``prover_llm: ${llm_configs.claude_opus_4_5}`` is always in the merge. An
+        inline ``prover_llm`` dict would then OmegaConf-*deep-merge* onto that resolved
+        config and silently inherit stale keys -- notably ``thinking.budget_tokens:
+        10000``, which the API rejects ("Extra inputs are not permitted") under
+        ``thinking.type: adaptive`` and which sends every request into a 10k-attempt
+        retry storm (no usage, just 400s). A brand-new key has nothing to merge with,
+        so our provider config is used verbatim; ``${llm_configs.open_afps}`` (a string
+        node) cleanly *replaces* default.yaml's interpolation, and ``llm_configs`` is
+        stripped after resolution as a non-Config temporary key.
         """
-        prover: dict[str, Any] = {
-            "prover_llm": {
-                "model": self._ax_model(),
-                "provider_config": self._provider_config(),
-            }
+        config: dict[str, Any] = {
+            "llm_configs": {
+                "open_afps": {
+                    "model": self._ax_model(),
+                    "provider_config": self._provider_config(),
+                }
+            },
+            "prover": {"prover_llm": "${llm_configs.open_afps}"},
         }
         if self.max_iterations is not None:
-            prover["max_iterations"] = int(self.max_iterations)
-        return json.dumps({"prover": prover}, indent=2)
+            config["prover"]["max_iterations"] = int(self.max_iterations)
+        return json.dumps(config, indent=2)
 
     def _agent_command(self) -> str:
         # No <<MODEL>>/<<EFFORT>> substitution: those live in axprover.yaml.

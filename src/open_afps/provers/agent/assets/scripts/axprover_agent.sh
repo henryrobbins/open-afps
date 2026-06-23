@@ -10,9 +10,12 @@ set -euo pipefail
 # and prove each in turn. No change to configure_wd's signature is needed.
 #
 # Notes:
-#   * --config is a TOP-LEVEL flag and MUST precede the `prove` subcommand. It
-#     layers axprover.yaml (written by AxProverHarness) over ax-prover's bundled
-#     default.yaml, which the CLI auto-prepends.
+#   * --config is a TOP-LEVEL flag and MUST precede the `prove` subcommand. The
+#     CLI's --config is argparse action="append" with default ["default.yaml"], so
+#     passing axprover.yaml *appends* to (does not replace) the bundled default.yaml:
+#     the effective merge is [default.yaml, axprover.yaml]. AxProverHarness relies on
+#     this (it overrides only deltas) and works around the deep-merge it implies --
+#     see AxProverHarness._render_config.
 #   * --skip-build reuses the warm Mathlib .lake instead of re-running lake build
 #     (the same assumption the other harnesses make).
 #   * --overwrite re-proves even files ax-prover thinks are already done.
@@ -21,8 +24,15 @@ set -euo pipefail
 #   * AX_PROVER_USAGE_FILE is forward-compat: once the upstream usage patch lands
 #     (AX_PROVER_HARNESS_PLAN.md step 3), ax-prover writes per-target token totals
 #     there and AxProverHarness.parse sums every ax_usage.*.json after the run.
+#   * ax-prover logs are human-readable (not the JSONL the parsers consume), so we
+#     tee each run's stdout+stderr to ax_prover.<target>.log. The file lands in the
+#     workdir and is pulled back with it (Modal) / lives on the bind mount (Docker),
+#     so the logs survive even when the harness discards the stream. PYTHONUNBUFFERED
+#     defeats CPython's block-buffering of a piped stdout so the tee is line-fresh.
 #
 # https://github.com/Axiomatic-AI/ax-prover-base
+
+export PYTHONUNBUFFERED=1
 
 while IFS= read -r f; do
   [ -z "$f" ] && continue
@@ -32,9 +42,11 @@ while IFS= read -r f; do
   f="${f#./}"
   safe=$(printf '%s' "$f" | tr '/.' '__')
   export AX_PROVER_USAGE_FILE="ax_usage.${safe}.json"
+  # `|| true` is on the pipeline: with `set -o pipefail` a failing ax-prover still
+  # lets the loop continue, and tee captures the full log either way.
   ax-prover --config axprover.yaml prove "$f" \
     --folder . \
     --skip-build \
     --overwrite \
-    -o "ax_output.${safe}.json" || true
+    -o "ax_output.${safe}.json" 2>&1 | tee "ax_prover.${safe}.log" || true
 done < <(grep -rl --include='*.lean' '\bsorry\b' . | grep -v '/\.lake/' || true)
