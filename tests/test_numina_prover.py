@@ -168,6 +168,73 @@ def test_round_loop_continues_on_limit_then_stops_on_complete(
     assert out.metadata["input_tokens"] == 300
 
 
+def test_helper_cost_is_folded_into_total(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """discussion_partner usage in the workdir ledger bills into cost_usd."""
+
+    def _stub(self: NuminaProver, workdir: Path, harness: Harness) -> list[str]:
+        # Simulate the in-sandbox skill appending usage across two rounds' calls.
+        ledger = workdir / ".claude" / "helper_usage.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        with ledger.open("a", encoding="utf-8") as fh:
+            fh.write(
+                json.dumps(
+                    {
+                        "backend": "gpt",
+                        "model": "gpt-5.4",
+                        "input_tokens": 1_000_000,
+                        "output_tokens": 1_000_000,
+                    }
+                )
+                + "\n"
+            )
+        return [_result_line("COMPLETE")]
+
+    monkeypatch.setattr(NuminaProver, "_run_agent", _stub)
+    prover = _make_prover(max_rounds=20, guard_statements=False)
+
+    out = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+
+    # gpt-5.4 = ($2.5 in + $15 out)/Mtok over 1M+1M tokens = $17.50 helper.
+    assert out.metadata["agent_cost_usd"] == pytest.approx(0.01)
+    assert out.metadata["helper_cost_usd"] == pytest.approx(17.5)
+    assert out.cost_usd == pytest.approx(0.01 + 17.5)
+    assert out.metadata["helper_breakdown"]["gpt:gpt-5.4"]["calls"] == 1
+    assert out.metadata["helper_unpriced_models"] == []
+
+
+def test_helper_cost_flags_unpriced_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unknown helper model is flagged, not silently billed at zero."""
+
+    def _stub(self: NuminaProver, workdir: Path, harness: Harness) -> list[str]:
+        ledger = workdir / ".claude" / "helper_usage.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        ledger.write_text(
+            json.dumps(
+                {
+                    "backend": "gemini",
+                    "model": "gemini-made-up",
+                    "input_tokens": 500,
+                    "output_tokens": 500,
+                }
+            )
+            + "\n"
+        )
+        return [_result_line("COMPLETE")]
+
+    monkeypatch.setattr(NuminaProver, "_run_agent", _stub)
+    prover = _make_prover(max_rounds=20, guard_statements=False)
+
+    out = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+
+    assert out.metadata["helper_cost_usd"] == pytest.approx(0.0)
+    assert out.metadata["helper_unpriced_models"] == ["gemini-made-up"]
+    assert out.metadata["helper_tokens"] == {"input": 500, "output": 500}
+
+
 def test_round_loop_respects_max_rounds(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

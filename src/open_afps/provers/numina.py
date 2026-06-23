@@ -25,6 +25,7 @@ still tracked (and surfaced in metadata) for parity/observability.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -78,6 +79,13 @@ _REASON_RE = re.compile(
 )
 
 _SORRY_RE = re.compile(r"\bsorry\b")
+
+# Helper-LLM usage ledger: ``discussion_partner.py`` appends one JSON record per
+# Gemini/GPT call here (workdir-relative, under ``.claude/`` next to ``cli.log``).
+# ``prove()`` reads it after the run, prices the tokens, and bills the result into
+# the run's ``cost_usd`` so discussion-partner spend is not lost. The path is the
+# host-side mirror of the default in ``discussion_partner._record_usage``.
+_HELPER_USAGE_FILE = Path(".claude") / "helper_usage.jsonl"
 
 
 @dataclass
@@ -137,6 +145,10 @@ class NuminaProver(AgentProver):
         # 5. Round-continuation loop.
         loop = self._run_rounds(workdir, harness, tracker)
 
+        # 5b. Price the helper-LLM (discussion_partner) usage the agent racked up
+        #     inside the sandbox and fold it into the run's total cost.
+        helper = self._helper_cost(workdir)
+
         # 6. Diff the workdir's .lean files against the staged originals.
         completed: dict[str, str] = {}
         for path in sorted(workdir.rglob("*.lean")):
@@ -149,7 +161,7 @@ class NuminaProver(AgentProver):
 
         return GenerationOutput(
             completed_files=completed,
-            cost_usd=loop["total_cost_usd"],
+            cost_usd=loop["total_cost_usd"] + helper["cost_usd"],
             logs="\n".join(loop["lines"]),
             metadata={
                 "harness": harness.name,
@@ -158,6 +170,15 @@ class NuminaProver(AgentProver):
                 "assets": self.config.assets,
                 "input_tokens": loop["input_tokens"],
                 "output_tokens": loop["output_tokens"],
+                # cost_usd above bundles agent + helper; keep the split visible.
+                "agent_cost_usd": loop["total_cost_usd"],
+                "helper_cost_usd": helper["cost_usd"],
+                "helper_tokens": {
+                    "input": helper["input_tokens"],
+                    "output": helper["output_tokens"],
+                },
+                "helper_breakdown": helper["breakdown"],
+                "helper_unpriced_models": helper["unpriced_models"],
                 "rounds": loop["rounds"],
                 "end_reason": loop["end_reason"],
                 "session_resets": loop["session_resets"],
@@ -281,6 +302,66 @@ class NuminaProver(AgentProver):
         return None
 
     # -- helpers --------------------------------------------------------------
+
+    def _helper_cost(self, workdir: Path) -> dict[str, Any]:
+        """Price the discussion-partner usage ledger into USD.
+
+        Reads the JSONL ledger ``discussion_partner.py`` appended inside the
+        sandbox (one record per Gemini/GPT call, accumulated across rounds in the
+        persistent workdir) and converts the tokens via :func:`compute_cost_usd`.
+        Records whose model is absent from the price table contribute ``0.0`` but
+        their tokens are still summed and the model name flagged in
+        ``unpriced_models`` -- so an unpriced helper is visible, not silently free.
+        Returns total cost, token totals, a per-``backend:model`` breakdown, and
+        the unpriced-model list.
+        """
+        path = workdir / _HELPER_USAGE_FILE
+        total = 0.0
+        input_tokens = 0
+        output_tokens = 0
+        unpriced: list[str] = []
+        breakdown: dict[str, dict[str, Any]] = {}
+        if path.is_file():
+            for line in path.read_text().splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                model = str(rec.get("model", ""))
+                it = int(rec.get("input_tokens", 0) or 0)
+                ot = int(rec.get("output_tokens", 0) or 0)
+                input_tokens += it
+                output_tokens += ot
+                cost = compute_cost_usd(model, it, ot)
+                if cost is None:
+                    if model not in unpriced:
+                        unpriced.append(model)
+                    cost = 0.0
+                total += cost
+                key = f"{rec.get('backend', '?')}:{model}"
+                agg = breakdown.setdefault(
+                    key,
+                    {
+                        "calls": 0,
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "cost_usd": 0.0,
+                    },
+                )
+                agg["calls"] += 1
+                agg["input_tokens"] += it
+                agg["output_tokens"] += ot
+                agg["cost_usd"] += cost
+        return {
+            "cost_usd": total,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "unpriced_models": unpriced,
+            "breakdown": breakdown,
+        }
 
     def _tracked_files(self, task: ProofTask, workdir: Path) -> list[Path]:
         """The workdir ``.lean`` files whose statements the guard should protect."""

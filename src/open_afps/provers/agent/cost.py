@@ -24,6 +24,11 @@ COST_PER_MTOK: dict[str, tuple[float, float]] = {
     "gpt-5.4": (2.5, 15.0),
     "gpt-5.4-mini": (0.75, 4.5),
     "gpt-5.4-nano": (0.20, 1.25),
+    # Numina discussion-partner defaults (gpt/gemini backends). ESTIMATES -- verify
+    # against the provider pricing pages; unknown variants stay unpriced and are
+    # surfaced via NuminaProver's ``helper_unpriced_models`` rather than billed at 0.
+    "gpt-5.4-pro": (15.0, 120.0),
+    "gemini-3.1-pro-preview": (2.0, 12.0),
     "deepseek-v4-pro": (1.74, 3.48),
     "deepseek-v4-flash": (0.14, 0.28),
 }

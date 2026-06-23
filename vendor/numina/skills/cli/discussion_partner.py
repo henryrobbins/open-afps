@@ -5,6 +5,7 @@
 # ///
 """Discuss proof strategies, math problems, or Lean code with Gemini/GPT."""
 import argparse
+import json
 import logging
 import os
 import sys
@@ -16,6 +17,31 @@ logging.basicConfig(
     handlers=[logging.FileHandler(Path(os.environ.get("CLI_LOG_PATH", Path(__file__).parents[2] / "cli.log")))],
 )
 logger = logging.getLogger(__name__)
+
+
+def _record_usage(backend: str, model: str, in_tok: int, out_tok: int) -> None:
+    """Append one token-usage record to the helper-LLM ledger.
+
+    The host-side NuminaProver reads this JSONL file out of the synced-back
+    workdir and converts the tokens to USD, so discussion-partner (Gemini/GPT)
+    spend is folded into the run's reported cost instead of going untracked. The
+    default path sits next to ``cli.log`` under the workdir's ``.claude/`` (which
+    syncs back to the host); ``HELPER_USAGE_PATH`` overrides it (used by tests).
+    """
+    override = os.environ.get("HELPER_USAGE_PATH")
+    path = Path(override) if override else Path(__file__).parents[2] / "helper_usage.jsonl"
+    record = {
+        "backend": backend,
+        "model": model,
+        "input_tokens": int(in_tok or 0),
+        "output_tokens": int(out_tok or 0),
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record) + "\n")
+    except OSError as e:  # never fail the discussion over a bookkeeping write
+        logger.warning("failed to record helper usage: %s", e)
 
 
 def discuss(question: str, backend: str = "gemini", model: str | None = None) -> None:
@@ -47,6 +73,7 @@ def discuss(question: str, backend: str = "gemini", model: str | None = None) ->
                 in_tok = getattr(usage, "prompt_token_count", 0) or 0
                 out_tok = getattr(usage, "candidates_token_count", 0) or 0
                 logger.info("discuss (gemini) succeeded: response_len=%d in_tokens=%d out_tokens=%d", len(response.text), in_tok, out_tok)
+                _record_usage("gemini", model, in_tok, out_tok)
                 print(response.text)
             else:
                 logger.error("Gemini returned empty response")
@@ -79,6 +106,7 @@ def discuss(question: str, backend: str = "gemini", model: str | None = None) ->
                 in_tok = getattr(usage, "input_tokens", 0) or 0
                 out_tok = getattr(usage, "output_tokens", 0) or 0
                 logger.info("discuss (gpt) succeeded: in_tokens=%d out_tokens=%d", in_tok, out_tok)
+                _record_usage("gpt", model, in_tok, out_tok)
                 print(response.output[-1].content[0].text)
             else:
                 logger.error("GPT returned empty response")
