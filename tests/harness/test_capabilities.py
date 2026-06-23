@@ -10,16 +10,17 @@ actually works inside the sandbox -- not merely that the harness *configured* it
 The four capabilities the :class:`AgentProver` design depends on:
 
 * **shell + Lean toolchain** -- the agent can ``lake build`` a fresh module;
-* **skills** -- the default ``lean-proof`` skill ``configure_wd`` mounts is invocable
+* **skills** -- the ``probe-skill`` fixture ``configure_wd`` mounts is invocable
   from the harness-specific location (``.claude/skills`` vs ``.agents/skills``);
 * **lean-lsp MCP** -- the ``mcp__lean-lsp__*`` tools the default prompt leans on
   are wired up; and
 * **edit sync-back** -- a file the agent writes lands on the *host* workdir after
   the run completes (Docker bind-mounts it live; Modal pulls it on completion).
 
-All four harnesses, ``vibe`` included, mount the default ``lean-proof`` skill and
-run every probe; vibe stages it under ``VIBE_HOME/skills`` (its trust-independent
-user skills dir) rather than the project ``.agents/skills`` the others use.
+All four harnesses, ``vibe`` included, mount the ``probe-skill`` fixture (a no-op
+skill, in place of the default bundle's skills) and run every probe; vibe stages
+it under ``VIBE_HOME/skills`` (its trust-independent user skills dir) rather than
+the project ``.agents/skills`` the others use.
 
 Every test is marked ``agent_api`` (billable, needs agent creds) and excluded by
 default via ``addopts``; the backend dimension carries the ``docker`` / ``modal``
@@ -48,13 +49,19 @@ from pathlib import Path
 import pytest
 
 from open_afps.backends.base import ComputeBackend
-from open_afps.harness import HARNESSES, Harness, VibeHarness
+from open_afps.harness import HARNESSES, AssetBundle, Harness, VibeHarness
 from open_afps.images import DEFAULT_IMAGE
 
 pytestmark = pytest.mark.agent_api
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 RUNS_DIR = Path(__file__).resolve().parents[1] / ".runs"
+
+#: A no-op skill mounted into every probe so the skill-invocable check tests skill
+#: discovery itself, not whatever the default bundle happens to ship. Mounted with
+#: no plugins -- plugin loading isn't what these probes exercise.
+PROBE_SKILL = Path(__file__).parents[1] / "fixtures" / "skills" / "probe-skill"
+PROBE_BUNDLE = AssetBundle(name="probe", skills=(PROBE_SKILL,))
 
 #: A complete project the size of one tool call: edit in place, build, inspect.
 #:
@@ -152,8 +159,13 @@ def _make_harness(harness: str) -> Harness:
     if harness == "vibe":
         # The builtin ``lean`` agent is Labs-gated; drive the vendored non-Labs
         # ``lean-devstral`` stand-in so the probe runs without Labs access.
-        return VibeHarness(model=_MODELS["vibe"], effort="low", agent="lean-devstral")
-    return HARNESSES[harness](model=_MODELS[harness], effort="low")
+        return VibeHarness(
+            model=_MODELS["vibe"],
+            effort="low",
+            agent="lean-devstral",
+            assets=PROBE_BUNDLE,
+        )
+    return HARNESSES[harness](model=_MODELS[harness], effort="low", assets=PROBE_BUNDLE)
 
 
 def _make_run_dir(backend: str, case_id: str) -> Path:
@@ -585,10 +597,10 @@ def test_bash_lake_build_fresh_module(harness: str, backend: str) -> None:
 @pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("harness", HARNESS_NAMES)
 def test_skill_invocable(harness: str, backend: str) -> None:
-    """Agent invokes the ``lean-proof`` skill configure_wd mounted for it."""
+    """Agent invokes the ``probe-skill`` fixture configure_wd mounted for it."""
     run_dir = _make_run_dir(backend, f"skill_invocable_{harness}")
     _stage(run_dir)
-    action, classifier, tool, matcher = _skill_check(harness, "lean-proof")
+    action, classifier, tool, matcher = _skill_check(harness, "probe-skill")
     jsonl = _run(harness, backend, run_dir, action)
     events = _load_events(jsonl)
     outcome, evidence = classifier(events, tool, matcher)
