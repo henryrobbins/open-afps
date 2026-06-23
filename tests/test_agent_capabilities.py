@@ -1,8 +1,8 @@
 """End-to-end capability probes: does each agent CLI have what it needs?
 
 Ported from milp_flare's ``test_docker.py`` harness suite. Each test drives a
-real agent (``claude_code`` / ``codex`` / ``opencode``) through a real compute
-backend (``docker`` / ``modal``) with a "make exactly one tool call then stop"
+real agent (``claude_code`` / ``codex`` / ``opencode`` / ``vibe``) through a real
+compute backend (``docker`` / ``modal``) with a "make exactly one tool call then stop"
 prompt, then inspects the streamed JSON event stream to confirm the capability
 actually works inside the sandbox -- not merely that the harness *configured* it
 (that is covered by the no-creds unit tests in ``test_agent_prover.py``).
@@ -17,6 +17,10 @@ The four capabilities the :class:`AgentProver` design depends on:
 * **edit sync-back** -- a file the agent writes lands on the *host* workdir after
   the run completes (Docker bind-mounts it live; Modal pulls it on completion).
 
+All four harnesses, ``vibe`` included, mount the ``filling-sorrys`` skill and run
+every probe; vibe stages it under ``VIBE_HOME/skills`` (its trust-independent user
+skills dir) rather than the project ``.agents/skills`` the others use.
+
 Every test is marked ``agent_api`` (billable, needs agent creds) and excluded by
 default via ``addopts``; the backend dimension carries the ``docker`` / ``modal``
 marker per parametrization. Run e.g. ``pytest -m 'agent_api and docker'``. Each
@@ -27,6 +31,8 @@ Prerequisites:
   - codex: ``~/.codex/auth.json`` from ``codex login``
   - opencode: ``DEEPSEEK_API_KEY`` in env (tests use deepseek-chat to keep
     integration spend off the Anthropic bill)
+  - vibe: ``MISTRAL_API_KEY`` in env (tests run the non-Labs ``lean-devstral``
+    stand-in so they don't need Labs access to the builtin ``lean`` agent)
   - docker backend: docker on PATH + the ``open-afps:latest`` image
   - modal backend: ``MODAL_TOKEN_*`` env or ``~/.modal.toml`` + the published image
 """
@@ -43,7 +49,7 @@ import pytest
 
 from open_afps.backends.base import ComputeBackend
 from open_afps.images import DEFAULT_IMAGE
-from open_afps.provers.agent.harness import HARNESSES, Harness
+from open_afps.provers.agent.harness import HARNESSES, Harness, VibeHarness
 
 pytestmark = pytest.mark.agent_api
 
@@ -62,7 +68,7 @@ Rules:
 - Do not summarize. Just make the one call.
 """
 
-HARNESS_NAMES = ["claude_code", "codex", "opencode"]
+HARNESS_NAMES = ["claude_code", "codex", "opencode", "vibe"]
 
 #: Cheap models per agent to keep the (billable) integration run inexpensive.
 _MODELS = {
@@ -73,6 +79,9 @@ _MODELS = {
     # deepseek-chat keeps cost low and exercises OpenCode's non-anthropic branch
     # (provider is inferred from the model prefix in the harness).
     "opencode": "deepseek-chat",
+    # The builtin ``lean`` agent (real Leanstral) is Labs-gated; the non-Labs
+    # ``lean-devstral`` stand-in (selected in _make_harness) runs this model.
+    "vibe": "devstral-medium-latest",
 }
 
 # Backend dimension: each value carries its own opt-out marker so a run can pick
@@ -94,6 +103,8 @@ def _agent_available(harness: str) -> bool:
         return (Path.home() / ".codex" / "auth.json").exists()
     if harness == "opencode":
         return bool(os.environ.get("DEEPSEEK_API_KEY"))
+    if harness == "vibe":
+        return bool(os.environ.get("MISTRAL_API_KEY"))
     return False
 
 
@@ -127,6 +138,10 @@ def _make_backend(backend: str) -> ComputeBackend:
 
 
 def _make_harness(harness: str) -> Harness:
+    if harness == "vibe":
+        # The builtin ``lean`` agent is Labs-gated; drive the vendored non-Labs
+        # ``lean-devstral`` stand-in so the probe runs without Labs access.
+        return VibeHarness(model=_MODELS["vibe"], effort="low", agent="lean-devstral")
     return HARNESSES[harness](model=_MODELS[harness], effort="low")
 
 
@@ -349,6 +364,54 @@ def _opencode_classify(
     return "success", f"status={status!r}"
 
 
+#: Vibe wraps any failed tool call's content in this tag (vibe.core.utils.tags);
+#: a non-zero bash exit is raised as a ToolError and surfaces the same way, so its
+#: presence in a ``role:"tool"`` message is the uniform "this call failed" signal.
+_VIBE_TOOL_ERROR_TAG = "<tool_error>"
+
+
+def _vibe_classify(
+    events: list[dict],
+    tool_name: str,
+    matches: Callable[[dict], bool] = lambda _: True,
+) -> tuple[str, str]:
+    """Classify vibe NDJSON messages (assistant ``tool_calls`` + ``role:"tool"``).
+
+    Vibe's ``--output streaming`` dumps one ``LLMMessage`` per line: the assistant
+    message carries OpenAI-style ``tool_calls`` (``function.name`` + JSON-string
+    ``arguments``); the tool result is a separate ``role:"tool"`` message keyed by
+    ``tool_call_id``. Success is a matching result with no ``<tool_error>`` tag.
+    """
+    target_id: str | None = None
+    for ev in events:
+        if ev.get("role") != "assistant":
+            continue
+        for tc in ev.get("tool_calls") or []:
+            fn = tc.get("function") or {}
+            if fn.get("name") != tool_name:
+                continue
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            if not isinstance(args, dict) or not matches(args):
+                continue
+            target_id = tc.get("id")
+            break
+        if target_id is not None:
+            break
+    if target_id is None:
+        return "missing", f"no assistant tool_call for `{tool_name}`"
+    for ev in events:
+        if ev.get("role") != "tool" or ev.get("tool_call_id") != target_id:
+            continue
+        content = ev.get("content") or ""
+        if _VIBE_TOOL_ERROR_TAG in content:
+            return "error", f"tool_error: {content!r}"
+        return "success", "tool result ok"
+    return "missing", "no tool result for id"
+
+
 def _codex_skill_classify(
     events: list[dict],
     _tool: str | None,
@@ -407,6 +470,13 @@ def _bash_check(harness: str, command: str):
             "bash",
             lambda inp: command in (inp.get("command") or ""),
         )
+    if harness == "vibe":
+        return (
+            f"Use the bash tool to run exactly: `{command}`.",
+            _vibe_classify,
+            "bash",
+            lambda inp: command in (inp.get("command") or ""),
+        )
     raise AssertionError(harness)
 
 
@@ -432,6 +502,13 @@ def _skill_check(harness: str, skill_name: str):
             None,
             None,
         )
+    if harness == "vibe":
+        return (
+            f"Use the skill tool to load the `{skill_name}` skill.",
+            _vibe_classify,
+            "skill",
+            lambda inp: skill_name in str(inp.get("name") or inp),
+        )
     raise AssertionError(harness)
 
 
@@ -453,6 +530,18 @@ def _lean_lsp_check(harness: str, file_rel: str):
             prompt,
             _opencode_classify,
             "lean-lsp_lean_diagnostic_messages",
+            lambda _: True,
+        )
+    if harness == "vibe":
+        # Vibe publishes MCP tools as ``<server_alias>_<remote_name>`` (alias is the
+        # config server name ``lean-lsp``), and its smaller model invokes the exact
+        # name it's told to -- so the prompt must name the flattened form, not the
+        # ``mcp__lean-lsp__*`` Claude alias the other prompts use.
+        vibe_tool = "lean-lsp_lean_diagnostic_messages"
+        return (
+            f"Call the MCP tool `{vibe_tool}` on the file `{file_rel}`.",
+            _vibe_classify,
+            vibe_tool,
             lambda _: True,
         )
     raise AssertionError(harness)
