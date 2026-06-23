@@ -57,15 +57,26 @@ FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
 RUNS_DIR = Path(__file__).resolve().parent / ".runs"
 
 #: A complete project the size of one tool call: edit in place, build, inspect.
+#:
+#: The framing matters for agents whose system prompt is a task scaffold (e.g.
+#: vibe's ``lean`` agent, which otherwise ignores this and starts proving the
+#: project's sorrys, churning/deleting the probe file and running to timeout). So
+#: we state up front that this is a capability test -- not a coding/proof task --
+#: and that stopping after the one call, without cleanup, IS the success condition.
 ONE_CALL_PROMPT = """\
-You are testing a harness. Make exactly one tool call and then stop.
+You are running inside an automated capability test for an agent tool harness.
+We are verifying ONE thing: that a single specific tool works in this sandbox.
+This is NOT a coding, editing, or proof task. Do not try to solve, prove, build,
+or improve anything in this project, and do not explore it.
 
 The single tool call you must make: {action}
 
 Rules:
-- Make this exact tool call once. Do not retry on failure.
-- Do not use any other tool. If the call fails, just stop.
-- Do not summarize. Just make the one call.
+- Make this exact tool call exactly once. Do not retry if it fails.
+- The instant that call returns, the test is COMPLETE -- stop immediately.
+- Make no other tool call, before or after it. In particular, do not read, edit,
+  prove, run, list, clean up after yourself, or DELETE or modify any file.
+- Do not summarize. Make the one call, then stop.
 """
 
 HARNESS_NAMES = ["claude_code", "codex", "opencode", "vibe"]
