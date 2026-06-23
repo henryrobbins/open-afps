@@ -140,7 +140,7 @@ def test_auth_spec_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_configure_wd_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None:
-    harness = VibeHarness("labs-leanstral-2603", agent="lean")
+    harness = VibeHarness("devstral-medium-latest", agent="lean-devstral")
     harness.configure_wd(tmp_path, "fill the sorrys")
 
     assert (tmp_path / "agent.sh").is_file()
@@ -149,6 +149,12 @@ def test_configure_wd_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None
     config = (tmp_path / ".vibe" / "config.toml").read_text()
     assert 'installed_agents = ["lean"]' in config
     assert "[session_logging]" in config
+    # Ungate mutating tools in `vibe -p` (otherwise `edit` is denied) and wire in the
+    # lean-lsp compile-check loop -- both live on the base config so they cover the
+    # builtin `lean` agent and the stand-ins alike.
+    assert "auto_approve = true" in config
+    assert "[[mcp_servers]]" in config
+    assert 'args = ["lean-lsp-mcp"]' in config
 
     standin = tmp_path / ".vibe" / "agents" / "lean-devstral.toml"
     assert standin.is_file()

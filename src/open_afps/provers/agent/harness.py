@@ -517,8 +517,28 @@ class VibeHarness(Harness):
         vibe_home = wd / self.VIBE_HOME_DIR
         agents_dir = vibe_home / "agents"
         agents_dir.mkdir(parents=True, exist_ok=True)
+        # ``auto_approve`` is the *only* thing that ungates mutating tools (``edit``,
+        # ``write_file``) in ``vibe -p`` programmatic mode: there is no approval
+        # callback, so any tool that resolves to ``ASK`` is answered "Tool execution
+        # not permitted" and silently skipped. Folder trust is never consulted on this
+        # path. The builtin ``lean`` profile sets no ``auto_approve``, so without this
+        # even the real Leanstral cannot write its proof. Set it on the base config so
+        # it applies to ``--agent lean`` and the vendored stand-ins alike.
+        #
+        # ``mcp_servers`` wires in lean-lsp-mcp (the same ``uvx lean-lsp-mcp`` server
+        # the other harnesses mount via .mcp.json) so the agent actually gets the
+        # compile/diagnostic feedback loop the prompt assumes. Vibe publishes its tools
+        # as ``lean-lsp_<tool>``; discovery failure is non-fatal (logged, agent runs
+        # without them) so this is safe even if the server is missing.
         (vibe_home / "config.toml").write_text(
-            'installed_agents = ["lean"]\n\n[session_logging]\nenabled = true\n'
+            'installed_agents = ["lean"]\n'
+            "auto_approve = true\n\n"
+            "[session_logging]\nenabled = true\n\n"
+            "[[mcp_servers]]\n"
+            'transport = "stdio"\n'
+            'name = "lean-lsp"\n'
+            'command = "uvx"\n'
+            'args = ["lean-lsp-mcp"]\n'
         )
         # Vendored stand-in profiles live as ``<agent>.toml`` (e.g. ``lean-devstral``,
         # ``lean-magistral``). The builtin ``lean`` agent (real Leanstral) ships with
