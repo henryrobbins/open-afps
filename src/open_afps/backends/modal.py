@@ -207,19 +207,31 @@ def _pull_wd(sb: modal.Sandbox, wd: Path) -> None:
     Excludes the huge image-baked ``.lake`` symlink target. For the verify path no
     files change so this is just the stderr/log; for generation it is how edits
     return -- one code path that always pulls (cheap for small projects).
+
+    A failure here silently drops *all* of a run's generation output (edits +
+    usage files), so don't collapse every cause into one opaque message: check the
+    tar exit code and log the real exception with a traceback. The distinct causes
+    (dead sandbox vs. a non-zero ``tar`` on some file the agent created vs. a
+    missing tarball) need different fixes, and the bare warning hid which it was.
     """
     try:
-        sb.exec(
+        proc = sb.exec(
             "bash",
             "-c",
             f"tar -czf /tmp/out.tar.gz -C {REMOTE_WD} --exclude=./.lake .",
-        ).wait()
+        )
+        # tar exits non-zero on e.g. a file that changed/vanished mid-archive; surface
+        # it rather than letting the (possibly partial/missing) copy fail opaquely.
+        exit_code = proc.wait()
+        if exit_code != 0:
+            stderr = "".join(proc.stderr).strip() or "(no stderr)"
+            log.warning("pull_wd: tar exited %s: %s", exit_code, stderr)
         with tempfile.NamedTemporaryFile(suffix=".tar.gz") as tmp:
             sb.filesystem.copy_to_local("/tmp/out.tar.gz", tmp.name)
             with tarfile.open(tmp.name, mode="r:gz") as tf:
                 tf.extractall(wd, filter="data")
     except Exception:
-        log.warning("pull_wd: failed to pull artifacts (Sandbox unavailable)")
+        log.warning("pull_wd: failed to pull artifacts from %s", wd, exc_info=True)
 
 
 def _pull_stderr(sb: modal.Sandbox) -> str:
