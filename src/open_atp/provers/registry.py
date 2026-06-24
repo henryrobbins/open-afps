@@ -23,11 +23,18 @@ generation on Modal and the check on local Docker.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 
 from open_atp.backends.base import ComputeBackend
+from open_atp.harness import (
+    AxProverHarnessConfig,
+    ClaudeCodeHarnessConfig,
+    CodexHarnessConfig,
+    HarnessConfig,
+    OpenCodeHarnessConfig,
+    VibeHarnessConfig,
+)
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
 from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
 from open_atp.provers.base import AutomatedProver, AutomatedProverConfig
@@ -55,53 +62,49 @@ class PROVERS(StrEnum):
 
 @dataclass(frozen=True)
 class _Entry:
-    """A registry row: which classes back a prover, plus baked-in config."""
+    """A registry row: the prover + config classes backing a name.
+
+    ``harness_config_cls`` (agent provers only) is the
+    :class:`~open_atp.harness.HarnessConfig` subclass composed into the
+    :class:`~open_atp.provers.agent_prover.AgentProverConfig` -- it selects the harness
+    and its defaults. ``None`` for non-agent provers and for Numina (which pins its own
+    harness on its config).
+    """
 
     prover_cls: type[AutomatedProver]
     config_cls: type[AutomatedProverConfig]
-    # Config overrides implied by the name itself (e.g. ``agent:codex`` -> codex).
-    defaults: Mapping[str, object] = field(default_factory=dict)
+    harness_config_cls: type[HarnessConfig] | None = None
 
 
-#: ``PROVERS -> (ProverClass, ConfigClass, defaults)``. Config-driven so callers never
-#: hand-wire classes.
+#: ``PROVERS -> (ProverClass, ConfigClass, HarnessConfigClass)``. Config-driven so
+#: callers never hand-wire classes. Every agentic prover is the shared
+#: :class:`AgentProver`; the entry's harness config selects the CLI and bakes its
+#: harness-appropriate defaults (codex's OpenAI model, ax-prover's effort, vibe's
+#: stand-in agent/Magistral model). The registry hands back exactly that default prover
+#: -- callers who want to customize construct the config + prover directly.
 _REGISTRY: dict[PROVERS, _Entry] = {
     PROVERS.ARISTOTLE: _Entry(AristotleProver, AristotleProverConfig),
-    PROVERS.CLAUDE: _Entry(AgentProver, AgentProverConfig),
-    # codex authenticates via ChatGPT/OpenAI (``codex login``), so it must run an
-    # OpenAI model -- not the AgentProverConfig default (``claude-opus-4-8``), which
-    # codex can't serve without an Anthropic ``model_providers`` entry.
-    PROVERS.CODEX: _Entry(
-        AgentProver, AgentProverConfig, {"harness": "codex", "model": "gpt-5.5"}
-    ),
-    PROVERS.OPENCODE: _Entry(AgentProver, AgentProverConfig, {"harness": "opencode"}),
+    PROVERS.CLAUDE: _Entry(AgentProver, AgentProverConfig, ClaudeCodeHarnessConfig),
+    # codex authenticates via ChatGPT/OpenAI (``codex login``), so its harness config
+    # defaults to an OpenAI model -- claude-opus can't be served without an Anthropic
+    # ``model_providers`` entry.
+    PROVERS.CODEX: _Entry(AgentProver, AgentProverConfig, CodexHarnessConfig),
+    PROVERS.OPENCODE: _Entry(AgentProver, AgentProverConfig, OpenCodeHarnessConfig),
     # ax-prover-base runs as an AgentProver on the ``axprover`` harness: its own
     # LangGraph proposer->builder->reviewer loop edits the .lean in place, while
     # AgentProver staging/diff/auth and the shared Verifier do the final
     # compile/sorry/axiom check (we don't trust ax-prover's own reviewer).
-    PROVERS.AXPROVER: _Entry(
-        AgentProver,
-        AgentProverConfig,
-        {"harness": "axprover", "model": "claude-opus-4-8", "effort": "high"},
-    ),
+    PROVERS.AXPROVER: _Entry(AgentProver, AgentProverConfig, AxProverHarnessConfig),
     PROVERS.NUMINA: _Entry(NuminaProver, NuminaProverConfig),
     # ``vibe`` runs as an AgentProver on the ``vibe`` harness driving Mistral Vibe's
     # Lean agent scaffold (the builtin ``lean`` agent *is* Leanstral; api-hosted, no
     # GPU). The real model ``labs-leanstral-2603`` is Labs-gated (403 until a Mistral
-    # org admin enables Labs), so this defaults to Magistral -- a non-Labs *reasoning*
-    # model any La Plateforme key can reach. The model is a knob, like the agent specs:
-    # ``overrides={"model": "devstral-medium-latest"}`` swaps it. Vibe has no
-    # ``--model`` flag, so the harness templates the model into the vendored
-    # ``lean-standin`` profile at launch. Rename/repoint to the Labs model once enabled.
-    PROVERS.VIBE: _Entry(
-        AgentProver,
-        AgentProverConfig,
-        {
-            "harness": "vibe",
-            "agent": "lean-standin",
-            "model": "magistral-medium-latest",
-        },
-    ),
+    # org admin enables Labs), so VibeHarnessConfig defaults to Magistral -- a non-Labs
+    # *reasoning* model any La Plateforme key can reach -- on the ``lean-standin``
+    # profile. To swap the model, construct ``VibeHarnessConfig(model=...)`` directly;
+    # vibe has no ``--model`` flag, so the harness templates it into the stand-in
+    # profile at launch. Repoint to the Labs model once enabled.
+    PROVERS.VIBE: _Entry(AgentProver, AgentProverConfig, VibeHarnessConfig),
 }
 
 
@@ -115,17 +118,24 @@ def get_prover(
     *,
     verification_backend: ComputeBackend,
     agent_backend: ComputeBackend | None = None,
-    overrides: Mapping[str, object] | None = None,
 ) -> AutomatedProver:
-    """Construct the prover ``name`` against the shared verify backend.
+    """Construct the *default* prover ``name`` against the shared verify backend.
 
-    ``name`` is a :class:`PROVERS` member (or its string value). The config is built
-    from the name's baked-in defaults + caller ``overrides`` (per-prover knobs: model,
-    effort, max_rounds, ...). The sandbox image (and the toolchain + Mathlib pins
-    projects are checked against) comes from ``verification_backend``'s config, not a
-    parameter here. Agentic provers also receive ``agent_backend`` for generation
-    (defaults to the verify backend), keeping the agent-vs-verify backend split
-    available.
+    ``name`` is a :class:`PROVERS` member (or its string value). The prover is built
+    with its config class's baked-in defaults -- this factory is a shortcut for the
+    out-of-the-box provers only. To customize any knob (model, effort, max_rounds, a
+    harness-specific guard, ...), construct the config and prover directly instead::
+
+        from open_atp.harness import ClaudeCodeHarnessConfig
+        from open_atp.provers import AgentProver, AgentProverConfig
+
+        harness = ClaudeCodeHarnessConfig(model="claude-sonnet-4-6", effort="low")
+        prover = AgentProver(AgentProverConfig(harness=harness), backend)
+
+    The sandbox image (and the toolchain + Mathlib pins projects are checked against)
+    comes from ``verification_backend``'s config, not a parameter here. Agentic provers
+    also receive ``agent_backend`` for generation (defaults to the verify backend),
+    keeping the agent-vs-verify backend split available.
 
     Parameters
     ----------
@@ -141,36 +151,29 @@ def get_prover(
         ``verification_backend``, so generation and verification share a backend unless
         you split them (e.g. generate on Modal, verify on local Docker). Ignored by
         non-agentic provers (e.g. :class:`~open_atp.provers.aristotle.AristotleProver`).
-    overrides : Mapping[str, object], optional
-        Per-prover config knobs layered over the name's baked-in defaults (model,
-        effort, max_rounds, ...). Keys must be fields of the prover's config class.
 
     Returns
     -------
     prover : AutomatedProver
-        The constructed prover, ready to drive via
+        The constructed default prover, ready to drive via
         :meth:`~open_atp.provers.base.AutomatedProver.prove`.
 
     Examples
     --------
 
     Construction is cheap and offline (the backend is wired in, not called), so the
-    factory builds a ready-to-drive prover directly. ``overrides`` layer per-prover
-    knobs over the name's baked-in defaults:
+    factory builds a ready-to-drive prover directly from the name's defaults:
 
     >>> from open_atp import PROVERS, get_prover
     >>> from open_atp.backends.docker import DockerBackend, DockerConfig
     >>> from open_atp.images import DEFAULT_IMAGE
     >>> backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    >>> prover = get_prover(
-    ...     PROVERS.CLAUDE,
-    ...     verification_backend=backend,
-    ...     overrides={"model": "claude-sonnet-4-6", "effort": "low"},
-    ... )
-    >>> prover.config.model
-    'claude-sonnet-4-6'
+    >>> prover = get_prover(PROVERS.CLAUDE, verification_backend=backend)
+    >>> prover.config.harness.model
+    'claude-opus-4-8'
 
-    See each prover class for a family-specific construction example
+    For a customized prover, construct the config + prover directly -- see each prover
+    class for a family-specific example
     (:class:`~open_atp.provers.agent_prover.AgentProver`,
     :class:`~open_atp.provers.numina.NuminaProver`,
     :class:`~open_atp.provers.aristotle.AristotleProver`).
@@ -199,12 +202,14 @@ def get_prover(
             f"Unknown prover {name!r}; choose from {[p.value for p in PROVERS]}."
         ) from None
     entry = _REGISTRY[prover]
-
-    kwargs: dict[str, object] = {}
-    kwargs.update(entry.defaults)
-    if overrides:
-        kwargs.update(overrides)
-    config = entry.config_cls(**kwargs)  # type: ignore[arg-type]
+    # Agent entries compose the name's harness config; the rest use their config's own
+    # defaults (Numina pins its harness; Aristotle has none).
+    if entry.harness_config_cls is not None:
+        config: AutomatedProverConfig = entry.config_cls(
+            harness=entry.harness_config_cls()  # type: ignore[call-arg]
+        )
+    else:
+        config = entry.config_cls()
 
     # Agentic provers take (config, verify_backend, agent_backend); Aristotle does
     # its generation over the network and takes only the verify backend.

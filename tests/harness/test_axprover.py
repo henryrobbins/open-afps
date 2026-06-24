@@ -24,7 +24,13 @@ from pathlib import Path
 import pytest
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.harness import HARNESSES, AxProverHarness, Harness
+from open_atp.harness import (
+    HARNESS_CONFIGS,
+    HARNESSES,
+    AxProverHarness,
+    AxProverHarnessConfig,
+    Harness,
+)
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
@@ -71,9 +77,7 @@ def _write_usage(wd: Path, target: str, input_tokens: int, output_tokens: int) -
 def _make_prover() -> AgentProver:
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     config = AgentProverConfig(
-        harness="axprover",
-        model="claude-opus-4-8",
-        effort="high",
+        harness=AxProverHarnessConfig(model="claude-opus-4-8", effort="high")
     )
     # Distinct agent backend so prove() takes the non-reuse path (no live session) --
     # the diff unit test stubs _run_agent and must not touch a real backend.
@@ -84,24 +88,24 @@ def _make_prover() -> AgentProver:
 # --- construction / config -------------------------------------------------
 
 
-def test_registered_and_from_config_carries_max_iterations() -> None:
+def test_registered_and_config_build_carries_max_iterations() -> None:
     assert HARNESSES["axprover"] is AxProverHarness
+    assert HARNESS_CONFIGS["axprover"] is AxProverHarnessConfig
 
-    config = AgentProverConfig(
-        harness="axprover",
+    config = AxProverHarnessConfig(
         model="claude-opus-4-8",
         effort="high",
         max_iterations=20,
     )
-    harness = AxProverHarness.from_config(config)
+    harness = config.build()
     assert isinstance(harness, AxProverHarness)
     assert harness.model == "claude-opus-4-8"
     assert harness.effort == "high"
-    assert harness.max_iterations == 20
+    assert harness.config.max_iterations == 20
 
 
 def test_auth_spec_requires_a_provider_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    harness = AxProverHarness("claude-opus-4-8")
+    harness = AxProverHarnessConfig(model="claude-opus-4-8").build()
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"):
         monkeypatch.delenv(key, raising=False)
     with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
@@ -111,7 +115,7 @@ def test_auth_spec_requires_a_provider_key(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_agent_command_is_self_discovering_script() -> None:
-    script = AxProverHarness("claude-opus-4-8")._agent_command()
+    script = AxProverHarnessConfig(model="claude-opus-4-8").build()._agent_command()
     # --config must precede the `prove` subcommand; warm-cache + robustness flags.
     assert "ax-prover --config axprover.yaml prove" in script
     assert "--skip-build" in script
@@ -123,7 +127,9 @@ def test_agent_command_is_self_discovering_script() -> None:
 
 
 def test_render_config_anthropic_model_and_effort(tmp_path: Path) -> None:
-    harness = AxProverHarness("claude-opus-4-8", effort="high", max_iterations=15)
+    harness = AxProverHarnessConfig(
+        model="claude-opus-4-8", effort="high", max_iterations=15
+    ).build()
     harness.configure_wd(tmp_path, "ignored prompt")
 
     assert (tmp_path / "agent.sh").is_file()
@@ -145,17 +151,30 @@ def test_render_config_anthropic_model_and_effort(tmp_path: Path) -> None:
 
 
 def test_render_config_provider_prefix_and_knob_per_provider() -> None:
-    assert "openai:gpt-5.2" == AxProverHarness("gpt-5.2")._ax_model()
-    assert "google_genai:gemini-3-pro" == AxProverHarness("gemini-3-pro")._ax_model()
+    assert (
+        "openai:gpt-5.2" == AxProverHarnessConfig(model="gpt-5.2").build()._ax_model()
+    )
+    assert (
+        "google_genai:gemini-3-pro"
+        == AxProverHarnessConfig(model="gemini-3-pro").build()._ax_model()
+    )
 
-    openai_cfg = AxProverHarness("gpt-5.2", effort="high")._provider_config()
+    openai_cfg = (
+        AxProverHarnessConfig(model="gpt-5.2", effort="high").build()._provider_config()
+    )
     assert openai_cfg["reasoning"] == {"effort": "high"}
-    google_cfg = AxProverHarness("gemini-3-pro", effort="medium")._provider_config()
+    google_cfg = (
+        AxProverHarnessConfig(model="gemini-3-pro", effort="medium")
+        .build()
+        ._provider_config()
+    )
     assert google_cfg["thinking_level"] == "medium"
 
 
 def test_render_config_omits_max_iterations_when_unset(tmp_path: Path) -> None:
-    AxProverHarness("claude-opus-4-8").configure_wd(tmp_path, "prompt")
+    AxProverHarnessConfig(model="claude-opus-4-8").build().configure_wd(
+        tmp_path, "prompt"
+    )
     cfg = json.loads((tmp_path / "axprover.yaml").read_text())
     assert "max_iterations" not in cfg["prover"]
 
@@ -164,7 +183,7 @@ def test_render_config_omits_max_iterations_when_unset(tmp_path: Path) -> None:
 
 
 def test_parse_sums_tokens_across_usage_files(tmp_path: Path) -> None:
-    harness = AxProverHarness("claude-opus-4-8")
+    harness = AxProverHarnessConfig(model="claude-opus-4-8").build()
     harness.configure_wd(tmp_path, "prompt")
     _write_usage(tmp_path, "A_lean", 1000, 200)
     _write_usage(tmp_path, "B_lean", 500, 50)
@@ -178,7 +197,7 @@ def test_parse_sums_tokens_across_usage_files(tmp_path: Path) -> None:
 
 
 def test_parse_without_usage_files_reports_zero_tokens(tmp_path: Path) -> None:
-    harness = AxProverHarness("claude-opus-4-8")
+    harness = AxProverHarnessConfig(model="claude-opus-4-8").build()
     harness.configure_wd(tmp_path, "prompt")  # no usage files written
     result = harness.parse(STREAM_LINES)
     assert result.input_tokens == 0
@@ -284,10 +303,11 @@ def test_live_axprover_solves_trivial_theorem(backend: str, tmp_path: Path) -> N
         pytest.skip(f"backend {backend} not available")
 
     config = AgentProverConfig(
-        harness="axprover",
-        model="claude-opus-4-8",
-        effort="high",
-        max_iterations=10,
+        harness=AxProverHarnessConfig(
+            model="claude-opus-4-8",
+            effort="high",
+            max_iterations=10,
+        )
     )
     prover = AgentProver(config, _make_live_backend(backend))
 

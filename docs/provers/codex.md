@@ -12,22 +12,21 @@ check. See {doc}`index` for the staging/diff lifecycle every agent harness share
 
 ```python
 from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.harness import CodexHarnessConfig
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-config = AgentProverConfig(
-    harness="codex",
-    model="gpt-5.5",
-    effort="high",
-)
+config = AgentProverConfig(harness=CodexHarnessConfig(effort="high"))
 prover = AgentProver(config, verification_backend=backend)
 ```
 
+{class}`~open_atp.harness.CodexHarnessConfig` selects the Codex CLI. Because Codex
+authenticates through ChatGPT/OpenAI it must run an OpenAI model, so its `model`
+defaults to `gpt-5.5` rather than the Anthropic base default.
+
 Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
-`agent:codex`. Because Codex authenticates through ChatGPT/OpenAI it must run an
-OpenAI model, so the `agent:codex` spec defaults `model` to `gpt-5.5` rather than the
-`AgentProverConfig` Anthropic default.
+`agent:codex`.
 
 ## Harness details
 

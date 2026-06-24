@@ -13,17 +13,22 @@ check. See {doc}`index` for the staging/diff lifecycle every agent harness share
 
 ```python
 from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.harness import ClaudeCodeHarnessConfig
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 config = AgentProverConfig(
-    harness="claude_code",
-    model="claude-opus-4-8",
-    effort="high",
+    harness=ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high"),
 )
 prover = AgentProver(config, verification_backend=backend)
 ```
+
+{class}`~open_atp.provers.agent_prover.AgentProverConfig` composes a
+{class}`~open_atp.harness.HarnessConfig`; here a
+{class}`~open_atp.harness.ClaudeCodeHarnessConfig` selects the Claude Code CLI and
+carries its `model`/`effort`. Swap in any other harness config to change CLI. Claude
+Code is the default, so a bare `AgentProverConfig()` already uses it.
 
 Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI: `agent`
 (Claude Code is the default harness, so no `:harness` suffix is needed).

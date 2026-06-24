@@ -60,6 +60,11 @@ generate, then verify in the sandbox) so subclasses only implement `_generate`.
    :no-members:
 ```
 
+`AgentProverConfig.harness` is a {class}`~open_atp.harness.HarnessConfig` — pick the
+CLI and its knobs by composing one (e.g.
+`AgentProverConfig(harness=VibeHarnessConfig(max_turns=8))`). The per-harness configs
+are documented under {doc}`harness`.
+
 ## NuminaProver
 
 ```{eval-rst}

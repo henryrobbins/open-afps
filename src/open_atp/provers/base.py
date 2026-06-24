@@ -68,10 +68,12 @@ class AutomatedProverConfig:
         The inverse of :func:`dataclasses.asdict`: any tuple-typed field is
         restored from the list JSON round-trips it to. Unknown keys are dropped
         so a serialized superset (or a sibling subclass's extra knobs) loads
-        cleanly. Subclasses inherit this unchanged -- ``cls`` resolves to the
-        concrete config, so its own fields are honoured.
+        cleanly. Non-init fields (e.g. a per-harness config's pinned ``harness``)
+        are skipped -- they are fixed by the class, not loaded. Subclasses inherit
+        this unchanged -- ``cls`` resolves to the concrete config, so its own
+        fields are honoured.
         """
-        known = {f.name: f for f in fields(cls)}
+        known = {f.name: f for f in fields(cls) if f.init}
         kwargs: dict[str, Any] = {}
         for key, value in data.items():
             f = known.get(key)

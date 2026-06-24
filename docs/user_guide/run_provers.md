@@ -43,13 +43,12 @@ from pathlib import Path
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.images import DEFAULT_IMAGE
+from open_atp.harness import ClaudeCodeHarnessConfig
 from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 config = AgentProverConfig(
-    harness="claude_code",
-    model="claude-opus-4-8",
-    effort="high",
+    harness=ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high"),
 )
 prover = AgentProver(config, verification_backend=backend)
 
@@ -64,8 +63,11 @@ print("duration_s:", result.duration_s)
 `prove` populates `output_dir/{wd,logs}/`: `wd` is the completed lake project and
 `logs` holds the run record (`stdout.txt`, `stderr.txt`, `result.json`).
 
-Swap `harness` for `"codex"` or `"opencode"` (and the matching `model`) to use a
-different agent CLI — see the per-harness prover pages under {doc}`../provers/index`.
+Each agent CLI has its own {class}`~open_atp.harness.HarnessConfig`
+(`CodexHarnessConfig`, `OpenCodeHarnessConfig`, `VibeHarnessConfig`,
+`AxProverHarnessConfig`) carrying that harness's knobs — set `AgentProverConfig`'s
+`harness` to any of them to switch CLI. See the per-harness prover pages under
+{doc}`../provers/index`.
 
 ## Filling sorrys with Aristotle
 

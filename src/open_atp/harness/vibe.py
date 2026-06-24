@@ -5,11 +5,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from open_atp.harness._paths import _SCRIPTS, _VIBE_ASSETS
-from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
+from open_atp.harness.base import AuthSpec, Harness, HarnessConfig, HarnessRunResult
 from open_atp.harness.bundles import AssetBundle
 
 
@@ -38,36 +39,17 @@ class VibeHarness(Harness):
 
     name = "vibe"
 
+    config: VibeHarnessConfig
+
     #: Workdir-relative VIBE_HOME (matches the export in ``vibe_agent.sh``).
     VIBE_HOME_DIR = ".vibe"
 
     def __init__(
-        self,
-        model: str,
-        effort: str = "medium",
-        *,
-        agent: str = "lean",
-        max_turns: int | None = None,
-        max_price: float | None = None,
-        assets: AssetBundle | None = None,
+        self, config: VibeHarnessConfig, assets: AssetBundle | None = None
     ) -> None:
-        super().__init__(model, effort, assets)
-        self.agent = agent
-        self.max_turns = max_turns
-        self.max_price = max_price
+        super().__init__(config, assets)
         #: Set in :meth:`configure_wd`; where :meth:`parse` looks for session logs.
         self._session_log_dir: Path | None = None
-
-    @classmethod
-    def from_config(cls, config: Any, *, assets: AssetBundle | None = None) -> Harness:
-        return cls(
-            config.model,
-            config.effort,
-            agent=getattr(config, "agent", "lean"),
-            max_turns=getattr(config, "max_turns", None),
-            max_price=getattr(config, "max_price", None),
-            assets=assets,
-        )
 
     def auth_spec(self) -> AuthSpec:
         # The lean agent's provider reads MISTRAL_API_KEY from the process env
@@ -123,8 +105,8 @@ class VibeHarness(Harness):
         # ``_render`` substitutes ``<<MODEL>>`` with ``self.model`` (default Magistral)
         # as it writes the copy into the workdir. The builtin ``lean`` agent (real
         # Leanstral) ships with vibe and pins its own model, so it needs no profile.
-        if self.agent != "lean":
-            profile = _VIBE_ASSETS / f"{self.agent}.toml"
+        if self.config.agent != "lean":
+            profile = _VIBE_ASSETS / f"{self.config.agent}.toml"
             (agents_dir / profile.name).write_text(self._render(profile.read_text()))
         # Mount the selected bundle's skills (by default the vendored ``lean-proof``
         # skill) under VIBE_HOME/skills -- vibe's *user* skills dir, which loads
@@ -138,11 +120,13 @@ class VibeHarness(Harness):
     def _agent_command(self) -> str:
         template = (_SCRIPTS / "vibe_agent.sh").read_text()
         extra = ""
-        if self.max_turns is not None:
-            extra += f" \\\n    --max-turns {int(self.max_turns)}"
-        if self.max_price is not None:
-            extra += f" \\\n    --max-price {self.max_price}"
-        return template.replace("<<AGENT>>", self.agent).replace("<<EXTRA>>", extra)
+        if self.config.max_turns is not None:
+            extra += f" \\\n    --max-turns {int(self.config.max_turns)}"
+        if self.config.max_price is not None:
+            extra += f" \\\n    --max-price {self.config.max_price}"
+        return template.replace("<<AGENT>>", self.config.agent).replace(
+            "<<EXTRA>>", extra
+        )
 
     def parse(self, lines: list[str]) -> HarnessRunResult:
         # Final assistant text + stop signal come from the NDJSON stream; token/cost
@@ -198,3 +182,29 @@ class VibeHarness(Harness):
                 if isinstance(content, str) and content:
                     result.result_text = content
         return result
+
+
+@dataclass
+class VibeHarnessConfig(HarnessConfig):
+    """:class:`~open_atp.harness.base.HarnessConfig` for the Mistral Vibe CLI.
+
+    Vibe has no ``--model`` flag and its builtin ``lean`` agent (real Leanstral) is
+    Labs-gated, so this defaults to the non-Labs ``lean-standin`` profile on Magistral
+    -- the harness templates ``model`` into that profile at launch.
+
+    Attributes
+    ----------
+    agent : str
+        Which vibe agent profile to drive: ``lean`` (Leanstral) or the model-templated
+        ``lean-standin`` stand-in. Default ``lean-standin``.
+    max_turns : int, optional
+        ``vibe -p`` programmatic-run guard. ``None`` leaves it unset.
+    max_price : float, optional
+        ``vibe -p`` programmatic-run guard. ``None`` leaves it unset.
+    """
+
+    model: str = "magistral-medium-latest"
+    agent: str = "lean-standin"
+    max_turns: int | None = None
+    max_price: float | None = None
+    harness_cls: ClassVar[type[Harness]] = VibeHarness

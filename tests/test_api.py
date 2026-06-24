@@ -24,6 +24,11 @@ from pathlib import Path
 import pytest
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.harness import (
+    ClaudeCodeHarnessConfig,
+    CodexHarnessConfig,
+    OpenCodeHarnessConfig,
+)
 from open_atp.images import DEFAULT_IMAGE, Image
 from open_atp.lean import LeanProject, ProofTask, ToolchainMismatch, stage_files
 from open_atp.provers import PROVERS, available_provers, get_prover
@@ -111,14 +116,15 @@ def test_get_prover_constructs_each_registered_prover() -> None:
     agent = build(PROVERS.CLAUDE)
     assert isinstance(agent, AgentProver) and not isinstance(agent, NuminaProver)
     assert isinstance(agent.config, AgentProverConfig)
-    assert agent.config.harness == "claude_code"
+    assert isinstance(agent.config.harness, ClaudeCodeHarnessConfig)
 
     codex = build(PROVERS.CODEX)
     assert isinstance(codex, AgentProver)
-    assert codex.config.harness == "codex"
+    assert isinstance(codex.config.harness, CodexHarnessConfig)
+    assert codex.config.harness.model == "gpt-5.5"
 
     opencode = build(PROVERS.OPENCODE)
-    assert opencode.config.harness == "opencode"
+    assert isinstance(opencode.config.harness, OpenCodeHarnessConfig)
 
     numina = build(PROVERS.NUMINA)
     assert isinstance(numina, NuminaProver)
@@ -128,10 +134,11 @@ def test_get_prover_constructs_each_registered_prover() -> None:
 def test_get_prover_accepts_string_value() -> None:
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     prover = get_prover("agent:codex", verification_backend=backend)
-    assert isinstance(prover, AgentProver) and prover.config.harness == "codex"
+    assert isinstance(prover, AgentProver)
+    assert isinstance(prover.config.harness, CodexHarnessConfig)
 
 
-def test_get_prover_applies_overrides_and_injects_agent_backend() -> None:
+def test_get_prover_injects_agent_backend() -> None:
     verify = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     agent_be = DockerBackend(DockerConfig(image=Image(name="other:tag")))
 
@@ -139,11 +146,10 @@ def test_get_prover_applies_overrides_and_injects_agent_backend() -> None:
         PROVERS.CLAUDE,
         verification_backend=verify,
         agent_backend=agent_be,
-        overrides={"model": "claude-sonnet-4-6", "effort": "low"},
     )
     assert isinstance(agent, AgentProver)
-    assert agent.config.model == "claude-sonnet-4-6"
-    assert agent.config.effort == "low"
+    # The factory builds the name's defaults; there is no override surface.
+    assert agent.config.harness.model == "claude-opus-4-8"
     # Generation backend is the injected one; verification stays the verify backend.
     assert agent.agent_backend is agent_be
     assert agent.verifier.backend is verify

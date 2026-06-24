@@ -18,9 +18,9 @@ import pytest
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.harness import (
-    HARNESSES,
+    HARNESS_CONFIGS,
     AssetBundle,
-    ClaudeCodeHarness,
+    ClaudeCodeHarnessConfig,
     Harness,
     bundle_for_config,
     compute_cost_usd,
@@ -59,7 +59,7 @@ def _make_prover(*, reuse: bool = False) -> AgentProver:
 
 
 def test_claude_code_parse_lines_tokens_and_cost() -> None:
-    harness = ClaudeCodeHarness(model="claude-opus-4-8", effort="high")
+    harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high").build()
     result = harness.parse(STREAM.read_text().splitlines())
 
     assert result.input_tokens == 18432
@@ -70,7 +70,7 @@ def test_claude_code_parse_lines_tokens_and_cost() -> None:
 
 
 def test_parse_ignores_blank_and_malformed_lines() -> None:
-    harness = ClaudeCodeHarness(model="claude-opus-4-8")
+    harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8").build()
     lines = ["", "   ", "not json", '{"type":"system"}']
     result = harness.parse(lines)
     assert result.input_tokens == 0
@@ -87,7 +87,7 @@ def test_compute_cost_usd_known_and_unknown_model() -> None:
 
 def test_codex_cost_falls_back_to_token_table() -> None:
     """Codex reports no USD, so prove() must estimate from token totals."""
-    harness = HARNESSES["codex"](model="gpt-5.4", effort="high")
+    harness = HARNESS_CONFIGS["codex"](model="gpt-5.4", effort="high").build()
     lines = [
         '{"type":"turn.completed","usage":{"input_tokens":2000000,'
         '"output_tokens":1000000}}',
@@ -103,7 +103,7 @@ def test_codex_cost_falls_back_to_token_table() -> None:
 
 
 def test_claude_code_configure_wd_writes_assets(tmp_path: Path) -> None:
-    harness = ClaudeCodeHarness(model="claude-opus-4-8", effort="high")
+    harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high").build()
     harness.configure_wd(tmp_path, "fill the sorrys")
 
     assert (tmp_path / "agent.sh").is_file()
@@ -156,7 +156,9 @@ def test_config_overrides_select_skills_and_plugins() -> None:
 
 def test_empty_plugins_mount_nothing_for_claude(tmp_path: Path) -> None:
     bundle = AssetBundle(name="t", skills=(resolve_skill("lean-proof"),), plugins=())
-    harness = ClaudeCodeHarness(model="claude-opus-4-8", effort="high", assets=bundle)
+    harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high").build(
+        assets=bundle
+    )
     harness.configure_wd(tmp_path, "x")
     assert not (tmp_path / ".plugins").exists()
     assert harness._plugin_flags() == ""
@@ -184,9 +186,9 @@ def test_non_claude_harnesses_mount_skills_not_plugins(
         skills=(resolve_skill("lean-proof"),),
         plugins=(resolve_plugin("lean4"),),
     )
-    harness = HARNESSES[harness_name](
-        model="claude-opus-4-8", effort="high", assets=bundle
-    )
+    harness = HARNESS_CONFIGS[harness_name](
+        model="claude-opus-4-8", effort="high"
+    ).build(assets=bundle)
     harness.configure_wd(tmp_path, "x")
     assert (tmp_path / dest / "lean-proof" / "SKILL.md").is_file()
     assert not (tmp_path / ".plugins").exists()

@@ -18,9 +18,10 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TextIO
+from typing import Self, TextIO
 
 from open_atp.backends.base import (
     CommandHandle,
@@ -28,7 +29,14 @@ from open_atp.backends.base import (
     ComputeBackend,
     ComputeSession,
 )
-from open_atp.harness import HARNESSES, Harness, bundle_for_config, compute_cost_usd
+from open_atp.harness import (
+    HARNESS_CONFIGS,
+    ClaudeCodeHarnessConfig,
+    Harness,
+    HarnessConfig,
+    bundle_for_config,
+    compute_cost_usd,
+)
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.base import AutomatedProver, AutomatedProverConfig
 from open_atp.verify import ProofResult
@@ -93,18 +101,22 @@ class AgentProverConfig(AutomatedProverConfig):
     """Configuration for :class:`AgentProver`.
 
     Extends :class:`~open_atp.provers.base.AutomatedProverConfig` (``timeout_s``,
-    ``env``) with the agent-harness knobs.
+    ``env``) with the asset/skill orchestration knobs and -- by *composition* -- a
+    :class:`~open_atp.harness.HarnessConfig` describing which agent CLI to drive and
+    how (model, effort, and that harness's own guards). Customizing is explicit:
+    ``AgentProverConfig(harness=VibeHarnessConfig(max_turns=8))``.
 
     Attributes
     ----------
-    harness : str
-        Which agent CLI to drive: one of ``claude_code`` | ``opencode`` | ``codex``
-        | ``vibe``. Default ``claude_code``.
-    model : str
-        Model id passed to the harness. Default ``claude-opus-4-8``.
-    effort : str
-        Reasoning-effort level passed to harnesses that support it. Default
-        ``high``.
+    harness : HarnessConfig
+        The harness to drive and its knobs, as a
+        :class:`~open_atp.harness.HarnessConfig` instance:
+        :class:`~open_atp.harness.ClaudeCodeHarnessConfig` (default) |
+        :class:`~open_atp.harness.CodexHarnessConfig` |
+        :class:`~open_atp.harness.OpenCodeHarnessConfig` |
+        :class:`~open_atp.harness.VibeHarnessConfig` |
+        :class:`~open_atp.harness.AxProverHarnessConfig`. Carries ``model``/``effort``
+        plus any harness-specific knobs.
     assets : str
         Vendored skill/prompt/MCP asset bundle to mount into the workdir. Default
         ``default``.
@@ -118,32 +130,35 @@ class AgentProverConfig(AutomatedProverConfig):
     extra_env : dict[str, str]
         Additional environment variables forwarded into the agent sandbox. Default
         empty.
-    agent : str
-        Vibe-only: which vibe agent profile to drive (``lean`` is Leanstral;
-        ``lean-standin`` the non-Labs, model-templated stand-in). Ignored by the
-        other harnesses. Default ``lean``.
-    max_turns : int, optional
-        Vibe-only programmatic-run guard passed straight to ``vibe -p``. ``None``
-        leaves it unset. Ignored by the other harnesses.
-    max_price : float, optional
-        Vibe-only programmatic-run guard passed straight to ``vibe -p``. ``None``
-        leaves it unset. Ignored by the other harnesses.
-    max_iterations : int, optional
-        AxProver-only cap on ax-prover's proposer->builder->reviewer loop. ``None``
-        keeps ax-prover's default (50). Ignored by the other harnesses.
     """
 
-    harness: str = "claude_code"
-    model: str = "claude-opus-4-8"
-    effort: str = "high"
+    harness: HarnessConfig = field(default_factory=ClaudeCodeHarnessConfig)
     assets: str = "default"
     skills: list[str] | None = None
     plugins: list[str] | None = None
     extra_env: dict[str, str] = field(default_factory=dict)
-    agent: str = "lean"
-    max_turns: int | None = None
-    max_price: float | None = None
-    max_iterations: int | None = None
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, object]) -> Self:
+        """Rehydrate the composed ``harness`` config, then build as usual.
+
+        ``harness`` is a :class:`~open_atp.harness.HarnessConfig` instance, but a
+        serialized/hand-written config carries the harness by registry *name* (the
+        JSON-friendly form, matching ``result.metadata["harness"]``). Two forms are
+        accepted and resolved through :data:`~open_atp.harness.HARNESS_CONFIGS`: a bare
+        name string (``"vibe"`` -> defaults) or a mapping with a ``"name"`` key plus
+        knobs (``{"name": "vibe", "max_turns": 8}``). An already-built ``HarnessConfig``
+        passes through untouched.
+        """
+        harness = data.get("harness")
+        if isinstance(harness, str):
+            data = {**data, "harness": HARNESS_CONFIGS[harness]()}
+        elif isinstance(harness, Mapping):
+            sub = dict(harness)
+            name = sub.pop("name", None)
+            if isinstance(name, str):
+                data = {**data, "harness": HARNESS_CONFIGS[name].from_dict(sub)}
+        return super().from_dict(data)
 
 
 class AgentProver(AutomatedProver):
@@ -163,16 +178,13 @@ class AgentProver(AutomatedProver):
     to the verify backend):
 
     >>> from open_atp.backends.docker import DockerBackend, DockerConfig
+    >>> from open_atp.harness import CodexHarnessConfig
     >>> from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
     >>> backend = DockerBackend(DockerConfig())
-    >>> config = AgentProverConfig(
-    ...     harness="claude_code",
-    ...     model="claude-opus-4-8",
-    ...     effort="high",
-    ... )
+    >>> config = AgentProverConfig(harness=CodexHarnessConfig(effort="high"))
     >>> prover = AgentProver(config, verification_backend=backend)
-    >>> prover.config.harness
-    'claude_code'
+    >>> prover.config.harness.model
+    'gpt-5.5'
     """
 
     name = "agent"
@@ -205,7 +217,7 @@ class AgentProver(AutomatedProver):
 
         # 3. Configure the workdir for the chosen harness + asset bundle.
         bundle = bundle_for_config(self.config)
-        harness = HARNESSES[self.config.harness].from_config(self.config, assets=bundle)
+        harness = self.config.harness.build(assets=bundle)
         # Prompt precedence: explicit task instructions > bundle default > generic.
         prompt = task.instructions or bundle.default_prompt() or _DEFAULT_PROMPT
         harness.configure_wd(wd, prompt)
@@ -274,7 +286,7 @@ class AgentProver(AutomatedProver):
         cost = parsed.cost_usd
         if cost is None:
             cost = compute_cost_usd(
-                self.config.model, parsed.input_tokens, parsed.output_tokens
+                self.config.harness.model, parsed.input_tokens, parsed.output_tokens
             )
 
         completed: dict[str, str] = {}
@@ -290,8 +302,8 @@ class AgentProver(AutomatedProver):
         result.cost_usd = cost
         result.metadata = {
             "harness": harness.name,
-            "model": self.config.model,
-            "effort": self.config.effort,
+            "model": self.config.harness.model,
+            "effort": self.config.harness.effort,
             "input_tokens": parsed.input_tokens,
             "output_tokens": parsed.output_tokens,
             "stop_reason": parsed.stop_reason,

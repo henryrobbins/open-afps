@@ -35,8 +35,9 @@ from typing import Any, Literal
 
 from open_atp.backends.base import ComputeSession
 from open_atp.harness import (
-    HARNESSES,
+    ClaudeCodeHarnessConfig,
     Harness,
+    HarnessConfig,
     HarnessRunResult,
     compute_cost_usd,
     resolve_bundle,
@@ -98,8 +99,9 @@ class NuminaProverConfig(AgentProverConfig):
 
     Attributes
     ----------
-    harness : str
-        Fixed to ``claude_code``: Numina is claude-CLI driven and not configurable.
+    harness : HarnessConfig
+        Fixed to a :class:`~open_atp.harness.ClaudeCodeHarnessConfig`: Numina is
+        claude-CLI driven and not configurable (pinned ``init=False``).
     assets : str
         Asset bundle to mount. Default ``numina`` (coordinator prompt + vendored
         skills + subagent prompts).
@@ -124,7 +126,7 @@ class NuminaProverConfig(AgentProverConfig):
         empty.
     """
 
-    harness: str = "claude_code"
+    harness: HarnessConfig = field(default_factory=ClaudeCodeHarnessConfig, init=False)
     assets: str = "numina"
     max_rounds: int = 20
     max_consecutive_limits: int = 2
@@ -180,9 +182,7 @@ class NuminaProver(AgentProver):
         # 3. Configure the workdir with the Numina asset bundle (coordinator prompt
         #    + vendored skills + subagent prompts).
         bundle = resolve_bundle(self.config.assets)
-        harness = HARNESSES[self.config.harness](
-            self.config.model, self.config.effort, assets=bundle
-        )
+        harness = self.config.harness.build(assets=bundle)
         base_prompt = task.instructions or bundle.default_prompt() or _FALLBACK_PROMPT
         harness.configure_wd(wd, base_prompt + _END_REASON_PROTOCOL)
         stdout_path = logs_dir / "stdout.txt"
@@ -248,8 +248,8 @@ class NuminaProver(AgentProver):
         result.cost_usd = loop["total_cost_usd"] + helper["cost_usd"]
         result.metadata = {
             "harness": harness.name,
-            "model": self.config.model,
-            "effort": self.config.effort,
+            "model": self.config.harness.model,
+            "effort": self.config.harness.effort,
             "assets": self.config.assets,
             "input_tokens": loop["input_tokens"],
             "output_tokens": loop["output_tokens"],
@@ -327,7 +327,9 @@ class NuminaProver(AgentProver):
             if round_cost is None:
                 round_cost = (
                     compute_cost_usd(
-                        self.config.model, parsed.input_tokens, parsed.output_tokens
+                        self.config.harness.model,
+                        parsed.input_tokens,
+                        parsed.output_tokens,
                     )
                     or 0.0
                 )

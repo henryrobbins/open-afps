@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
+from typing import ClassVar
 
 from open_atp.harness._paths import _SCRIPTS
-from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
+from open_atp.harness.base import AuthSpec, Harness, HarnessConfig, HarnessRunResult
 
 
 class CodexHarness(Harness):
@@ -83,3 +85,15 @@ class CodexHarness(Harness):
                 result.stop_reason = sr
         # Codex does not surface USD; left as None so the prover fills from tokens.
         return result
+
+
+@dataclass
+class CodexHarnessConfig(HarnessConfig):
+    """:class:`~open_atp.harness.base.HarnessConfig` for the Codex CLI.
+
+    Codex authenticates via ChatGPT/OpenAI, so it must run an OpenAI model; ``model``
+    defaults to ``gpt-5.5`` rather than the Anthropic base default.
+    """
+
+    model: str = "gpt-5.5"
+    harness_cls: ClassVar[type[Harness]] = CodexHarness

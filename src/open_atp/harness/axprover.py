@@ -5,11 +5,18 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
 from open_atp.harness._paths import _SCRIPTS
-from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult, _infer_provider
+from open_atp.harness.base import (
+    AuthSpec,
+    Harness,
+    HarnessConfig,
+    HarnessRunResult,
+    _infer_provider,
+)
 from open_atp.harness.bundles import AssetBundle
 
 #: Cap on ax-prover's per-call LLM retries (its ``DEFAULT_LLM_RETRY_CONFIG`` ships
@@ -49,6 +56,8 @@ class AxProverHarness(Harness):
 
     name = "axprover"
 
+    config: AxProverHarnessConfig
+
     #: open-atp provider name -> ax-prover's LangChain ``provider:model`` prefix.
     _AX_PROVIDER_PREFIX: ClassVar[dict[str, str]] = {
         "anthropic": "anthropic",
@@ -58,26 +67,11 @@ class AxProverHarness(Harness):
     }
 
     def __init__(
-        self,
-        model: str,
-        effort: str = "medium",
-        *,
-        max_iterations: int | None = None,
-        assets: AssetBundle | None = None,
+        self, config: AxProverHarnessConfig, assets: AssetBundle | None = None
     ) -> None:
-        super().__init__(model, effort, assets)
-        self.max_iterations = max_iterations
+        super().__init__(config, assets)
         #: Set in :meth:`configure_wd`; where :meth:`parse` looks for usage files.
         self._wd: Path | None = None
-
-    @classmethod
-    def from_config(cls, config: Any, *, assets: AssetBundle | None = None) -> Harness:
-        return cls(
-            config.model,
-            config.effort,
-            max_iterations=getattr(config, "max_iterations", None),
-            assets=assets,
-        )
 
     def auth_spec(self) -> AuthSpec:
         # Raw provider keys, exactly like OpenCodeHarness; ax-prover reads them from
@@ -171,8 +165,8 @@ class AxProverHarness(Harness):
             },
             "prover": {"prover_llm": "${llm_configs.open_atp}"},
         }
-        if self.max_iterations is not None:
-            config["prover"]["max_iterations"] = int(self.max_iterations)
+        if self.config.max_iterations is not None:
+            config["prover"]["max_iterations"] = int(self.config.max_iterations)
         return json.dumps(config, indent=2)
 
     def _agent_command(self) -> str:
@@ -220,3 +214,21 @@ class AxProverHarness(Harness):
             if stripped:
                 result.result_text = stripped
         return result
+
+
+@dataclass
+class AxProverHarnessConfig(HarnessConfig):
+    """:class:`~open_atp.harness.base.HarnessConfig` for the ax-prover-base harness.
+
+    Defaults to ``high`` effort, matching ax-prover-base.
+
+    Attributes
+    ----------
+    max_iterations : int, optional
+        Cap on ax-prover's proposer->builder->reviewer loop. ``None`` keeps
+        ax-prover's own default (50).
+    """
+
+    effort: str = "high"
+    max_iterations: int | None = None
+    harness_cls: ClassVar[type[Harness]] = AxProverHarness

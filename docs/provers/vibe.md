@@ -23,24 +23,31 @@ Lean scaffold on a non-Labs **reasoning** model any La Plateforme key can reach
 
 ```python
 from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.harness import VibeHarnessConfig
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 config = AgentProverConfig(
-    harness="vibe",
-    agent="lean-standin",            # "lean" once Labs is enabled
-    model="magistral-medium-latest",
-    max_turns=None,                  # passed to `vibe -p --max-turns`
-    max_price=None,                  # passed to `vibe -p --max-price`
+    harness=VibeHarnessConfig(
+        agent="lean-standin",            # "lean" once Labs is enabled
+        model="magistral-medium-latest",
+        max_turns=None,                  # passed to `vibe -p --max-turns`
+        max_price=None,                  # passed to `vibe -p --max-price`
+    ),
 )
 prover = AgentProver(config, verification_backend=backend)
 ```
 
+{class}`~open_atp.harness.VibeHarnessConfig` selects the Vibe CLI and carries the
+Vibe-specific `agent`, `max_turns`, and `max_price` knobs (which live only on this
+harness config, not the shared base).
+
 Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI: `vibe`
-(defaults: `agent="lean-standin"`, `model="magistral-medium-latest"`). Swap the model
-with `overrides={"model": "devstral-medium-latest"}`. The `agent`, `max_turns`, and
-`max_price` fields are Vibe-specific.
+(defaults: `agent="lean-standin"`, `model="magistral-medium-latest"`). `get_prover`
+returns this default prover only; to swap the model, construct
+`VibeHarnessConfig(model="devstral-medium-latest")` and pass it to `AgentProverConfig`
+directly (as above).
 
 ## Harness details
 

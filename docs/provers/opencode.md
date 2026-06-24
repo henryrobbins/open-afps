@@ -14,17 +14,19 @@ check. See {doc}`index` for the staging/diff lifecycle every agent harness share
 
 ```python
 from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.harness import OpenCodeHarnessConfig
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 config = AgentProverConfig(
-    harness="opencode",
-    model="claude-opus-4-8",
-    effort="medium",
+    harness=OpenCodeHarnessConfig(model="claude-opus-4-8", effort="medium"),
 )
 prover = AgentProver(config, verification_backend=backend)
 ```
+
+{class}`~open_atp.harness.OpenCodeHarnessConfig` selects the OpenCode CLI; its
+`provider` is inferred from the model prefix unless set explicitly.
 
 Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
 `agent:opencode`. The provider is inferred from the model prefix (`claude-*` →

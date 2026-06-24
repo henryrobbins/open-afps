@@ -49,7 +49,7 @@ from pathlib import Path
 import pytest
 
 from open_atp.backends.base import ComputeBackend
-from open_atp.harness import HARNESSES, AssetBundle, Harness, VibeHarness
+from open_atp.harness import HARNESS_CONFIGS, AssetBundle, Harness, VibeHarnessConfig
 from open_atp.images import DEFAULT_IMAGE
 
 pytestmark = pytest.mark.agent_api
@@ -159,13 +159,14 @@ def _make_harness(harness: str) -> Harness:
     if harness == "vibe":
         # The builtin ``lean`` agent is Labs-gated; drive the vendored non-Labs
         # ``lean-standin`` stand-in so the probe runs without Labs access.
-        return VibeHarness(
+        return VibeHarnessConfig(
             model=_MODELS["vibe"],
             effort="low",
             agent="lean-standin",
-            assets=PROBE_BUNDLE,
-        )
-    return HARNESSES[harness](model=_MODELS[harness], effort="low", assets=PROBE_BUNDLE)
+        ).build(PROBE_BUNDLE)
+    return HARNESS_CONFIGS[harness](model=_MODELS[harness], effort="low").build(
+        PROBE_BUNDLE
+    )
 
 
 def _make_run_dir(backend: str, case_id: str) -> Path:

@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import shutil
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
 
 from open_atp.harness.bundles import DEFAULT_BUNDLE, AssetBundle
 
@@ -76,20 +77,20 @@ class Harness(ABC):
     name: ClassVar[str]
 
     def __init__(
-        self, model: str, effort: str = "medium", assets: AssetBundle | None = None
+        self, config: HarnessConfig, assets: AssetBundle | None = None
     ) -> None:
-        self.model = model
-        self.effort = effort
+        self.config = config
         self.assets = assets or DEFAULT_BUNDLE
 
-    @classmethod
-    def from_config(cls, config: Any, *, assets: AssetBundle | None = None) -> Harness:
-        """Build a harness from an :class:`AgentProverConfig`.
+    @property
+    def model(self) -> str:
+        """The model id this harness runs (read from its :class:`HarnessConfig`)."""
+        return self.config.model
 
-        The default reads only the shared ``model``/``effort`` knobs; harnesses with
-        extra config (e.g. :class:`VibeHarness`'s agent/turn/price) override this.
-        """
-        return cls(config.model, config.effort, assets=assets)
+    @property
+    def effort(self) -> str:
+        """The reasoning-effort level (read from its :class:`HarnessConfig`)."""
+        return self.config.effort
 
     @property
     def command(self) -> str:
@@ -178,6 +179,46 @@ class Harness(ABC):
 
     @abstractmethod
     def _parse_lines(self, lines: list[str]) -> HarnessRunResult: ...
+
+
+@dataclass
+class HarnessConfig:
+    """Declarative, serializable config for one agent CLI harness.
+
+    Mirrors the :class:`~open_atp.backends.base.BackendConfig` ->
+    :class:`~open_atp.backends.base.ComputeBackend` split: this config is the spec
+    (the knob set), and :meth:`build` constructs the runtime :class:`Harness` from
+    it. Each harness ships a subclass next to it that sets :attr:`harness_cls` and
+    adds the knobs that harness honours (e.g.
+    :class:`~open_atp.harness.vibe.VibeHarnessConfig`'s ``agent``/``max_turns``/
+    ``max_price``). ``model`` and ``effort`` are shared by every harness and live
+    here on the base.
+
+    Attributes
+    ----------
+    model : str
+        Model id the harness runs. Default ``claude-opus-4-8``.
+    effort : str
+        Reasoning-effort level passed to harnesses that support it. Default
+        ``high``.
+    """
+
+    model: str = "claude-opus-4-8"
+    effort: str = "high"
+
+    #: The harness class :meth:`build` instantiates; set by each subclass.
+    harness_cls: ClassVar[type[Harness]]
+
+    def build(self, assets: AssetBundle | None = None) -> Harness:
+        """Construct the harness this config describes, from a resolved asset bundle."""
+        return self.harness_cls(self, assets)
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, object]) -> Self:
+        """Build from a mapping (e.g. parsed JSON), ignoring unknown keys."""
+        known = {f.name for f in fields(cls) if f.init}
+        kwargs: dict[str, Any] = {k: v for k, v in data.items() if k in known}
+        return cls(**kwargs)
 
 
 def _infer_provider(model: str) -> str:

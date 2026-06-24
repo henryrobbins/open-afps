@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
+from typing import ClassVar
 
 from open_atp.harness._paths import _MCP_JSON, _SCRIPTS
-from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
+from open_atp.harness.base import AuthSpec, Harness, HarnessConfig, HarnessRunResult
 
 
 class ClaudeCodeHarness(Harness):
@@ -95,3 +97,14 @@ class ClaudeCodeHarness(Harness):
                 result.input_tokens = usage.get("input_tokens", result.input_tokens)
                 result.output_tokens = usage.get("output_tokens", result.output_tokens)
         return result
+
+
+@dataclass
+class ClaudeCodeHarnessConfig(HarnessConfig):
+    """:class:`~open_atp.harness.base.HarnessConfig` for the Claude Code CLI.
+
+    Claude Code is the only harness that loads plugins; it has no harness-specific
+    knobs beyond the shared ``model``/``effort``.
+    """
+
+    harness_cls: ClassVar[type[Harness]] = ClaudeCodeHarness
