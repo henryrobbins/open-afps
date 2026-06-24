@@ -18,7 +18,7 @@ then verify in the sandbox — so every prover gets the same final check for fre
 The Claude Code, Codex, OpenCode, AxProver, and Vibe provers are all the same
 {class}`~open_afps.provers.agent_prover.AgentProver` composed with a different
 {class}`~open_afps.harness.base.Harness`; `Spec` is the
-{func}`~open_afps.api.build_prover` registry name. Every prover subclasses
+{func}`~open_afps.api.get_prover` registry name. Every prover subclasses
 {class}`~open_afps.provers.base.AutomatedProver` and funnels its output through the
 shared {class}`~open_afps.core.verifier.Verifier`.
 

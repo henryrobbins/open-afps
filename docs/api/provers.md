@@ -12,8 +12,8 @@ with a {class}`~open_afps.backends.base.ComputeBackend` (the *compute* concern).
 ## Base
 
 The base prover abstraction. An {class}`~open_afps.provers.base.AutomatedProver` is a
-candidate generator; the base class owns the shared lifecycle (generate, then verify
-in the sandbox) so subclasses only implement `prove`.
+candidate generator; the base class owns the shared lifecycle (the public `prove`:
+generate, then verify in the sandbox) so subclasses only implement `_generate`.
 
 ```{eval-rst}
 .. autoclass:: open_afps.provers.base.AutomatedProver

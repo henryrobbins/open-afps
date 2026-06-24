@@ -26,7 +26,7 @@ config = AgentProverConfig(
 prover = AgentProver(config, verification_backend=backend)
 ```
 
-Or by registry spec through {func}`~open_afps.api.build_prover` / the CLI:
+Or by registry spec through {func}`~open_afps.api.get_prover` / the CLI:
 `agent:codex`. Because Codex authenticates through ChatGPT/OpenAI it must run an
 OpenAI model, so the `agent:codex` spec defaults `model` to `gpt-5.5` rather than the
 `AgentProverConfig` Anthropic default.

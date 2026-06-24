@@ -56,12 +56,15 @@ config = AgentProverConfig(
 prover = AgentProver(config, verification_backend=backend)
 
 task = ProofTask(project=LeanProject("path/to/lake/project"))
-result = prover.run(task, workdir=Path("runs/demo"))
+result = prover.prove(task, output_dir=Path("runs/demo"))
 
 print("success:", result.success)
 print("cost_usd:", result.cost_usd)
 print("duration_s:", result.duration_s)
 ```
+
+`prove` populates `output_dir/{wd,logs}/`: `wd` is the completed lake project and
+`logs` holds the run record (`stdout.txt`, `stderr.txt`, `result.json`).
 
 Swap `harness` for `"codex"` or `"opencode"` (and the matching `model`) to use a
 different agent CLI — see the per-harness prover pages under {doc}`../provers/index`.
@@ -87,7 +90,7 @@ config = AristotleProverConfig(
 prover = AristotleProver(config, verification_backend=backend)
 
 task = ProofTask(project=LeanProject("path/to/lake/project"))
-result = prover.run(task, workdir=Path("runs/aristotle_demo"))
+result = prover.prove(task, output_dir=Path("runs/aristotle_demo"))
 ```
 
 ## Inspecting the result
@@ -101,6 +104,9 @@ result.completed_files   # {relative path -> new file contents}
 result.verification      # VerificationReport (per-file compile, axioms, log)
 result.cost_usd          # estimated USD, when the prover reports it
 result.duration_s        # wall-clock seconds
+result.output_dir        # the run's output dir
+result.wd                # output_dir/wd  -- the completed lake project
+result.logs_dir          # output_dir/logs -- stdout.txt, stderr.txt, result.json
 ```
 
 The {class}`~open_afps.core.result.VerificationReport` exposes the individual

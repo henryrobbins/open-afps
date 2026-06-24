@@ -2,7 +2,7 @@
 
 The reference mirrors the package layout under `src/open_afps/`:
 
-- {doc}`platform` — `open_afps.api`: the dispatch layer ({func}`~open_afps.api.build_prover`, {class}`~open_afps.api.Platform`, {class}`~open_afps.api.SolveResult`).
+- {doc}`platform` — `open_afps.api`: the prover registry ({class}`~open_afps.api.PROVERS`, {func}`~open_afps.api.get_prover`, {func}`~open_afps.api.available_provers`).
 - {doc}`core/index` — `open_afps.core`: the task/result contracts and the shared verifier.
 - {doc}`backends` — `open_afps.backends`: the `ComputeBackend` sandbox primitive (`docker` | `modal`).
 - {doc}`provers` — `open_afps.provers`: the `AutomatedProver` base and the concrete candidate generators.

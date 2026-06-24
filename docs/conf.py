@@ -65,16 +65,15 @@ numpydoc_show_class_members = False
 numpydoc_xref_param_type = True
 numpydoc_xref_ignore = {"of", "or", "optional", "default"}
 numpydoc_xref_aliases = {
-    # Platform
-    "Platform": "open_afps.api.Platform",
-    "SolveResult": "open_afps.api.SolveResult",
-    "build_prover": "open_afps.api.build_prover",
+    # Registry
+    "PROVERS": "open_afps.api.PROVERS",
+    "get_prover": "open_afps.api.get_prover",
+    "stage_files": "open_afps.utils.stage_files",
     # Core
     "LeanProject": "open_afps.core.task.LeanProject",
     "ProofTask": "open_afps.core.task.ProofTask",
     "ToolchainMismatch": "open_afps.core.task.ToolchainMismatch",
     "VerificationReport": "open_afps.core.result.VerificationReport",
-    "GenerationOutput": "open_afps.core.result.GenerationOutput",
     "ProofResult": "open_afps.core.result.ProofResult",
     "Verifier": "open_afps.core.verifier.Verifier",
     "AutomatedProver": "open_afps.provers.base.AutomatedProver",

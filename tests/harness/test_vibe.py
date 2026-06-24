@@ -24,6 +24,7 @@ from pathlib import Path
 import pytest
 
 from open_afps.backends.docker import DockerBackend, DockerConfig
+from open_afps.core.result import ProofResult
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.harness import HARNESSES, Harness, VibeHarness
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
@@ -205,13 +206,21 @@ def test_parse_without_session_log_leaves_cost_none(tmp_path: Path) -> None:
 # --- prove() diff logic (no Docker) ----------------------------------------
 
 
-def test_prove_reports_changes_and_session_cost(
+def test_generate_reports_changes_and_session_cost(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """prove(): stage -> stubbed agent writes a solved file + session log -> diff."""
+    """_generate(): stage -> stubbed agent writes a solved file + session log -> diff.
+
+    Drives the generation half directly (no Docker verify) and asserts the vibe
+    session log is relocated into the logs dir.
+    """
 
     def _fake_run_agent(
-        self: AgentProver, workdir: Path, harness: Harness
+        self: AgentProver,
+        workdir: Path,
+        harness: Harness,
+        stdout_path: Path,
+        session: object | None = None,
     ) -> tuple[list[str], str]:
         (workdir / "MILExample.lean").write_text(SOLVED_FILE)
         # The real vibe run writes this; emulate it so parse() finds the cost.
@@ -221,20 +230,23 @@ def test_prove_reports_changes_and_session_cost(
 
     monkeypatch.setattr(AgentProver, "_run_agent", _fake_run_agent)
     prover = _make_prover()
-    workdir = tmp_path / "wd"
+    wd = tmp_path / "wd"
+    logs_dir = tmp_path / "logs"
+    wd.mkdir()
+    logs_dir.mkdir()
+    result = ProofResult(prover="agent", verification=None, output_dir=tmp_path)
 
-    output = prover.prove(ProofTask(LeanProject(FIXTURE)), workdir)
+    prover._generate(ProofTask(LeanProject(FIXTURE)), wd, logs_dir, result)
 
-    assert (workdir / "MILExample.lean").read_text() == SOLVED_FILE
-    assert list(output.completed_files) == ["MILExample.lean"]
+    assert (wd / "MILExample.lean").read_text() == SOLVED_FILE
+    assert list(result.completed_files) == ["MILExample.lean"]
     # The session log was relocated out of the workdir into the run's logs dir, so
-    # download_wd stays the proof project and download_logs carries the record.
-    logs_dir = workdir.parent / "logs"
-    assert not (workdir / ".vibe" / "logs").exists()
+    # the wd stays the proof project and the logs dir carries the record.
+    assert not (wd / ".vibe" / "logs").exists()
     assert (logs_dir / "vibe-session").is_dir()
     assert list((logs_dir / "vibe-session").rglob("meta.json"))
     # Cost flows straight from the session log (vibe never self-reports in stdout).
-    assert output.cost_usd == pytest.approx(0.0119204)
-    assert output.metadata["harness"] == "vibe"
-    assert output.metadata["model"] == "magistral-medium-latest"
-    assert output.metadata["input_tokens"] == 26951
+    assert result.cost_usd == pytest.approx(0.0119204)
+    assert result.metadata["harness"] == "vibe"
+    assert result.metadata["model"] == "magistral-medium-latest"
+    assert result.metadata["input_tokens"] == 26951

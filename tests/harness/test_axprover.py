@@ -24,6 +24,7 @@ from pathlib import Path
 import pytest
 
 from open_afps.backends.docker import DockerBackend, DockerConfig
+from open_afps.core.result import ProofResult
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.harness import HARNESSES, AxProverHarness, Harness
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
@@ -192,13 +193,21 @@ def test_parse_without_usage_files_reports_zero_tokens(tmp_path: Path) -> None:
 # --- prove() diff logic (no Docker) ----------------------------------------
 
 
-def test_prove_reports_changes_and_token_cost(
+def test_generate_reports_changes_and_token_cost(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """prove(): stage -> stubbed agent writes a solved file + usage file -> diff."""
+    """_generate(): stage -> stubbed agent writes a solved file + usage file -> diff.
+
+    Drives the generation half directly (no Docker verify) and asserts the per-target
+    usage file is relocated into the logs dir.
+    """
 
     def _fake_run_agent(
-        self: AgentProver, workdir: Path, harness: Harness
+        self: AgentProver,
+        workdir: Path,
+        harness: Harness,
+        stdout_path: Path,
+        session: object | None = None,
     ) -> tuple[list[str], str]:
         (workdir / "MILExample.lean").write_text(SOLVED_FILE)
         # The real run writes this; emulate it so parse() finds the tokens.
@@ -208,22 +217,25 @@ def test_prove_reports_changes_and_token_cost(
 
     monkeypatch.setattr(AgentProver, "_run_agent", _fake_run_agent)
     prover = _make_prover()
-    workdir = tmp_path / "wd"
+    wd = tmp_path / "wd"
+    logs_dir = tmp_path / "logs"
+    wd.mkdir()
+    logs_dir.mkdir()
+    result = ProofResult(prover="agent", verification=None, output_dir=tmp_path)
 
-    output = prover.prove(ProofTask(LeanProject(FIXTURE)), workdir)
+    prover._generate(ProofTask(LeanProject(FIXTURE)), wd, logs_dir, result)
 
-    assert (workdir / "MILExample.lean").read_text() == SOLVED_FILE
-    assert list(output.completed_files) == ["MILExample.lean"]
+    assert (wd / "MILExample.lean").read_text() == SOLVED_FILE
+    assert list(result.completed_files) == ["MILExample.lean"]
     # The per-target usage file was relocated out of the workdir into the logs dir.
-    logs_dir = workdir.parent / "logs"
-    assert not (workdir / "ax_output.MILExample_lean.json").exists()
+    assert not (wd / "ax_output.MILExample_lean.json").exists()
     assert (logs_dir / "ax_output.MILExample_lean.json").is_file()
     # cost_usd is derived from the token table for claude-opus-4-8 (5/25 per Mtok).
     expected = 1_000_000 * 5.0 / 1e6 + 100_000 * 25.0 / 1e6
-    assert output.cost_usd == pytest.approx(expected)
-    assert output.metadata["harness"] == "axprover"
-    assert output.metadata["model"] == "claude-opus-4-8"
-    assert output.metadata["input_tokens"] == 1_000_000
+    assert result.cost_usd == pytest.approx(expected)
+    assert result.metadata["harness"] == "axprover"
+    assert result.metadata["model"] == "claude-opus-4-8"
+    assert result.metadata["input_tokens"] == 1_000_000
 
 
 # --- live integration (opt-in) ---------------------------------------------
@@ -285,7 +297,7 @@ def test_live_axprover_solves_trivial_theorem(backend: str, tmp_path: Path) -> N
     )
     prover = AgentProver(config, _make_live_backend(backend))
 
-    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
 
     assert result.completed_files, "ax-prover returned no changed files"
     assert result.success, result.verification and result.verification.compile_log

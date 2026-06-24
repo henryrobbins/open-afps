@@ -20,12 +20,18 @@ import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TextIO
 
-from open_afps.backends.base import CommandResult, ComputeBackend, ComputeSession
-from open_afps.core.result import GenerationOutput
+from open_afps.backends.base import (
+    CommandHandle,
+    CommandResult,
+    ComputeBackend,
+    ComputeSession,
+)
+from open_afps.core.result import ProofResult
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.harness import HARNESSES, Harness, bundle_for_config, compute_cost_usd
-from open_afps.provers.base import AutomatedProver, AutomatedProverConfig, logs_dir_for
+from open_afps.provers.base import AutomatedProver, AutomatedProverConfig
 
 log = logging.getLogger(__name__)
 
@@ -156,14 +162,16 @@ class AgentProver(AutomatedProver):
         # the agent, local Docker for the cheap final check) -- but defaults to shared.
         self.agent_backend = agent_backend or verification_backend
 
-    def prove(self, task: ProofTask, workdir: Path) -> GenerationOutput:
+    def _generate(
+        self, task: ProofTask, wd: Path, logs_dir: Path, result: ProofResult
+    ) -> None:
         # 1. Stage the project so the workdir is a complete project to edit in place.
-        shutil.copytree(task.project.root, workdir, dirs_exist_ok=True, ignore=_IGNORE)
+        shutil.copytree(task.project.root, wd, dirs_exist_ok=True, ignore=_IGNORE)
 
         # 2. Snapshot the original .lean contents for the post-run diff.
         original = {
-            p.relative_to(workdir).as_posix(): p.read_text()
-            for p in workdir.rglob("*.lean")
+            p.relative_to(wd).as_posix(): p.read_text()
+            for p in wd.rglob("*.lean")
             if ".lake" not in p.parts
         }
 
@@ -172,7 +180,8 @@ class AgentProver(AutomatedProver):
         harness = HARNESSES[self.config.harness].from_config(self.config, assets=bundle)
         # Prompt precedence: explicit task instructions > bundle default > generic.
         prompt = task.instructions or bundle.default_prompt() or _DEFAULT_PROMPT
-        harness.configure_wd(workdir, prompt)
+        harness.configure_wd(wd, prompt)
+        stdout_path = logs_dir / "stdout.txt"
 
         # 4. Run the agent. When generation and verification share a backend, keep the
         #    sandbox alive and run the final check in it -- no second spin-up.
@@ -181,29 +190,57 @@ class AgentProver(AutomatedProver):
             # created; per-command env is forwarded by _run_agent's exec.
             _, mounts = self._auth(harness)
             with self.agent_backend.session(
-                workdir, mounts=mounts, timeout_s=self.config.timeout_s
+                wd, mounts=mounts, timeout_s=self.config.timeout_s
             ) as session:
-                lines, stderr = self._run_agent(workdir, harness, session=session)
-                # Bring the agent's edits back to the host so the diff sees them
-                # (no-op for bind-mounted Docker; a tar pull for Modal).
-                session.sync_out()
-                output = self._build_output(workdir, harness, lines, original, stderr)
-                output.verification = self.verifier.verify(
-                    LeanProject(workdir), session=session
+                lines, stderr = self._run_agent(
+                    wd, harness, stdout_path, session=session
                 )
-                return output
+                self._download_wd(wd, session=session)
+                # Parse (which reads harness usage files still in wd) before
+                # _download_logs relocates them out.
+                self._fill_result(result, harness, wd, original, lines)
+                self._download_logs(harness, wd, logs_dir, stderr)
+                result.verification = self.verifier.verify(
+                    LeanProject(wd), session=session
+                )
+                return
 
-        lines, stderr = self._run_agent(workdir, harness)
-        return self._build_output(workdir, harness, lines, original, stderr)
+        lines, stderr = self._run_agent(wd, harness, stdout_path)
+        self._download_wd(wd)
+        self._fill_result(result, harness, wd, original, lines)
+        self._download_logs(harness, wd, logs_dir, stderr)
 
-    def _build_output(
+    def _download_wd(self, wd: Path, session: ComputeSession | None = None) -> None:
+        """Bring the agent's edits onto the host at ``wd``.
+
+        A tar pull for a live Modal session; a no-op for bind-mounted Docker (where the
+        agent wrote ``wd`` directly) and for the one-shot path (whose backend syncs out
+        on context exit).
+        """
+        if session is not None:
+            session.sync_out()
+
+    def _download_logs(
+        self, harness: Harness, wd: Path, logs_dir: Path, stderr: str = ""
+    ) -> None:
+        """Populate ``logs_dir`` with the run record beside the live ``stdout.txt``.
+
+        The streamed stdout is already teed into ``logs_dir/stdout.txt`` as it arrives;
+        here we relocate any harness-specific rich logs out of the workdir (no-op for
+        the CLI harnesses) and write the captured ``stderr``.
+        """
+        harness.collect_logs(wd, logs_dir)
+        if stderr:
+            (logs_dir / "stderr.txt").write_text(stderr)
+
+    def _fill_result(
         self,
-        workdir: Path,
+        result: ProofResult,
         harness: Harness,
-        lines: list[str],
+        wd: Path,
         original: dict[str, str],
-        stderr: str = "",
-    ) -> GenerationOutput:
+        lines: list[str],
+    ) -> None:
         """Token totals -> cost, then diff the workdir against the staged originals."""
         parsed = harness.parse(lines)
         cost = parsed.cost_usd
@@ -213,32 +250,24 @@ class AgentProver(AutomatedProver):
             )
 
         completed: dict[str, str] = {}
-        for path in sorted(workdir.rglob("*.lean")):
+        for path in sorted(wd.rglob("*.lean")):
             if ".lake" in path.parts:
                 continue
-            rel = path.relative_to(workdir).as_posix()
+            rel = path.relative_to(wd).as_posix()
             content = path.read_text()
             if original.get(rel) != content:
                 completed[rel] = content
 
-        # Relocate any harness-specific rich logs out of the workdir into the run's
-        # logs dir (no-op for the CLI harnesses, whose record is the stdout stream).
-        harness.collect_logs(workdir, logs_dir_for(workdir))
-
-        return GenerationOutput(
-            completed_files=completed,
-            cost_usd=cost,
-            logs="\n".join(lines),
-            stderr=stderr,
-            metadata={
-                "harness": harness.name,
-                "model": self.config.model,
-                "effort": self.config.effort,
-                "input_tokens": parsed.input_tokens,
-                "output_tokens": parsed.output_tokens,
-                "stop_reason": parsed.stop_reason,
-            },
-        )
+        result.completed_files = completed
+        result.cost_usd = cost
+        result.metadata = {
+            "harness": harness.name,
+            "model": self.config.model,
+            "effort": self.config.effort,
+            "input_tokens": parsed.input_tokens,
+            "output_tokens": parsed.output_tokens,
+            "stop_reason": parsed.stop_reason,
+        }
 
     def _auth(self, harness: Harness) -> tuple[dict[str, str], list[tuple[str, str]]]:
         """Resolve the harness's :class:`AuthSpec` into backend env + mounts."""
@@ -256,13 +285,20 @@ class AgentProver(AutomatedProver):
         return env, mounts
 
     def _run_agent(
-        self, workdir: Path, harness: Harness, session: ComputeSession | None = None
+        self,
+        workdir: Path,
+        harness: Harness,
+        stdout_path: Path,
+        session: ComputeSession | None = None,
     ) -> tuple[list[str], str]:
-        """Resolve auth, launch the agent in the backend, and drain its stdout.
+        """Resolve auth, launch the agent in the backend, and tee its stdout.
 
-        Returns ``(stdout_lines, stderr)`` -- the streamed event lines plus the run's
-        captured stderr (Modal's ``modal_stderr.txt`` / the one-shot run's stderr),
-        which the prover writes to ``logs/stderr.txt``.
+        Each streamed event line is written to ``stdout_path`` (opened in append mode,
+        so a multi-round caller accumulates one transcript) as it arrives -- the live
+        run log -- and collected to return for token/cost parsing. Returns
+        ``(stdout_lines, stderr)``: the lines plus the run's captured stderr (Modal's
+        ``modal_stderr.txt`` / the one-shot run's stderr), which the prover writes to
+        ``logs/stderr.txt``.
 
         Isolated (it owns credential resolution + the backend call) so tests can
         stand in a fake run -- write a solved file, return a captured stream --
@@ -274,24 +310,32 @@ class AgentProver(AutomatedProver):
         """
         env, mounts = self._auth(harness)
         lines: list[str] = []
-        if session is not None:
-            # Mounts were pinned at session creation; only per-command env here.
-            handle = session.exec(harness.command, env=env)
-            lines.extend(handle.stream())
-            result = handle.wait()
-            self._log_agent_result(harness, result, lines)
+
+        def drain(handle: CommandHandle, sink: TextIO) -> None:
+            for line in handle.stream():
+                sink.write(line + "\n")
+                sink.flush()
+                lines.append(line)
+
+        with stdout_path.open("a", encoding="utf-8") as sink:
+            if session is not None:
+                # Mounts were pinned at session creation; only per-command env here.
+                handle = session.exec(harness.command, env=env)
+                drain(handle, sink)
+                result = handle.wait()
+                self._log_agent_result(harness, result, lines)
+                return lines, result.stderr
+            with self.agent_backend.start(
+                workdir,
+                harness.command,
+                env=env,
+                mounts=mounts,
+                timeout_s=self.config.timeout_s,
+            ) as handle:
+                drain(handle, sink)
+                result = handle.wait()
+                self._log_agent_result(harness, result, lines)
             return lines, result.stderr
-        with self.agent_backend.start(
-            workdir,
-            harness.command,
-            env=env,
-            mounts=mounts,
-            timeout_s=self.config.timeout_s,
-        ) as handle:
-            lines.extend(handle.stream())
-            result = handle.wait()
-            self._log_agent_result(harness, result, lines)
-        return lines, result.stderr
 
     def _log_agent_result(
         self, harness: Harness, result: CommandResult, lines: list[str]

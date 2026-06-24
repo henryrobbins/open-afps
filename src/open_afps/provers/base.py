@@ -1,11 +1,20 @@
 """Base prover abstraction.
 
 An :class:`AutomatedProver` is a *candidate generator*: it takes a
-:class:`~open_afps.core.task.ProofTask` and produces completed Lean files. The base
-class owns the shared lifecycle -- generate, then verify in the sandbox -- so that
-subclasses only implement ``prove`` and every prover (including Aristotle) gets the
-same final check for free. Concrete provers live alongside this base in
-``open_afps.provers``.
+:class:`~open_afps.core.task.ProofTask` and a caller-chosen output directory, fills
+the project's ``sorry``\\s, verifies the result in a shared sandbox, and returns a
+:class:`~open_afps.core.result.ProofResult`. The base class owns the shared lifecycle
+-- stage the output layout, generate, then verify -- so subclasses only implement
+``_generate`` and every prover (including Aristotle) gets the same final check for
+free. Concrete provers live alongside this base in ``open_afps.provers``.
+
+The public entry point is :meth:`AutomatedProver.prove`. A caller constructs a prover
+directly (or via :func:`open_afps.api.get_prover`) and calls it::
+
+    result = prover.prove(task, output_dir)
+
+``prove`` populates ``output_dir/{wd,logs}/``: ``wd`` is the completed lake project
+and ``logs`` is the run record.
 """
 
 from __future__ import annotations
@@ -17,21 +26,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from open_afps.backends.base import ComputeBackend
-from open_afps.core.result import GenerationOutput, ProofResult
-from open_afps.core.task import ProofTask
+from open_afps.core.result import ProofResult
+from open_afps.core.task import LeanProject, ProofTask
 from open_afps.core.verifier import Verifier
-
-
-def logs_dir_for(workdir: Path) -> Path:
-    """The logs directory paired with ``workdir`` (``<run>/<label>/logs``).
-
-    The platform stages each run as ``<run>/<label>/{wd,logs}/``; ``workdir`` is the
-    ``wd`` half (the proof project) and this is its ``logs`` sibling. Provers that
-    write rich logs inside the sandbox (Vibe, ax-prover, Aristotle) relocate them
-    here so ``download_wd`` stays the proof project and ``download_logs`` carries the
-    full record. Kept in one place so every prover agrees on the convention.
-    """
-    return workdir.parent / "logs"
 
 
 @dataclass
@@ -72,11 +69,6 @@ class AutomatedProver(abc.ABC):
 
     name: str = "base"
 
-    #: Filename for the run's captured primary output under ``logs/``. For agentic
-    #: provers this is the streamed event JSONL; Aristotle (no stream) overrides it
-    #: with its run summary.
-    stream_log_name: str = "stdout.jsonl"
-
     def __init__(
         self, config: AutomatedProverConfig, verification_backend: ComputeBackend
     ) -> None:
@@ -88,63 +80,48 @@ class AutomatedProver(abc.ABC):
         )
 
     @abc.abstractmethod
-    def prove(self, task: ProofTask, workdir: Path) -> GenerationOutput:
-        """Produce completed files for ``task`` inside ``workdir``.
+    def _generate(
+        self, task: ProofTask, wd: Path, logs_dir: Path, result: ProofResult
+    ) -> None:
+        """Generate the completed project in ``wd`` and record the run in ``result``.
 
-        Implementations must leave ``workdir`` containing the full completed project
-        so the verifier can compile it in place, and return a
-        :class:`GenerationOutput` describing what was produced.
+        Implementations must leave ``wd`` containing the full completed project so the
+        verifier can compile it in place, write the run's logs into ``logs_dir``, and
+        fill ``result`` (``completed_files``, ``cost_usd``, ``metadata``). A prover that
+        already verified the candidate in its own live sandbox sets
+        ``result.verification`` itself; otherwise :meth:`prove` runs the shared check.
         """
 
-    def run(self, task: ProofTask, workdir: Path) -> ProofResult:
-        """Full lifecycle: reject-on-mismatch, generate, verify, package result."""
+    def prove(self, task: ProofTask, output_dir: Path | str) -> ProofResult:
+        """Full lifecycle: reject-on-mismatch, generate, verify, write the result.
+
+        ``output_dir`` is caller-chosen and is populated as ``output_dir/{wd,logs}/``:
+        ``wd`` is the completed lake project (the proof output) and ``logs`` is the run
+        record (the agent ``stdout.txt``/``stderr.txt``, ``result.json``, and any
+        harness-specific rich logs).
+        """
         self.verifier.check_compatible(task.project)
 
-        # Create the logs sibling up front so ``prove`` (which relocates harness-
-        # specific rich logs here) and the post-run materialization both have a target.
-        logs_dir = logs_dir_for(workdir)
+        output_dir = Path(output_dir)
+        wd = output_dir / "wd"
+        logs_dir = output_dir / "logs"
+        wd.mkdir(parents=True, exist_ok=True)
         logs_dir.mkdir(parents=True, exist_ok=True)
 
+        result = ProofResult(prover=self.name, verification=None, output_dir=output_dir)
         start = time.monotonic()
-        output = self.prove(task, workdir)
-        duration = time.monotonic() - start
+        self._generate(task, wd, logs_dir, result)
+        result.duration_s = time.monotonic() - start
 
-        # Verify the project now living in workdir (subclasses sync results there).
-        from open_afps.core.task import LeanProject
-
-        # A prover that ran its generation and the final check in one shared sandbox
-        # (the agent/verify backend-reuse path) reports the report on ``output``; reuse
-        # it rather than spinning a second sandbox. Otherwise verify standalone --
+        # A prover that ran generation and the final check in one shared sandbox (the
+        # agent/verify backend-reuse path) set ``result.verification`` itself; reuse it
+        # rather than spinning a second sandbox. Otherwise verify standalone --
         # Aristotle (no sandbox) and the split-backend case land here.
-        report = output.verification or self.verifier.verify(LeanProject(workdir))
+        if result.verification is None:
+            result.verification = self.verifier.verify(LeanProject(wd))
 
-        result = ProofResult(
-            prover=self.name,
-            verification=report,
-            completed_files=output.completed_files,
-            cost_usd=output.cost_usd,
-            duration_s=duration,
-            logs=output.logs,
-            artifacts_dir=workdir,
-            logs_dir=logs_dir,
-            metadata=output.metadata,
-        )
-        self._write_logs(output, result, logs_dir)
-        return result
-
-    def _write_logs(
-        self, output: GenerationOutput, result: ProofResult, logs_dir: Path
-    ) -> None:
-        """Materialize the common log files alongside any relocated rich records.
-
-        The captured primary output (``output.logs`` -- the streamed agent JSONL) and
-        ``stderr`` are written uniformly; harness-specific records were already moved
-        into ``logs_dir`` by ``prove``. ``result.json`` is a self-describing summary so
-        a downloaded logs dir stands on its own.
-        """
-        (logs_dir / self.stream_log_name).write_text(output.logs)
-        if output.stderr:
-            (logs_dir / "stderr.txt").write_text(output.stderr)
+        # A self-describing summary so a downloaded logs dir stands on its own.
         (logs_dir / "result.json").write_text(
             json.dumps(result.to_dict(), indent=2, default=str)
         )
+        return result

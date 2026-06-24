@@ -23,9 +23,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
-from open_afps.core.result import GenerationOutput
+from open_afps.core.result import ProofResult
 from open_afps.core.task import ProofTask
-from open_afps.provers.base import AutomatedProver, AutomatedProverConfig, logs_dir_for
+from open_afps.provers.base import AutomatedProver, AutomatedProverConfig
 
 if TYPE_CHECKING:
     from aristotlelib import AgentTask, Project
@@ -103,15 +103,12 @@ class AristotleProver(AutomatedProver):
 
     config: AristotleProverConfig
 
-    # Aristotle has no streamed event log; its primary captured output is the hosted
-    # agent's run summary, written to ``logs/summary.md`` (the full event record lands
-    # beside it as ``events.json``/``transcript.txt``).
-    stream_log_name = "summary.md"
-
-    def prove(self, task: ProofTask, workdir: Path) -> GenerationOutput:
+    def _generate(
+        self, task: ProofTask, wd: Path, logs_dir: Path, result: ProofResult
+    ) -> None:
         # Stage the original project so the workdir is a complete project both for the
         # upload and, after extraction, for verification.
-        shutil.copytree(task.project.root, workdir, dirs_exist_ok=True, ignore=_IGNORE)
+        shutil.copytree(task.project.root, wd, dirs_exist_ok=True, ignore=_IGNORE)
 
         original = {
             p.relative_to(task.project.root).as_posix(): p.read_text()
@@ -120,41 +117,37 @@ class AristotleProver(AutomatedProver):
 
         prompt = task.instructions or _DEFAULT_PROMPT
         # The raw result archive and the full run record both belong with the run's
-        # logs, not the proof project. The base ``run`` creates ``logs/`` already; make
-        # it here too so ``prove`` stands alone when called directly.
-        logs_dir = logs_dir_for(workdir)
-        logs_dir.mkdir(parents=True, exist_ok=True)
+        # logs, not the proof project. ``prove`` already created ``logs_dir``; the
+        # hosted agent has no live stdout stream, so its record (events, transcript,
+        # summary) is downloaded here rather than teed.
         result_tar = logs_dir / "aristotle_result.tar.gz"
         downloaded, metadata = asyncio.run(
-            self._submit_and_download(workdir, prompt, result_tar, logs_dir)
+            self._submit_and_download(wd, prompt, result_tar, logs_dir)
         )
 
         if downloaded is not None:
-            self._extract_over(downloaded, workdir)
+            self._extract_over(downloaded, wd)
 
         # Report the .lean files Aristotle changed or added.
         completed: dict[str, str] = {}
-        for path in sorted(workdir.rglob("*.lean")):
+        for path in sorted(wd.rglob("*.lean")):
             if ".lake" in path.parts:
                 continue
-            rel = path.relative_to(workdir).as_posix()
+            rel = path.relative_to(wd).as_posix()
             content = path.read_text()
             if original.get(rel) != content:
                 completed[rel] = content
 
-        summary = (
-            (workdir / "ARISTOTLE_SUMMARY.md").read_text()
-            if (workdir / "ARISTOTLE_SUMMARY.md").is_file()
-            else ""
-        )
+        # The hosted agent's run summary is its primary human-readable record; surface
+        # it beside the event record in the logs dir.
+        summary_src = wd / "ARISTOTLE_SUMMARY.md"
+        if summary_src.is_file():
+            (logs_dir / "summary.md").write_text(summary_src.read_text())
 
-        return GenerationOutput(
-            completed_files=completed,
-            # The Aristotle API does not expose a per-run cost; leave it unset.
-            cost_usd=None,
-            logs=summary,
-            metadata=metadata,
-        )
+        result.completed_files = completed
+        # The Aristotle API does not expose a per-run cost; leave it unset.
+        result.cost_usd = None
+        result.metadata = metadata
 
     async def _submit_and_download(
         self, project_dir: Path, prompt: str, dest_tar: Path, logs_dir: Path

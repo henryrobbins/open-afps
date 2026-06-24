@@ -27,7 +27,7 @@ config = AgentProverConfig(
 prover = AgentProver(config, verification_backend=backend)
 ```
 
-Or by registry spec through {func}`~open_afps.api.build_prover` / the CLI: `agent`
+Or by registry spec through {func}`~open_afps.api.get_prover` / the CLI: `agent`
 (Claude Code is the default harness, so no `:harness` suffix is needed).
 
 ## Harness details

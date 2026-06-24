@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from open_afps.backends.docker import DockerBackend, DockerConfig
+from open_afps.core.result import ProofResult
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.harness import (
     HARNESSES,
@@ -197,16 +198,34 @@ def test_non_claude_harnesses_mount_skills_not_plugins(
     assert not (tmp_path / ".plugins").exists()
 
 
-# --- prove() diff logic (no Docker) ----------------------------------------
+# --- _generate() diff logic (no Docker) ------------------------------------
+#
+# These exercise the generation half directly: the public ``prove`` always runs the
+# shared verifier (Docker), so the no-Docker unit tests call ``_generate`` and assert
+# on the filled :class:`ProofResult` instead.
 
 
-def test_prove_reports_files_the_agent_changed(
+def _run_generate(prover: AgentProver, tmp_path: Path) -> tuple[ProofResult, Path]:
+    wd = tmp_path / "wd"
+    logs_dir = tmp_path / "logs"
+    wd.mkdir()
+    logs_dir.mkdir()
+    result = ProofResult(prover="agent", verification=None, output_dir=tmp_path)
+    prover._generate(ProofTask(LeanProject(FIXTURE)), wd, logs_dir, result)
+    return result, wd
+
+
+def test_generate_reports_files_the_agent_changed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """prove(): stage -> (stubbed) agent writes a solved file -> diff. No Docker."""
+    """_generate(): stage -> (stubbed) agent writes a solved file -> diff. No Docker."""
 
     def _fake_run_agent(
-        self: AgentProver, workdir: Path, harness: Harness
+        self: AgentProver,
+        workdir: Path,
+        harness: Harness,
+        stdout_path: Path,
+        session: object | None = None,
     ) -> tuple[list[str], str]:
         # The real agent would edit files in place; emulate that.
         (workdir / "MILExample.lean").write_text(SOLVED_FILE)
@@ -215,52 +234,59 @@ def test_prove_reports_files_the_agent_changed(
     monkeypatch.setattr(AgentProver, "_run_agent", _fake_run_agent)
     # No CLAUDE_CODE_OAUTH_TOKEN needed: _run_agent (which calls auth) is stubbed.
     prover = _make_prover()
-    workdir = tmp_path / "wd"
 
-    output = prover.prove(ProofTask(LeanProject(FIXTURE)), workdir)
+    result, wd = _run_generate(prover, tmp_path)
 
     # The solved file landed in the workdir and is the only reported change.
-    assert (workdir / "MILExample.lean").read_text() == SOLVED_FILE
-    assert list(output.completed_files) == ["MILExample.lean"]
-    assert "rw [mul_comm" in output.completed_files["MILExample.lean"]
+    assert (wd / "MILExample.lean").read_text() == SOLVED_FILE
+    assert list(result.completed_files) == ["MILExample.lean"]
+    assert "rw [mul_comm" in result.completed_files["MILExample.lean"]
     # Cost + token metadata flowed through from the parsed stream.
-    assert output.cost_usd == pytest.approx(0.4231)
-    assert output.metadata["harness"] == "claude_code"
-    assert output.metadata["model"] == "claude-opus-4-8"
-    assert output.metadata["input_tokens"] == 18432
+    assert result.cost_usd == pytest.approx(0.4231)
+    assert result.metadata["harness"] == "claude_code"
+    assert result.metadata["model"] == "claude-opus-4-8"
+    assert result.metadata["input_tokens"] == 18432
 
 
-def test_prove_reports_no_changes_when_agent_does_nothing(
+def test_generate_reports_no_changes_when_agent_does_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def _noop_run_agent(
-        self: AgentProver, workdir: Path, harness: Harness
+        self: AgentProver,
+        workdir: Path,
+        harness: Harness,
+        stdout_path: Path,
+        session: object | None = None,
     ) -> tuple[list[str], str]:
         return [], ""
 
     monkeypatch.setattr(AgentProver, "_run_agent", _noop_run_agent)
     prover = _make_prover()
 
-    output = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
-    assert output.completed_files == {}
+    result, _ = _run_generate(prover, tmp_path)
+    assert result.completed_files == {}
     # No stream -> zero tokens -> estimated $0.00 for the known model.
-    assert output.cost_usd == pytest.approx(0.0)
+    assert result.cost_usd == pytest.approx(0.0)
 
 
 # --- mocked agent + real Docker verify --------------------------------------
 
 
 @pytest.mark.docker
-def test_run_end_to_end_verifies_mocked_agent_result(
+def test_prove_end_to_end_verifies_mocked_agent_result(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Full run(): a mocked agent writes a real proof; the Docker verifier confirms.
+    """Full prove(): a mocked agent writes a real proof; the Docker verifier confirms.
 
     Mocked agent, real local check -- the path every prover shares, with no creds.
     """
 
     def _fake_run_agent(
-        self: AgentProver, workdir: Path, harness: Harness
+        self: AgentProver,
+        workdir: Path,
+        harness: Harness,
+        stdout_path: Path,
+        session: object | None = None,
     ) -> tuple[list[str], str]:
         (workdir / "MILExample.lean").write_text(SOLVED_FILE)
         return STREAM.read_text().splitlines(), ""
@@ -268,16 +294,19 @@ def test_run_end_to_end_verifies_mocked_agent_result(
     monkeypatch.setattr(AgentProver, "_run_agent", _fake_run_agent)
     prover = _make_prover()
 
-    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
 
     assert result.success, result.verification and result.verification.compile_log
     assert result.verification is not None and result.verification.verified
     assert result.prover == "agent"
     assert result.cost_usd == pytest.approx(0.4231)
+    # The proof landed in output_dir/wd and the run record in output_dir/logs.
+    assert (result.wd / "MILExample.lean").is_file()
+    assert (result.logs_dir / "result.json").is_file()
 
 
 @pytest.mark.docker
-def test_run_reuses_one_sandbox_for_generation_and_verify(
+def test_prove_reuses_one_sandbox_for_generation_and_verify(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """reuse=True: generation and the final verify run in ONE live sandbox.
@@ -291,6 +320,7 @@ def test_run_reuses_one_sandbox_for_generation_and_verify(
         self: AgentProver,
         workdir: Path,
         harness: Harness,
+        stdout_path: Path,
         session: object | None = None,
     ) -> tuple[list[str], str]:
         # The reuse path hands the live session through to the agent run.
@@ -303,7 +333,7 @@ def test_run_reuses_one_sandbox_for_generation_and_verify(
     monkeypatch.setattr(AgentProver, "_auth", lambda self, harness: ({}, []))
     prover = _make_prover(reuse=True)
 
-    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
 
     assert result.success, result.verification and result.verification.compile_log
     assert result.verification is not None and result.verification.verified

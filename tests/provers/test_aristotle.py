@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from open_afps.backends.docker import DockerBackend, DockerConfig
+from open_afps.core.result import ProofResult
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 from open_afps.provers.aristotle import AristotleProver, AristotleProverConfig
 
@@ -76,28 +77,36 @@ def _fake_result(*, solved: bool) -> object:
     return _stub
 
 
-def test_prove_extracts_result_and_reports_changed_files(
+def test_generate_extracts_result_and_reports_changed_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """prove() alone: stage -> (stub) submit -> extract -> diff. No Docker needed."""
+    """_generate alone: stage -> (stub) submit -> extract -> diff. No Docker needed.
+
+    The public ``prove`` runs the shared Docker verify, so the no-Docker unit test
+    drives the generation half directly and asserts on the filled result.
+    """
     from open_afps.core.task import LeanProject, ProofTask
 
     monkeypatch.setattr(
         AristotleProver, "_submit_and_download", _fake_result(solved=True)
     )
     prover = _make_prover()
-    workdir = tmp_path / "wd"
+    wd = tmp_path / "wd"
+    logs_dir = tmp_path / "logs"
+    wd.mkdir()
+    logs_dir.mkdir()
+    result = ProofResult(prover="aristotle", verification=None, output_dir=tmp_path)
 
-    output = prover.prove(ProofTask(LeanProject(FIXTURE)), workdir)
+    prover._generate(ProofTask(LeanProject(FIXTURE)), wd, logs_dir, result)
 
     # The completed file landed in the workdir and is reported as changed.
-    assert (workdir / "MILExample.lean").read_text() == SOLVED_FILE
-    assert "MILExample.lean" in output.completed_files
-    assert "rw [mul_comm" in output.completed_files["MILExample.lean"]
-    assert output.metadata["project_id"] == "test-123"
-    assert "Summary" in output.logs
-    # The run record was synced to the host alongside the workdir.
-    assert Path(output.metadata["logs_dir"]).joinpath("events.json").is_file()
+    assert (wd / "MILExample.lean").read_text() == SOLVED_FILE
+    assert "MILExample.lean" in result.completed_files
+    assert "rw [mul_comm" in result.completed_files["MILExample.lean"]
+    assert result.metadata["project_id"] == "test-123"
+    # The hosted agent's summary and the run record landed in the logs dir.
+    assert "Summary" in (logs_dir / "summary.md").read_text()
+    assert (logs_dir / "events.json").is_file()
 
 
 def test_is_transient_distinguishes_dropped_links_from_real_errors() -> None:
@@ -181,7 +190,7 @@ def test_wait_until_terminal_gives_up_after_resume_budget(
 
 
 @pytest.mark.docker
-def test_run_end_to_end_verifies_completed_proof(
+def test_prove_end_to_end_verifies_completed_proof(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Full run(): mocked remote returns a real proof; Docker verifier confirms it."""
@@ -192,7 +201,7 @@ def test_run_end_to_end_verifies_completed_proof(
     )
     prover = _make_prover()
 
-    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
 
     assert result.success, result.verification and result.verification.compile_log
     assert result.verification is not None and result.verification.verified
@@ -201,7 +210,7 @@ def test_run_end_to_end_verifies_completed_proof(
 
 
 @pytest.mark.docker
-def test_run_reports_unverified_when_sorry_remains(
+def test_prove_reports_unverified_when_sorry_remains(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """If Aristotle returns the file still sorry'd, the verifier catches it."""
@@ -212,7 +221,7 @@ def test_run_reports_unverified_when_sorry_remains(
     )
     prover = _make_prover()
 
-    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
 
     assert not result.success
     assert result.verification is not None and not result.verification.sorry_free

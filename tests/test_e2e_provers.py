@@ -2,10 +2,11 @@
 trivial Mathematics-in-Lean fixture (one sorry'd theorem).
 
 This is the *single* live test the project needs: one parametrized function over
-``backend (docker, modal) x prover``, routed through the real :class:`Platform`
-(so it exercises the backend factory, ``solve`` fan-out, and the shared verifier
-exactly as a job would). It replaces the per-prover ``test_live_*_solves_trivial``
-copies that used to live in each prover's test module.
+``backend (docker, modal) x prover``, routed through :func:`get_prover` +
+:meth:`~open_afps.provers.base.AutomatedProver.prove` (so it exercises the backend
+factory, the registry, and the shared verifier exactly as a caller would). It replaces
+the per-prover ``test_live_*_solves_trivial`` copies that used to live in each prover's
+test module.
 
 Each case is gated two ways and skips (never fails) when its prerequisites are
 absent:
@@ -28,7 +29,7 @@ from pathlib import Path
 
 import pytest
 
-from open_afps.api import Platform, available_provers
+from open_afps.api import available_provers, get_prover, make_backend
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.images import DEFAULT_IMAGE
 
@@ -135,15 +136,10 @@ def test_prover_solves_trivial_theorem(
         if reason:
             pytest.skip(reason)
 
-    platform = Platform(
-        backend=backend, image=DEFAULT_IMAGE, runs_dir=tmp_path / "runs"
-    )
-    result = platform.solve(ProofTask(LeanProject(FIXTURE)), [spec])
-    (proof,) = result.results
+    compute = make_backend(backend, DEFAULT_IMAGE)
+    prover = get_prover(spec, verification_backend=compute)
+    proof = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "run")
 
-    # solve() isolates a raising prover into ``error`` -- surface it instead of a bare
-    # "verification is None" so a missing-cred / launch failure is legible.
-    assert proof.error is None, proof.error
     assert proof.completed_files, f"{spec} returned no changed files"
     assert proof.success, proof.verification and proof.verification.compile_log
 
@@ -151,6 +147,7 @@ def test_prover_solves_trivial_theorem(
 def test_registry_is_fully_covered() -> None:
     """Every registered prover has an e2e row (so new provers can't slip through)."""
     covered = {p.values[0] for p in PROVERS}
-    assert covered >= set(available_provers()), (
-        f"provers missing an e2e case: {sorted(set(available_provers()) - covered)}"
+    registry = {p.value for p in available_provers()}
+    assert covered >= registry, (
+        f"provers missing an e2e case: {sorted(registry - covered)}"
     )

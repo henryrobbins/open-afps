@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from open_afps.backends.docker import DockerBackend, DockerConfig
+from open_afps.core.result import ProofResult
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.harness import Harness
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
@@ -142,6 +143,21 @@ def _make_prover(*, reuse: bool = False, **overrides: object) -> NuminaProver:
     return NuminaProver(config, backend, agent_backend)
 
 
+def _run_generate(prover: NuminaProver, tmp_path: Path) -> ProofResult:
+    """Drive the generation half directly (no Docker verify), returning the result.
+
+    The public ``prove`` runs the shared verifier; the round-loop unit tests stub the
+    agent and only assert on the run metadata, so they call ``_generate`` instead.
+    """
+    wd = tmp_path / "wd"
+    logs_dir = tmp_path / "logs"
+    wd.mkdir()
+    logs_dir.mkdir()
+    result = ProofResult(prover="numina", verification=None, output_dir=tmp_path)
+    prover._generate(ProofTask(LeanProject(FIXTURE)), wd, logs_dir, result)
+    return result
+
+
 def _scripted_run_agent(
     reasons: list[str | None],
 ) -> tuple[list[int], object]:
@@ -152,6 +168,7 @@ def _scripted_run_agent(
         self: NuminaProver,
         workdir: Path,
         harness: Harness,
+        stdout_path: Path,
         session: object | None = None,
     ) -> tuple[list[str], str]:
         i = len(calls)
@@ -169,7 +186,7 @@ def test_round_loop_continues_on_limit_then_stops_on_complete(
     monkeypatch.setattr(NuminaProver, "_run_agent", stub)
     prover = _make_prover(max_rounds=20, guard_statements=False)
 
-    out = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    out = _run_generate(prover, tmp_path)
 
     assert len(calls) == 3
     assert out.metadata["rounds"] == 3
@@ -190,6 +207,7 @@ def test_helper_cost_is_folded_into_total(
         self: NuminaProver,
         workdir: Path,
         harness: Harness,
+        stdout_path: Path,
         session: object | None = None,
     ) -> tuple[list[str], str]:
         # Simulate the in-sandbox skill appending usage across two rounds' calls.
@@ -212,7 +230,7 @@ def test_helper_cost_is_folded_into_total(
     monkeypatch.setattr(NuminaProver, "_run_agent", _stub)
     prover = _make_prover(max_rounds=20, guard_statements=False)
 
-    out = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    out = _run_generate(prover, tmp_path)
 
     # gpt-5.4 = ($2.5 in + $15 out)/Mtok over 1M+1M tokens = $17.50 helper.
     assert out.metadata["agent_cost_usd"] == pytest.approx(0.01)
@@ -231,6 +249,7 @@ def test_helper_cost_flags_unpriced_model(
         self: NuminaProver,
         workdir: Path,
         harness: Harness,
+        stdout_path: Path,
         session: object | None = None,
     ) -> tuple[list[str], str]:
         ledger = workdir / ".claude" / "helper_usage.jsonl"
@@ -251,7 +270,7 @@ def test_helper_cost_flags_unpriced_model(
     monkeypatch.setattr(NuminaProver, "_run_agent", _stub)
     prover = _make_prover(max_rounds=20, guard_statements=False)
 
-    out = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    out = _run_generate(prover, tmp_path)
 
     assert out.metadata["helper_cost_usd"] == pytest.approx(0.0)
     assert out.metadata["helper_unpriced_models"] == ["gemini-made-up"]
@@ -265,7 +284,7 @@ def test_round_loop_respects_max_rounds(
     monkeypatch.setattr(NuminaProver, "_run_agent", stub)
     prover = _make_prover(max_rounds=4, guard_statements=False)
 
-    out = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    out = _run_generate(prover, tmp_path)
 
     assert len(calls) == 4
     assert out.metadata["rounds"] == 4
@@ -279,7 +298,7 @@ def test_round_loop_stops_immediately_on_complete(
     monkeypatch.setattr(NuminaProver, "_run_agent", stub)
     prover = _make_prover(max_rounds=20, guard_statements=False)
 
-    out = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    out = _run_generate(prover, tmp_path)
 
     assert len(calls) == 1
     assert out.metadata["session_resets"] == 0
@@ -295,6 +314,7 @@ def test_round_loop_falls_back_to_subtype_when_no_marker(
         self: NuminaProver,
         workdir: Path,
         harness: Harness,
+        stdout_path: Path,
         session: object | None = None,
     ) -> tuple[list[str], str]:
         calls.append(1)
@@ -303,7 +323,7 @@ def test_round_loop_falls_back_to_subtype_when_no_marker(
     monkeypatch.setattr(NuminaProver, "_run_agent", _stub)
     prover = _make_prover(max_rounds=20, guard_statements=False)
 
-    out = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    out = _run_generate(prover, tmp_path)
     assert len(calls) == 1
     assert out.metadata["end_reason"] == "COMPLETE"
 
@@ -320,6 +340,7 @@ def test_guard_error_stops_and_restores_weakened_theorem(
         self: NuminaProver,
         workdir: Path,
         harness: Harness,
+        stdout_path: Path,
         session: object | None = None,
     ) -> tuple[list[str], str]:
         target = workdir / "MILExample.lean"
@@ -334,7 +355,7 @@ def test_guard_error_stops_and_restores_weakened_theorem(
         max_rounds=20, guard_statements=True, on_statement_change="error"
     )
 
-    out = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    out = _run_generate(prover, tmp_path)
 
     assert out.metadata["statement_changed"] is True
     assert out.metadata["end_reason"] == "STATEMENT_CHANGED"
@@ -371,6 +392,7 @@ def test_run_end_to_end_verifies_mocked_numina_result(
         self: NuminaProver,
         workdir: Path,
         harness: Harness,
+        stdout_path: Path,
         session: object | None = None,
     ) -> tuple[list[str], str]:
         (workdir / "MILExample.lean").write_text(_SOLVED_FILE)
@@ -379,7 +401,7 @@ def test_run_end_to_end_verifies_mocked_numina_result(
     monkeypatch.setattr(NuminaProver, "_run_agent", _solve)
     prover = _make_prover(max_rounds=4)
 
-    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
 
     assert result.success, result.verification and result.verification.compile_log
     assert result.verification is not None and result.verification.verified
@@ -403,6 +425,7 @@ def test_run_reuses_one_sandbox_across_rounds_and_verify(
         self: NuminaProver,
         workdir: Path,
         harness: Harness,
+        stdout_path: Path,
         session: object | None = None,
     ) -> tuple[list[str], str]:
         assert session is not None  # rounds exec in the live session
@@ -414,7 +437,7 @@ def test_run_reuses_one_sandbox_across_rounds_and_verify(
     monkeypatch.setattr(NuminaProver, "_auth", lambda self, harness: ({}, []))
     prover = _make_prover(reuse=True, max_rounds=4)
 
-    result = prover.run(ProofTask(LeanProject(FIXTURE)), tmp_path / "wd")
+    result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
 
     assert result.success, result.verification and result.verification.compile_log
     assert result.verification is not None and result.verification.verified

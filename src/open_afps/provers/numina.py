@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from open_afps.backends.base import ComputeSession
-from open_afps.core.result import GenerationOutput
+from open_afps.core.result import ProofResult
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.harness import (
     HARNESSES,
@@ -44,7 +44,6 @@ from open_afps.harness import (
     resolve_bundle,
 )
 from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
-from open_afps.provers.base import logs_dir_for
 from open_afps.provers.numina_tracker import StatementTracker
 
 # Directories never worth copying into the agent workdir (mirrors AgentProver).
@@ -145,14 +144,16 @@ class NuminaProver(AgentProver):
 
     config: NuminaProverConfig
 
-    def prove(self, task: ProofTask, workdir: Path) -> GenerationOutput:
+    def _generate(
+        self, task: ProofTask, wd: Path, logs_dir: Path, result: ProofResult
+    ) -> None:
         # 1. Stage the project so the workdir is a complete project to edit in place.
-        shutil.copytree(task.project.root, workdir, dirs_exist_ok=True, ignore=_IGNORE)
+        shutil.copytree(task.project.root, wd, dirs_exist_ok=True, ignore=_IGNORE)
 
         # 2. Snapshot original .lean contents for the post-run diff.
         original = {
-            p.relative_to(workdir).as_posix(): p.read_text()
-            for p in workdir.rglob("*.lean")
+            p.relative_to(wd).as_posix(): p.read_text()
+            for p in wd.rglob("*.lean")
             if ".lake" not in p.parts
         }
 
@@ -163,10 +164,11 @@ class NuminaProver(AgentProver):
             self.config.model, self.config.effort, assets=bundle
         )
         base_prompt = task.instructions or bundle.default_prompt() or _FALLBACK_PROMPT
-        harness.configure_wd(workdir, base_prompt + _END_REASON_PROTOCOL)
+        harness.configure_wd(wd, base_prompt + _END_REASON_PROTOCOL)
+        stdout_path = logs_dir / "stdout.txt"
 
         # 4. Statement-change guard: snapshot the target theorems before the run.
-        tracked = self._tracked_files(task, workdir)
+        tracked = self._tracked_files(task, wd)
         tracker: StatementTracker | None = None
         if self.config.guard_statements and tracked:
             tracker = StatementTracker(tracked)
@@ -177,77 +179,77 @@ class NuminaProver(AgentProver):
         if self.agent_backend is self.verifier.backend:
             _, mounts = self._auth(harness)
             with self.agent_backend.session(
-                workdir, mounts=mounts, timeout_s=self.config.timeout_s
+                wd, mounts=mounts, timeout_s=self.config.timeout_s
             ) as session:
-                loop = self._run_rounds(workdir, harness, tracker, session=session)
+                loop = self._run_rounds(
+                    wd, harness, stdout_path, tracker, session=session
+                )
                 # Final pull so the host workdir (helper-usage ledger, completed
                 # files) is current before pricing + diffing.
-                session.sync_out()
-                output = self._finalize(workdir, harness, loop, original)
-                output.verification = self.verifier.verify(
-                    LeanProject(workdir), session=session
+                self._download_wd(wd, session=session)
+                self._finalize(result, wd, logs_dir, harness, loop, original)
+                result.verification = self.verifier.verify(
+                    LeanProject(wd), session=session
                 )
-                return output
+                return
 
-        loop = self._run_rounds(workdir, harness, tracker)
-        return self._finalize(workdir, harness, loop, original)
+        loop = self._run_rounds(wd, harness, stdout_path, tracker)
+        self._finalize(result, wd, logs_dir, harness, loop, original)
 
     def _finalize(
         self,
-        workdir: Path,
+        result: ProofResult,
+        wd: Path,
+        logs_dir: Path,
         harness: Harness,
         loop: dict[str, Any],
         original: dict[str, str],
-    ) -> GenerationOutput:
-        """Price helper-LLM usage, diff the workdir, and assemble the output."""
+    ) -> None:
+        """Price helper-LLM usage, diff the workdir, and fill the result."""
         # Price the helper-LLM (discussion_partner) usage the agent racked up inside
         # the sandbox and fold it into the run's total cost.
-        helper = self._helper_cost(workdir)
+        helper = self._helper_cost(wd)
 
         # Diff the workdir's .lean files against the staged originals.
         completed: dict[str, str] = {}
-        for path in sorted(workdir.rglob("*.lean")):
+        for path in sorted(wd.rglob("*.lean")):
             if ".lake" in path.parts:
                 continue
-            rel = path.relative_to(workdir).as_posix()
+            rel = path.relative_to(wd).as_posix()
             content = path.read_text()
             if original.get(rel) != content:
                 completed[rel] = content
 
-        # Relocate any harness-specific rich logs out of the workdir (no-op for the
-        # claude_code harness Numina pins, whose record is the stdout stream).
-        harness.collect_logs(workdir, logs_dir_for(workdir))
+        # Relocate harness logs (no-op for claude_code) and write captured stderr; the
+        # streamed stdout was already teed live into ``logs_dir/stdout.txt``.
+        self._download_logs(harness, wd, logs_dir, loop["stderr"])
 
-        return GenerationOutput(
-            completed_files=completed,
-            cost_usd=loop["total_cost_usd"] + helper["cost_usd"],
-            logs="\n".join(loop["lines"]),
-            stderr=loop["stderr"],
-            metadata={
-                "harness": harness.name,
-                "model": self.config.model,
-                "effort": self.config.effort,
-                "assets": self.config.assets,
-                "input_tokens": loop["input_tokens"],
-                "output_tokens": loop["output_tokens"],
-                # cost_usd above bundles agent + helper; keep the split visible.
-                "agent_cost_usd": loop["total_cost_usd"],
-                "helper_cost_usd": helper["cost_usd"],
-                "helper_tokens": {
-                    "input": helper["input_tokens"],
-                    "output": helper["output_tokens"],
-                },
-                "helper_breakdown": helper["breakdown"],
-                "helper_unpriced_models": helper["unpriced_models"],
-                "rounds": loop["rounds"],
-                "end_reason": loop["end_reason"],
-                "session_resets": loop["session_resets"],
-                "guard_statements": self.config.guard_statements,
-                "statement_changed": loop["statement_changed"],
-                "statement_changes": loop["statement_changes"],
-                "round_history": loop["round_history"],
+        result.completed_files = completed
+        result.cost_usd = loop["total_cost_usd"] + helper["cost_usd"]
+        result.metadata = {
+            "harness": harness.name,
+            "model": self.config.model,
+            "effort": self.config.effort,
+            "assets": self.config.assets,
+            "input_tokens": loop["input_tokens"],
+            "output_tokens": loop["output_tokens"],
+            # cost_usd above bundles agent + helper; keep the split visible.
+            "agent_cost_usd": loop["total_cost_usd"],
+            "helper_cost_usd": helper["cost_usd"],
+            "helper_tokens": {
+                "input": helper["input_tokens"],
+                "output": helper["output_tokens"],
             },
-        )
+            "helper_breakdown": helper["breakdown"],
+            "helper_unpriced_models": helper["unpriced_models"],
+            "rounds": loop["rounds"],
+            "end_reason": loop["end_reason"],
+            "session_resets": loop["session_resets"],
+            "guard_statements": self.config.guard_statements,
+            "statement_changed": loop["statement_changed"],
+            "statement_changes": loop["statement_changes"],
+            "round_history": loop["round_history"],
+        }
 
     # -- round loop -----------------------------------------------------------
 
@@ -255,20 +257,21 @@ class NuminaProver(AgentProver):
         self,
         workdir: Path,
         harness: Harness,
+        stdout_path: Path,
         tracker: StatementTracker | None,
         session: ComputeSession | None = None,
     ) -> dict[str, Any]:
         """Drive the agent for up to ``max_rounds``, continuing while it reports LIMIT.
 
-        Returns an accumulator dict (lines, token totals, cost, per-round history,
-        final end reason, statement-guard outcome).
+        Each round's stdout is teed live into ``stdout_path`` (appended, so the file is
+        the full multi-round transcript). Returns an accumulator dict (token totals,
+        cost, per-round history, final end reason, statement-guard outcome).
 
         ``session`` given: every round execs in the one persistent sandbox. We
         ``sync_out`` after each round so the host-side statement tracker reads the
         round's result, and ``sync_in`` after a restore so the sandbox picks it up for
         the next round (both no-ops on bind-mounted Docker).
         """
-        lines: list[str] = []
         stderrs: list[str] = []
         round_history: list[dict[str, Any]] = []
         total_cost = 0.0
@@ -288,9 +291,8 @@ class NuminaProver(AgentProver):
                 session_resets += 1
 
             round_lines, round_stderr = self._run_agent(
-                workdir, harness, session=session
+                workdir, harness, stdout_path, session=session
             )
-            lines.extend(round_lines)
             if round_stderr:
                 stderrs.append(round_stderr)
             # Pull the round's edits to the host so the statement tracker (and the
@@ -351,7 +353,6 @@ class NuminaProver(AgentProver):
                 consecutive_limits = 0
 
         return {
-            "lines": lines,
             "stderr": "\n".join(stderrs),
             "round_history": round_history,
             "rounds": len(round_history),
