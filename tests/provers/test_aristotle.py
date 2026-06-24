@@ -30,6 +30,10 @@ theorem mul_comm_assoc (a b c : ℝ) : a * b * c = b * (a * c) := by
 SUMMARY = "# Summary\nFilled the single sorry; project compiles.\n"
 
 
+async def _noop_sleep(_seconds: float) -> None:
+    """Stand in for asyncio.sleep so backoff doesn't slow the retry tests."""
+
+
 def _make_prover() -> AristotleProver:
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     config = AristotleProverConfig(
@@ -94,6 +98,86 @@ def test_prove_extracts_result_and_reports_changed_files(
     assert "Summary" in output.logs
     # The run record was synced to the host alongside the workdir.
     assert Path(output.metadata["logs_dir"]).joinpath("events.json").is_file()
+
+
+def test_is_transient_distinguishes_dropped_links_from_real_errors() -> None:
+    """Transport failures and 5xx retry; a 4xx (bad key/missing project) fails fast."""
+    import httpx
+    from aristotlelib.api_request import AristotleAPIError
+
+    from open_afps.provers.aristotle import _is_transient
+
+    assert _is_transient(httpx.RemoteProtocolError("stream dropped"))
+    assert _is_transient(httpx.ConnectError("refused"))
+    assert _is_transient(AristotleAPIError("Request failed: ...", status_code=None))
+    assert _is_transient(AristotleAPIError("server", status_code=503))
+    assert not _is_transient(AristotleAPIError("bad key", status_code=401))
+    assert not _is_transient(ValueError("unrelated"))
+
+
+def test_wait_until_terminal_resumes_after_dropped_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A dropped stream returns a still-running task; we re-attach until it settles.
+
+    Mirrors the production bug: ``wait_for_completion`` swallows the dropped link and
+    returns IN_PROGRESS, so without resuming we'd report the run failed even though it
+    completes server-side.
+    """
+    import asyncio
+
+    from aristotlelib.agent_task import TaskStatus
+
+    monkeypatch.setattr(asyncio, "sleep", _noop_sleep)
+
+    # First wait drops the link (status stays IN_PROGRESS); the second wait completes.
+    statuses = iter([TaskStatus.IN_PROGRESS, TaskStatus.COMPLETE])
+
+    class _FakeTask:
+        agent_task_id = "t-1"
+        status = TaskStatus.QUEUED
+        waits = 0
+
+        async def wait_for_completion(self) -> None:
+            self.waits += 1
+
+        async def refresh(self) -> None:
+            self.status = next(statuses)
+
+    task = _FakeTask()
+    asyncio.run(_make_prover()._wait_until_terminal(task))
+
+    assert task.waits == 2  # resumed exactly once after the drop
+    assert task.status is TaskStatus.COMPLETE
+
+
+def test_wait_until_terminal_gives_up_after_resume_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If the stream never settles, stop after the budget instead of looping forever."""
+    import asyncio
+
+    from aristotlelib.agent_task import TaskStatus
+
+    monkeypatch.setattr(asyncio, "sleep", _noop_sleep)
+
+    class _StuckTask:
+        agent_task_id = "t-2"
+        status = TaskStatus.IN_PROGRESS
+        waits = 0
+
+        async def wait_for_completion(self) -> None:
+            self.waits += 1
+
+        async def refresh(self) -> None:
+            pass  # never reaches a terminal state
+
+    prover = _make_prover()
+    prover.config.max_resume_attempts = 3
+    task = _StuckTask()
+    asyncio.run(prover._wait_until_terminal(task))
+
+    assert task.waits == 3  # bounded by the resume budget; no infinite loop
 
 
 @pytest.mark.docker

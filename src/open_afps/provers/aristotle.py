@@ -13,13 +13,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import shutil
 import tarfile
 import tempfile
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from open_afps.core.prover import AutomatedProver, AutomatedProverConfig, logs_dir_for
 from open_afps.core.result import GenerationOutput
@@ -27,6 +29,10 @@ from open_afps.core.task import ProofTask
 
 if TYPE_CHECKING:
     from aristotlelib import AgentTask, Project
+
+log = logging.getLogger(__name__)
+
+_T = TypeVar("_T")
 
 _DEFAULT_PROMPT = (
     "Complete every `sorry` in this Lean project. Make the project compile and be "
@@ -38,12 +44,39 @@ _DEFAULT_PROMPT = (
 _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
 
 
+def _is_transient(exc: BaseException) -> bool:
+    """True for errors worth retrying: a dropped connection, timeout, or 5xx.
+
+    aristotlelib turns httpx transport failures during a plain request into an
+    ``AristotleAPIError`` with no status code (its ``RequestError`` wrapper) and
+    leaves HTTP status errors with their code; a streamed run instead surfaces the
+    raw ``httpx`` error. We treat transport-level failures and server-side 5xx as
+    transient, but let real 4xx (bad key, missing project) fail fast.
+    """
+    import httpx
+    from aristotlelib.api_request import AristotleAPIError
+
+    if isinstance(exc, httpx.TransportError):
+        return True
+    if isinstance(exc, AristotleAPIError):
+        return exc.status_code is None or exc.status_code >= 500
+    return False
+
+
 @dataclass
 class AristotleProverConfig(AutomatedProverConfig):
     api_key_env: str = "ARISTOTLE_API_KEY"
     # Allow the hosted agent to ask clarifying questions? Off by default: this is a
     # headless API path and a prompt for stdin would hang the run.
     allow_agent_questions: bool = False
+    # The hosted run lives server-side, so a dropped connection is recoverable: re-fetch
+    # and resume rather than reporting the run failed. ``max_connection_retries`` bounds
+    # per-call retries (list/refresh/download); ``max_resume_attempts`` bounds how many
+    # times we re-attach to the event stream when it drops mid-run; backoff is the
+    # initial sleep, doubling (capped) between tries.
+    max_connection_retries: int = 5
+    max_resume_attempts: int = 20
+    resume_backoff_seconds: float = 5.0
 
 
 class AristotleProver(AutomatedProver):
@@ -130,15 +163,18 @@ class AristotleProver(AutomatedProver):
         project = await Project.create_from_directory(
             prompt=prompt, project_dir=project_dir, agent_questions_setting=questions
         )
-        tasks, _ = await project.get_tasks(limit=1)
+        tasks, _ = await self._with_retry(
+            lambda: project.get_tasks(limit=1), "list tasks"
+        )
         metadata: dict[str, object] = {"project_id": project.project_id}
         if not tasks:
             metadata["error"] = "Aristotle returned no task to wait on."
             return None, metadata
 
         agent_task = tasks[0]
-        await agent_task.wait_for_completion()
-        await project.refresh()
+        # Resume across dropped connections until the task truly settles server-side.
+        await self._wait_until_terminal(agent_task)
+        await self._with_retry(project.refresh, "refresh project")
 
         metadata.update(
             task_id=agent_task.agent_task_id,
@@ -147,20 +183,99 @@ class AristotleProver(AutomatedProver):
             output_summary=agent_task.output_summary,
         )
 
-        # Sync the full run record to the host before returning.
-        await self._sync_run_info(project, agent_task, logs_dir)
+        # Sync the full run record to the host before returning. Best-effort: a hiccup
+        # syncing logs must not discard an otherwise-good result.
+        try:
+            await self._sync_run_info(project, agent_task, logs_dir)
+        except Exception:  # noqa: BLE001 -- logs are nice-to-have, not the result
+            log.warning("aristotle: failed to sync run record", exc_info=True)
         metadata["logs_dir"] = str(logs_dir)
 
         if not project.has_files:
             metadata["error"] = "Aristotle produced no output files."
             return None, metadata
 
-        await project.get_files(destination=dest_tar)
+        await self._with_retry(
+            lambda: project.get_files(destination=dest_tar), "download files"
+        )
         return dest_tar, metadata
 
-    @staticmethod
+    async def _with_retry(self, op: Callable[[], Awaitable[_T]], what: str) -> _T:
+        """Run an awaitable-returning ``op``, retrying transient connection failures.
+
+        Backs off exponentially (capped) and re-raises once the retry budget is spent
+        or the error is not transient, so a genuine bad key/4xx still fails fast.
+        """
+        delay = self.config.resume_backoff_seconds
+        for attempt in range(1, self.config.max_connection_retries + 1):
+            try:
+                return await op()
+            except Exception as exc:  # noqa: BLE001 -- re-raised unless transient
+                if (
+                    not _is_transient(exc)
+                    or attempt == self.config.max_connection_retries
+                ):
+                    raise
+                log.warning(
+                    "aristotle: %s failed (%s); retrying (attempt %d/%d)",
+                    what,
+                    exc,
+                    attempt,
+                    self.config.max_connection_retries,
+                )
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 60.0)
+        raise AssertionError("unreachable")  # loop either returns or raises
+
+    async def _wait_until_terminal(self, agent_task: AgentTask) -> None:
+        """Wait for the task to reach a terminal state, resuming across dropped links.
+
+        aristotlelib's ``wait_for_completion`` swallows a dropped event stream and
+        returns with a stale, still-running status while the task keeps going on the
+        server. Treat any non-terminal status after it returns as a dropped connection,
+        re-fetch the true state, and re-attach to the stream until the task actually
+        settles (or we exhaust the resume budget, in which case we proceed with
+        whatever output exists -- the run dashboard is the source of truth).
+        """
+        from aristotlelib.agent_task import TaskStatus
+
+        terminal = {
+            TaskStatus.COMPLETE,
+            TaskStatus.COMPLETE_WITH_ERRORS,
+            TaskStatus.OUT_OF_BUDGET,
+            TaskStatus.FAILED,
+            TaskStatus.CANCELED,
+        }
+        delay = self.config.resume_backoff_seconds
+        for attempt in range(1, self.config.max_resume_attempts + 1):
+            try:
+                await agent_task.wait_for_completion()
+            except Exception as exc:  # noqa: BLE001 -- re-raised unless transient
+                if not _is_transient(exc):
+                    raise
+                log.warning("aristotle: wait interrupted (%s); resuming", exc)
+            await self._with_retry(agent_task.refresh, "refresh task status")
+            if agent_task.status in terminal:
+                return
+            log.warning(
+                "aristotle: connection dropped with task still %s; resuming "
+                "(attempt %d/%d)",
+                agent_task.status.name,
+                attempt,
+                self.config.max_resume_attempts,
+            )
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 60.0)
+        log.warning(
+            "aristotle: task %s still %s after %d resume attempts; proceeding with "
+            "whatever output is available",
+            agent_task.agent_task_id,
+            agent_task.status.name,
+            self.config.max_resume_attempts,
+        )
+
     async def _sync_run_info(
-        project: Project, agent_task: AgentTask, logs_dir: Path
+        self, project: Project, agent_task: AgentTask, logs_dir: Path
     ) -> None:
         """Download the task's metadata and full event log to ``logs_dir``.
 
@@ -173,8 +288,11 @@ class AristotleProver(AutomatedProver):
         events = []
         pagination_key = None
         while True:
-            page, pagination_key = await agent_task.get_events(
-                limit=100, pagination_key=pagination_key, newest_first=False
+            page, pagination_key = await self._with_retry(
+                lambda: agent_task.get_events(
+                    limit=100, pagination_key=pagination_key, newest_first=False
+                ),
+                "fetch events",
             )
             events.extend(page)
             if not pagination_key:
