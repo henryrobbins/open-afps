@@ -22,10 +22,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from open_afps.backends.base import CommandResult, ComputeBackend, ComputeSession
-from open_afps.core.prover import AutomatedProver, AutomatedProverConfig, logs_dir_for
 from open_afps.core.result import GenerationOutput
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.harness import HARNESSES, Harness, bundle_for_config, compute_cost_usd
+from open_afps.provers.base import AutomatedProver, AutomatedProverConfig, logs_dir_for
 
 log = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
 class AgentProverConfig(AutomatedProverConfig):
     """Configuration for :class:`AgentProver`.
 
-    Extends :class:`~open_afps.core.prover.AutomatedProverConfig` (``image``,
+    Extends :class:`~open_afps.provers.base.AutomatedProverConfig` (``image``,
     ``supported_toolchain``, ``timeout_s``, ``env``) with the agent-harness knobs.
 
     Attributes

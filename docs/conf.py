@@ -77,8 +77,8 @@ numpydoc_xref_aliases = {
     "GenerationOutput": "open_afps.core.result.GenerationOutput",
     "ProofResult": "open_afps.core.result.ProofResult",
     "Verifier": "open_afps.core.verifier.Verifier",
-    "AutomatedProver": "open_afps.core.prover.AutomatedProver",
-    "AutomatedProverConfig": "open_afps.core.prover.AutomatedProverConfig",
+    "AutomatedProver": "open_afps.provers.base.AutomatedProver",
+    "AutomatedProverConfig": "open_afps.provers.base.AutomatedProverConfig",
     # Backends
     "ComputeBackend": "open_afps.backends.base.ComputeBackend",
     "BackendConfig": "open_afps.backends.base.BackendConfig",

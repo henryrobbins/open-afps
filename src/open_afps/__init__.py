@@ -12,14 +12,14 @@ The architecture rests on two reusable primitives:
   report whether it is sorry-free and axiom-clean.
 
 Everything else is a candidate generator
-(:class:`~open_afps.core.prover.AutomatedProver`) that produces completed files, which
+(:class:`~open_afps.provers.base.AutomatedProver`) that produces completed files, which
 are then funnelled through the shared verifier.
 """
 
 from open_afps.api import Platform, SolveResult, build_prover
-from open_afps.core.prover import AutomatedProver, AutomatedProverConfig
 from open_afps.core.result import ProofResult, VerificationReport
 from open_afps.core.task import LeanProject, ProofTask
+from open_afps.provers.base import AutomatedProver, AutomatedProverConfig
 
 __all__ = [
     "AutomatedProver",

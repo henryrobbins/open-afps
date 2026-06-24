@@ -4,7 +4,8 @@ An :class:`AutomatedProver` is a *candidate generator*: it takes a
 :class:`~open_afps.core.task.ProofTask` and produces completed Lean files. The base
 class owns the shared lifecycle -- generate, then verify in the sandbox -- so that
 subclasses only implement ``prove`` and every prover (including Aristotle) gets the
-same final check for free.
+same final check for free. Concrete provers live alongside this base in
+``open_afps.provers``.
 """
 
 from __future__ import annotations

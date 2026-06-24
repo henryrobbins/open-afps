@@ -34,7 +34,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 from open_afps.backends.base import ComputeSession
-from open_afps.core.prover import logs_dir_for
 from open_afps.core.result import GenerationOutput
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.harness import (
@@ -45,6 +44,7 @@ from open_afps.harness import (
     resolve_bundle,
 )
 from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
+from open_afps.provers.base import logs_dir_for
 from open_afps.provers.numina_tracker import StatementTracker
 
 # Directories never worth copying into the agent workdir (mirrors AgentProver).

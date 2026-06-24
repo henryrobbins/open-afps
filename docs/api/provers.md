@@ -4,10 +4,24 @@ tocdepth: 3
 
 # `provers`
 
-The concrete provers. Each subclasses {class}`~open_afps.core.prover.AutomatedProver`
+The concrete provers. Each subclasses {class}`~open_afps.provers.base.AutomatedProver`
 and funnels its output through the shared {class}`~open_afps.core.verifier.Verifier`.
 The agentic provers compose an {doc}`agent harness <harness>` (the *agent* concern)
 with a {class}`~open_afps.backends.base.ComputeBackend` (the *compute* concern).
+
+## Base
+
+The base prover abstraction. An {class}`~open_afps.provers.base.AutomatedProver` is a
+candidate generator; the base class owns the shared lifecycle (generate, then verify
+in the sandbox) so subclasses only implement `prove`.
+
+```{eval-rst}
+.. autoclass:: open_afps.provers.base.AutomatedProver
+   :exclude-members: name
+
+.. autoclass:: open_afps.provers.base.AutomatedProverConfig
+   :no-members:
+```
 
 ## AgentProver
 

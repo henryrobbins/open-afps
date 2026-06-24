@@ -23,9 +23,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
-from open_afps.core.prover import AutomatedProver, AutomatedProverConfig, logs_dir_for
 from open_afps.core.result import GenerationOutput
 from open_afps.core.task import ProofTask
+from open_afps.provers.base import AutomatedProver, AutomatedProverConfig, logs_dir_for
 
 if TYPE_CHECKING:
     from aristotlelib import AgentTask, Project
@@ -68,7 +68,7 @@ def _is_transient(exc: BaseException) -> bool:
 class AristotleProverConfig(AutomatedProverConfig):
     """Configuration for :class:`AristotleProver`.
 
-    Extends :class:`~open_afps.core.prover.AutomatedProverConfig` (``image``,
+    Extends :class:`~open_afps.provers.base.AutomatedProverConfig` (``image``,
     ``supported_toolchain``, ``timeout_s``, ``env``) with the hosted-API knobs.
 
     Attributes

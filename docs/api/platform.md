@@ -10,7 +10,7 @@ This is the top-level surface re-exported from `open_afps` itself.
 ## Factory
 
 {func}`~open_afps.api.build_prover` maps a registry name (e.g. `agent`,
-`agent:codex`, `aristotle`) to a constructed {class}`~open_afps.core.prover.AutomatedProver`,
+`agent:codex`, `aristotle`) to a constructed {class}`~open_afps.provers.base.AutomatedProver`,
 wiring in the shared image/toolchain, the verify backend, and (for agentic provers)
 the agent backend.
 

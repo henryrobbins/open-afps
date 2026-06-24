@@ -2,7 +2,7 @@
 
 A prover is a *candidate generator*: it takes a
 {class}`~open_afps.core.task.ProofTask` and produces completed Lean files. The base
-{class}`~open_afps.core.prover.AutomatedProver` owns the shared lifecycle — generate,
+{class}`~open_afps.provers.base.AutomatedProver` owns the shared lifecycle — generate,
 then verify in the sandbox — so every prover gets the same final check for free.
 
 | Prover | Spec | Generation | Credential |
@@ -19,7 +19,7 @@ The Claude Code, Codex, OpenCode, AxProver, and Vibe provers are all the same
 {class}`~open_afps.provers.agent_prover.AgentProver` composed with a different
 {class}`~open_afps.harness.base.Harness`; `Spec` is the
 {func}`~open_afps.api.build_prover` registry name. Every prover subclasses
-{class}`~open_afps.core.prover.AutomatedProver` and funnels its output through the
+{class}`~open_afps.provers.base.AutomatedProver` and funnels its output through the
 shared {class}`~open_afps.core.verifier.Verifier`.
 
 ## How the agent provers work

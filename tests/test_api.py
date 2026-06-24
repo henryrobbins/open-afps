@@ -30,12 +30,12 @@ from open_afps.api import (
     stage_files,
 )
 from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.core.prover import AutomatedProver
 from open_afps.core.result import GenerationOutput, ProofResult, VerificationReport
 from open_afps.core.task import LeanProject, ProofTask, ToolchainMismatch
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
 from open_afps.provers.aristotle import AristotleProver, AristotleProverConfig
+from open_afps.provers.base import AutomatedProver
 from open_afps.provers.numina import NuminaProver, NuminaProverConfig
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"

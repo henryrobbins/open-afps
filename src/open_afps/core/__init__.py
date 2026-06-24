@@ -1,1 +1,1 @@
-"""Core abstractions: tasks, results, the base prover, and the shared verifier."""
+"""Core abstractions: the task/result contracts and the shared verifier."""

@@ -1,0 +1,223 @@
+# AGENTS.md
+
+Developer guide for **open-afps** (Open Automated Formal Proof Synthesis). Read this
+before making changes. The user-facing overview lives in [README.md](README.md);
+this file is the engineering reference.
+
+## What this project does
+
+Upload one or more Lean files containing `sorry`, run them through proof-synthesis
+backends, and get back **verified** completed proofs with metadata (verification
+status, cost, duration). Every prover — including the hosted Aristotle — funnels its
+output through one **shared verifier** that compiles the candidate in a Lean+Mathlib
+sandbox and checks it compiles, is sorry-free, and is axiom-clean.
+
+### Two primitives + thin generators
+
+1. **`ComputeBackend`** (`backends/`) — run a command over a working directory inside a
+   Lean+Mathlib sandbox. Two impls: `DockerBackend`, `ModalBackend`.
+2. **`Verifier`** (`core/verifier.py`) — compile a candidate project in a backend and
+   report `verified` / `sorry_free` / `axioms`.
+
+```
+ComputeBackend (docker | modal)         ← the sandbox primitive
+        │
+        ├── Verifier  ──────────────────← shared final check (ALL provers)
+        │
+AutomatedProver (provers/base.py, base)
+ ├── AgentProver      coding-agent harness (claude/codex/opencode/axprover/vibe) + lean-lsp-mcp
+ ├── NuminaProver     configured AgentProver: claude + vendored Numina assets + round loop
+ └── AristotleProver  remote `aristotle submit --project-dir --wait` (no local generation sandbox)
+```
+
+### Input contract
+
+Submit a **full lake project** (carries `lean-toolchain` + `lake-manifest.json`). The
+verifier **rejects** projects whose toolchain doesn't match the sandbox image's pin
+(`ToolchainMismatch`) instead of failing deep in a build. The CLI can also take bare
+`.lean` files and stage them into the pinned skeleton. One Mathlib image to start
+(pinned Lean/Mathlib **v4.28.0**); `image` is a config field so more can be added.
+
+## Project structure (high-level)
+
+```
+src/open_afps/
+  api.py            Platform + prover registry — the dispatch/orchestration layer
+  __main__.py       `open-afps solve | build-image | build-modal-image` CLI
+  images/           image name + toolchain pins (DEFAULT_IMAGE, DEFAULT_TOOLCHAIN)
+  core/             task.py  result.py  prover.py  verifier.py
+  backends/         base.py  docker.py  modal.py            (ComputeBackend impls)
+  provers/          agent_prover.py  numina.py  numina_tracker.py  aristotle.py
+  harness/          coding-agent CLIs staged into the sandbox:
+                      base.py  claude_code.py  codex.py  opencode.py
+                      axprover.py  vibe.py  bundles.py  cost.py  _paths.py
+                    assets/  scripts/*.sh  configs/mcp.json  vibe/lean-standin.toml
+
+images/             Dockerfile (Mathlib base image) + lean/ skeleton (toolchain, lakefile)
+vendor/             vendored third-party assets, tracked to upstream SHAs (see VENDOR.md in each)
+  numina/             Numina skills + prompts (round-loop prover)
+  leanprover-skills/  host-agnostic Lean skills
+  lean4-skills/       Claude `lean4` plugin
+tests/              pytest suite (+ tests/.runs/ integration artifacts, gitignored)
+docs/               Sphinx docs (user_guide/, provers/, agent_harness/, api/)
+refs/               read-only symlinks to reference projects (NEVER modify or commit)
+```
+
+The README's `Layout` section predates the `harness/` split — trust the tree above.
+
+### Vendored code
+
+`vendor/*` is upstream third-party code pinned to a SHA (each has a `VENDOR.md`).
+Ruff is configured with `extend-exclude = ["vendor"]` — **do not reformat or lint
+vendored code**, and keep its upstream style. It ships in the wheel via
+`force-include` and is resolved at runtime by `harness/_paths.py` (wheel:
+`open_afps/vendor/<name>`; checkout: repo-root `vendor/<name>`).
+
+## Provers
+
+Names accepted by `--provers` and the `Platform` registry (`api.py`):
+
+| Name | Backing tool | Notes |
+| --- | --- | --- |
+| `aristotle` | Harmonic Aristotle (hosted) | remote API via `aristotlelib`, no local gen sandbox |
+| `agent` | Claude Code (`claude_code` harness) | default; coding agent + lean-lsp-mcp |
+| `agent:codex` | OpenAI Codex CLI | model `gpt-5.5` |
+| `agent:opencode` | opencode | |
+| `agent:axprover` | ax-prover (LangGraph) | proposer→builder→reviewer loop; default model `claude-opus-4-8`, effort `high` |
+| `numina` | Numina skills/prompts on Claude Code | round-continuation loop |
+| `vibe` | Mistral Vibe `lean` scaffold | hosted model (default `magistral-medium-latest`), no GPU; `--model` configurable |
+
+Agentic harnesses share **lean-lsp-mcp** as their LSP server. The shared `Verifier`
+does the final compile/sorry/axiom check regardless of which tool generated the proof.
+
+## Tooling
+
+- **Python ≥ 3.12**, packaged with **hatchling**, deps managed by **uv** (`uv.lock`).
+- **ruff** — lint (`E,F,I,UP`) + format, line length 88, excludes `vendor`.
+- **mypy** — `strict`, `files = ["src/open_afps"]`.
+- **pytest** — `pytest-cov`, `pytest-xdist` (default `-n 5`).
+- **lefthook** — pre-commit runs ruff check, ruff format --check, and mypy on staged
+  `*.py` (with `--force-exclude` so vendored code is skipped). Install with
+  `uv run lefthook install`.
+- **Sphinx** (furo + myst) for docs; Read the Docs config in `.readthedocs.yaml`.
+- CLI entry point: `open-afps` → `open_afps.__main__:main`.
+
+## Makefile commands
+
+```
+make install         uv sync
+make test            pytest, skipping docker/modal/live-API tests (default markers)
+make test-docker     -m docker     (requires the built image)
+make test-modal      -m modal      (requires a Modal token)
+make test-aristotle  -m aristotle_api   (live, needs ARISTOTLE_API_KEY)
+make test-agent      -m agent_api       (live + billable, needs creds)
+make cov             pytest with coverage → htmlcov/, coverage.xml
+make cov-open        build + open the HTML coverage report
+make cov-clean       remove coverage artifacts
+make lint            ruff check src tests
+make format          ruff format + ruff check --fix on src tests
+make typecheck       mypy
+make check           lint + typecheck + test
+make build-image     docker build -t open-afps:latest images/
+make docs            sphinx-build -W -b html docs docs/_build/html
+make docs-serve      live-reload docs
+make docs-clean      remove built docs
+make clean           remove build + cache artifacts
+```
+
+Run `make check` before pushing.
+
+## Testing
+
+Default `addopts`: `-m 'not aristotle_api and not agent_api and not numina_api' -n 5`.
+The live/billable credentialed suites are **opt-out by default** and run only when you
+select their marker. Markers (`pyproject.toml`):
+
+- `docker` — needs the `open-afps` Docker image (opt-out: `-m 'not docker'`)
+- `modal` — launches a Modal sandbox (opt-out: `-m 'not modal'`)
+- `aristotle_api` — live Aristotle API (opt-in: `-m aristotle_api`)
+- `agent_api` — live agent CLI, billable + creds (opt-in: `-m agent_api`)
+- `numina_api` — live NuminaProver, billable + creds (opt-in: `-m numina_api`)
+
+> Project convention: when running tests (even by explicit path), exclude the
+> docker / modal / `*_api` markers by default — they are slow, billable, or need
+> external compute. `make test` already does this. Use `-n 0` to run serially when
+> debugging.
+
+Integration artifacts (agent logs, workdirs) land in `tests/.runs/` (gitignored).
+
+## Compute setup: Docker vs. Modal
+
+Both backends run the shared `Verifier` **and** the agentic provers end-to-end against
+the Mathlib image. Pick a backend with `--backend`, or split generation from the cheap
+verify with `--agent-backend`.
+
+- **Docker** (`DockerBackend`) — bind-mounts the workdir; uses `images/Dockerfile`,
+  runs as the `agent` user. Local; build the image first:
+  ```bash
+  docker build -t open-afps:latest images/      # or: make build-image / open-afps build-image
+  uv run pytest -m docker
+  ```
+- **Modal** (`ModalBackend`) — pushes/pulls the workdir around an isolated Sandbox
+  filesystem; runs as **root**, so its image is built programmatically with the same
+  toolchain installed globally. Publish the image, then run the parity suite:
+  ```bash
+  uv run open-afps build-modal-image --name open-afps --app open-afps
+  uv run pytest -m modal          # needs MODAL_TOKEN_ID / MODAL_TOKEN_SECRET
+  ```
+  `ModalConfig.image` (sans `:tag`) must match the `--name` you publish under.
+
+Example splits:
+```bash
+uv run open-afps solve path/to/project --provers agent --backend modal
+uv run open-afps solve path/to/project --provers agent \
+    --agent-backend modal --backend docker   # Modal generates, Docker does cheap verify
+```
+
+## CLI quick reference
+
+```
+open-afps solve <inputs...> [options]      # lake project dir, or bare .lean files
+  --provers   comma-separated names (default: agent)
+  --instructions TEXT                       # guidance forwarded to provers
+  --targets   comma-separated files relative to project
+  --image / --toolchain                     # default to images/ pins
+  --backend {docker,modal}        default docker
+  --agent-backend {docker,modal}  separate generation backend (defaults to --backend)
+  --runs-dir DIR                  default runs/
+  --max-workers N
+  --json                          emit SolveResult as JSON
+
+open-afps build-image       [--tag TAG] [--no-cache]
+open-afps build-modal-image [--name N] [--app A] [--force]
+```
+
+Programmatic verify:
+```python
+from open_afps.core.task import LeanProject
+from open_afps.core.verifier import docker_verifier
+report = docker_verifier().verify(LeanProject("path/to/lake/project"))
+print(report.verified, report.sorry_free, report.axioms)
+```
+
+## Environment / secrets
+
+Copy `.env.example` → `.env` (gitignored, never committed). All keys are needed only
+for the corresponding **live** test or harness; absent keys make the dependent
+skill/test degrade or skip:
+
+- `ARISTOTLE_API_KEY` — `pytest -m aristotle_api`
+- `CLAUDE_CODE_OAUTH_TOKEN` — `agent_api` test with default claude_code harness
+  (`claude setup-token`)
+- `GEMINI_API_KEY` / `OPENAI_API_KEY` / `LEAN_LEANDEX_API_KEY` — Numina helper skills
+- `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` — `agent:axprover` (raw provider key matching
+  the configured `model`); `TAVILY_API_KEY` optional (ax-prover web search)
+- `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — Modal backend
+
+## Conventions
+
+- Commit directly to `main` unless told otherwise; warn before committing work that
+  clearly belongs on another branch.
+- Never modify or commit anything under `refs/` (read-only reference symlinks) or
+  reformat anything under `vendor/` (upstream-tracked).
+- Keep `mypy --strict` and ruff clean; run `make check` before pushing.

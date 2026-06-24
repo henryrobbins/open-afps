@@ -1,6 +1,6 @@
 """The common platform API: one project + chosen provers -> aggregated results.
 
-Phases 1-4 built the engines (a uniform :class:`~open_afps.core.prover.AutomatedProver`
+Phases 1-4 built the engines (a uniform :class:`~open_afps.provers.base.AutomatedProver`
 per method). This module is the dispatch/orchestration layer the project set out to
 build: accept *"a lake project (or bare ``.lean`` files) + a list of provers"*, fan it
 out across those provers concurrently, and return per-prover
@@ -34,12 +34,12 @@ from pathlib import Path
 from open_afps.backends.base import ComputeBackend
 from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.backends.modal import ModalBackend, ModalConfig
-from open_afps.core.prover import AutomatedProver, AutomatedProverConfig
 from open_afps.core.result import ProofResult
 from open_afps.core.task import LeanProject, ProofTask, ToolchainMismatch
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN, SKELETON_DIR
 from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
 from open_afps.provers.aristotle import AristotleProver, AristotleProverConfig
+from open_afps.provers.base import AutomatedProver, AutomatedProverConfig
 from open_afps.provers.numina import NuminaProver, NuminaProverConfig
 
 # --- prover registry / factory ---------------------------------------------
