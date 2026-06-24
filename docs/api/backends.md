@@ -18,7 +18,7 @@ filesystem -- without paying a second spin-up.
    :exclude-members: name
 
 .. autoclass:: open_atp.backends.base.BackendConfig
-   :no-members:
+   :exclude-members: image, timeout_s, env
 
 .. autoclass:: open_atp.backends.base.CommandHandle
 

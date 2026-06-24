@@ -17,8 +17,11 @@ from __future__ import annotations
 import abc
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
+from typing import Any, Self
+
+from open_atp.images import DEFAULT_IMAGE, Image
 
 
 @dataclass
@@ -120,8 +123,10 @@ class BackendConfig:
 
     Attributes
     ----------
-    image : str
-        Container image carrying Lean + Mathlib that the sandbox runs.
+    image : Image
+        The sandbox image carrying Lean + Mathlib -- its tag plus the toolchain and
+        Mathlib revision the verifier checks projects against. Default
+        :data:`~open_atp.images.DEFAULT_IMAGE`.
     timeout_s : int
         Wall-clock cap applied to a command when its call site does not pass an
         explicit ``timeout_s``. Default ``1800``.
@@ -130,9 +135,35 @@ class BackendConfig:
         empty.
     """
 
-    image: str
+    image: Image = DEFAULT_IMAGE
     timeout_s: int = 1800
     env: Mapping[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, object]) -> Self:
+        """Build a config from a mapping (e.g. parsed JSON), ignoring unknown keys.
+
+        The inverse of :func:`dataclasses.asdict`: any tuple-typed field (e.g.
+        :attr:`~open_atp.backends.docker.DockerConfig.volumes`) is restored from
+        the list JSON round-trips it to. Unknown keys are dropped so a serialized
+        superset (or a sibling backend's extra knobs) loads cleanly. Subclasses
+        inherit this unchanged -- ``cls`` resolves to the concrete config, so its
+        own fields are honoured.
+        """
+        known = {f.name: f for f in fields(cls)}
+        kwargs: dict[str, Any] = {}
+        for key, value in data.items():
+            f = known.get(key)
+            if f is None:
+                continue
+            if (
+                isinstance(value, list)
+                and isinstance(f.type, str)
+                and f.type.startswith("tuple")
+            ):
+                value = tuple(tuple(v) if isinstance(v, list) else v for v in value)
+            kwargs[key] = value
+        return cls(**kwargs)
 
 
 def wrap_command(workdir_mount: str, baked_lake: str, command: str) -> str:

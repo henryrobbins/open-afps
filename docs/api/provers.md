@@ -45,7 +45,7 @@ generate, then verify in the sandbox) so subclasses only implement `_generate`.
    :exclude-members: name
 
 .. autoclass:: open_atp.provers.base.AutomatedProverConfig
-   :no-members:
+   :exclude-members: timeout_s, env
 ```
 
 ## AgentProver

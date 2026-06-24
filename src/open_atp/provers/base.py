@@ -22,8 +22,10 @@ from __future__ import annotations
 import abc
 import json
 import time
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from dataclasses import dataclass, field, fields
 from pathlib import Path
+from typing import Any, Self
 
 from open_atp.backends.base import ComputeBackend
 from open_atp.lean import LeanProject, ProofTask
@@ -43,24 +45,46 @@ class AutomatedProverConfig:
     * :class:`~open_atp.provers.aristotle.AristotleProverConfig`: api key, mode,
       poll interval.
 
+    The sandbox image (its tag plus the Lean toolchain + Mathlib pins the shared
+    verifier checks every project against) lives on the backend's
+    :class:`~open_atp.backends.base.BackendConfig`, not here -- a prover inherits
+    whatever image its verification backend runs.
+
     Attributes
     ----------
-    image : str
-        Sandbox image carrying the supported Lean toolchain + Mathlib. Also the
-        image the shared verifier checks every project against.
-    supported_toolchain : str
-        Toolchain pinned inside ``image``; projects must match it or the verifier
-        rejects them.
     timeout_s : int
         Wall-clock budget for the generation run, in seconds. Default ``1800``.
     env : dict[str, str]
         Extra environment variables exported into the run. Default empty.
     """
 
-    image: str
-    supported_toolchain: str
     timeout_s: int = 1800
     env: dict[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, object]) -> Self:
+        """Build a config from a mapping (e.g. parsed JSON), ignoring unknown keys.
+
+        The inverse of :func:`dataclasses.asdict`: any tuple-typed field is
+        restored from the list JSON round-trips it to. Unknown keys are dropped
+        so a serialized superset (or a sibling subclass's extra knobs) loads
+        cleanly. Subclasses inherit this unchanged -- ``cls`` resolves to the
+        concrete config, so its own fields are honoured.
+        """
+        known = {f.name: f for f in fields(cls)}
+        kwargs: dict[str, Any] = {}
+        for key, value in data.items():
+            f = known.get(key)
+            if f is None:
+                continue
+            if (
+                isinstance(value, list)
+                and isinstance(f.type, str)
+                and f.type.startswith("tuple")
+            ):
+                value = tuple(tuple(v) if isinstance(v, list) else v for v in value)
+            kwargs[key] = value
+        return cls(**kwargs)
 
 
 class AutomatedProver(abc.ABC):
@@ -72,11 +96,11 @@ class AutomatedProver(abc.ABC):
         self, config: AutomatedProverConfig, verification_backend: ComputeBackend
     ) -> None:
         self.config = config
-        # The backend used for the *final check*. Agentic provers additionally run
-        # their generation in a backend; that is the subclass's concern.
-        self.verifier = Verifier(
-            verification_backend, supported_toolchain=config.supported_toolchain
-        )
+        # The backend used for the *final check*. Its image carries the toolchain +
+        # Mathlib pins the verifier rejects mismatched projects against. Agentic
+        # provers additionally run their generation in a backend; that is the
+        # subclass's concern.
+        self.verifier = Verifier(verification_backend)
 
     @abc.abstractmethod
     def _generate(
