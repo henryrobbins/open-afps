@@ -28,7 +28,6 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from open_atp.backends.base import ComputeBackend
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
 from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
 from open_atp.provers.base import AutomatedProver, AutomatedProverConfig
@@ -114,19 +113,19 @@ def available_provers() -> list[PROVERS]:
 def get_prover(
     name: PROVERS | str,
     *,
-    image: str = DEFAULT_IMAGE,
-    toolchain: str = DEFAULT_TOOLCHAIN,
     verification_backend: ComputeBackend,
     agent_backend: ComputeBackend | None = None,
     overrides: Mapping[str, object] | None = None,
 ) -> AutomatedProver:
-    """Construct the prover ``name`` with the shared image + verify backend.
+    """Construct the prover ``name`` against the shared verify backend.
 
     ``name`` is a :class:`PROVERS` member (or its string value). The config is built
-    from ``image``/``toolchain`` + the name's baked-in defaults + caller ``overrides``
-    (per-prover knobs: model, effort, max_rounds, ...). Agentic provers also receive
-    ``agent_backend`` for generation (defaults to the verify backend), keeping the
-    agent-vs-verify backend split available.
+    from the name's baked-in defaults + caller ``overrides`` (per-prover knobs: model,
+    effort, max_rounds, ...). The sandbox image (and the toolchain + Mathlib pins
+    projects are checked against) comes from ``verification_backend``'s config, not a
+    parameter here. Agentic provers also receive ``agent_backend`` for generation
+    (defaults to the verify backend), keeping the agent-vs-verify backend split
+    available.
 
     Parameters
     ----------
@@ -134,12 +133,6 @@ def get_prover(
         The prover to build -- a :class:`PROVERS` member or its registry-key string
         (e.g. ``PROVERS.CLAUDE`` or ``"agent"``). Raises :class:`ValueError` for an
         unknown name.
-    image : str, optional
-        The sandbox image the prover compiles/verifies against. Defaults to
-        :data:`~open_atp.images.DEFAULT_IMAGE`.
-    toolchain : str, optional
-        The Lean toolchain the prover supports. Defaults to
-        :data:`~open_atp.images.DEFAULT_TOOLCHAIN`.
     verification_backend : ComputeBackend
         The backend that runs the shared :class:`~open_atp.verify.Verifier` (the cheap
         final compile/sorry/axiom check).
@@ -207,7 +200,7 @@ def get_prover(
         ) from None
     entry = _REGISTRY[prover]
 
-    kwargs: dict[str, object] = {"image": image, "supported_toolchain": toolchain}
+    kwargs: dict[str, object] = {}
     kwargs.update(entry.defaults)
     if overrides:
         kwargs.update(overrides)

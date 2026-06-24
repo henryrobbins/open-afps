@@ -19,7 +19,7 @@ docker images
 ## Build the base image
 
 The image is built from the `Dockerfile` under `images/`. It pins the supported Lean
-toolchain ({data}`~open_atp.images.DEFAULT_TOOLCHAIN`) and pre-builds a Mathlib
+toolchain ({attr}`~open_atp.images.Image.lean_toolchain`) and pre-builds a Mathlib
 `olean` cache, so the first build is expected to take a while.
 
 ```bash

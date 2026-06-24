@@ -25,7 +25,7 @@ import pytest
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.harness import HARNESSES, Harness, VibeHarness
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
 from open_atp.verify import ProofResult
@@ -78,8 +78,6 @@ def _write_session_log(log_dir: Path, stats: dict[str, object]) -> None:
 def _make_prover() -> AgentProver:
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     config = AgentProverConfig(
-        image=DEFAULT_IMAGE,
-        supported_toolchain=DEFAULT_TOOLCHAIN,
         harness="vibe",
         agent="lean-standin",
         model="magistral-medium-latest",
@@ -97,8 +95,6 @@ def test_registered_and_from_config_carries_vibe_knobs() -> None:
     assert HARNESSES["vibe"] is VibeHarness
 
     config = AgentProverConfig(
-        image=DEFAULT_IMAGE,
-        supported_toolchain=DEFAULT_TOOLCHAIN,
         harness="vibe",
         agent="lean",
         model="labs-leanstral-2603",

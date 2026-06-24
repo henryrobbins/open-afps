@@ -39,11 +39,8 @@ still being implemented.
 
 ```python
 from open_atp.provers.numina import NuminaProverConfig
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 
 config = NuminaProverConfig(
-    image=DEFAULT_IMAGE,
-    supported_toolchain=DEFAULT_TOOLCHAIN,
     max_rounds=20,
     guard_statements=True,
 )

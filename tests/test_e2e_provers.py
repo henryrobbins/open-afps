@@ -32,14 +32,14 @@ import pytest
 from open_atp.backends.base import ComputeBackend
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.backends.modal import ModalBackend, ModalConfig
-from open_atp.images import DEFAULT_IMAGE
+from open_atp.images import DEFAULT_IMAGE, Image
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers import available_provers, get_prover
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
 
 
-def make_backend(kind: str, image: str = DEFAULT_IMAGE) -> ComputeBackend:
+def make_backend(kind: str, image: Image = DEFAULT_IMAGE) -> ComputeBackend:
     """Construct a compute backend by name (``docker`` | ``modal``)."""
     if kind == "docker":
         return DockerBackend(DockerConfig(image=image))

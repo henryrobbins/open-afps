@@ -149,13 +149,13 @@ def test_toolchain_mismatch_is_rejected(tmp_path: Path) -> None:
 def test_session_runs_many_commands_in_one_sandbox(tmp_path: Path) -> None:
     """One Sandbox, two execs: an edit then an in-session verify, terminated once."""
     from open_atp.backends.modal import ModalBackend, ModalConfig
-    from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+    from open_atp.images import DEFAULT_IMAGE
     from open_atp.verify import Verifier
 
     proj = _stage(tmp_path)
     (proj / "MILExample.lean").write_text("import Mathlib\n\n" + SOLVED_PROOF)
     backend = ModalBackend(ModalConfig(image=DEFAULT_IMAGE))
-    verifier = Verifier(backend, supported_toolchain=DEFAULT_TOOLCHAIN)
+    verifier = Verifier(backend)
 
     with backend.session(proj) as session:
         # A first exec (stands in for the agent run) then an in-session verify -- both

@@ -68,8 +68,8 @@ def _is_transient(exc: BaseException) -> bool:
 class AristotleProverConfig(AutomatedProverConfig):
     """Configuration for :class:`AristotleProver`.
 
-    Extends :class:`~open_atp.provers.base.AutomatedProverConfig` (``image``,
-    ``supported_toolchain``, ``timeout_s``, ``env``) with the hosted-API knobs.
+    Extends :class:`~open_atp.provers.base.AutomatedProverConfig` (``timeout_s``,
+    ``env``) with the hosted-API knobs.
 
     Attributes
     ----------
@@ -113,13 +113,9 @@ class AristotleProver(AutomatedProver):
     just the verify backend):
 
     >>> from open_atp.backends.docker import DockerBackend, DockerConfig
-    >>> from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
     >>> from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
-    >>> backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    >>> config = AristotleProverConfig(
-    ...     image=DEFAULT_IMAGE,
-    ...     supported_toolchain=DEFAULT_TOOLCHAIN,
-    ... )
+    >>> backend = DockerBackend(DockerConfig())
+    >>> config = AristotleProverConfig()
     >>> prover = AristotleProver(config, verification_backend=backend)
     >>> prover.config.api_key_env
     'ARISTOTLE_API_KEY'

@@ -26,7 +26,7 @@ sandbox via the shared {class}`~open_atp.verify.Verifier`. It requires:
   {doc}`compute_backend/docker`).
 - A **complete lake project** — a directory carrying its own `lean-toolchain` and
   `lake-manifest.json` — whose toolchain matches the image's pin
-  ({data}`~open_atp.images.DEFAULT_TOOLCHAIN`).
+  ({attr}`~open_atp.images.Image.lean_toolchain`).
 
 ```python
 from open_atp.lean import LeanProject

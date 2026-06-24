@@ -160,7 +160,7 @@ class DockerBackend(ComputeBackend):
             cmd += ["-v", f"{host}:{dest}"]
         for key, value in {**self.config.env, **env}.items():
             cmd += ["-e", f"{key}={value}"]
-        cmd += [self.config.image]
+        cmd += [self.config.image.name]
         return cmd
 
     def start(

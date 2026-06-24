@@ -29,7 +29,6 @@ enforces).
 ```{eval-rst}
 .. autodata:: open_atp.images.DEFAULT_IMAGE
 
-.. autodata:: open_atp.images.DEFAULT_TOOLCHAIN
-
-.. autodata:: open_atp.images.DEFAULT_MATHLIB_REV
+.. autoclass:: open_atp.images.Image
+   :members:
 ```

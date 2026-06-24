@@ -152,13 +152,9 @@ class NuminaProver(AgentProver):
     Build the config and construct the prover directly:
 
     >>> from open_atp.backends.docker import DockerBackend, DockerConfig
-    >>> from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
     >>> from open_atp.provers.numina import NuminaProver, NuminaProverConfig
-    >>> backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    >>> config = NuminaProverConfig(
-    ...     image=DEFAULT_IMAGE,
-    ...     supported_toolchain=DEFAULT_TOOLCHAIN,
-    ... )
+    >>> backend = DockerBackend(DockerConfig())
+    >>> config = NuminaProverConfig()
     >>> prover = NuminaProver(config, verification_backend=backend)
     >>> prover.config.max_rounds
     20

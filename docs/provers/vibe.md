@@ -23,13 +23,11 @@ Lean scaffold on a non-Labs **reasoning** model any La Plateforme key can reach
 
 ```python
 from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 config = AgentProverConfig(
-    image=DEFAULT_IMAGE,
-    supported_toolchain=DEFAULT_TOOLCHAIN,
     harness="vibe",
     agent="lean-standin",            # "lean" once Labs is enabled
     model="magistral-medium-latest",

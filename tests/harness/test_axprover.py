@@ -25,7 +25,7 @@ import pytest
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.harness import HARNESSES, AxProverHarness, Harness
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
 from open_atp.verify import ProofResult
@@ -71,8 +71,6 @@ def _write_usage(wd: Path, target: str, input_tokens: int, output_tokens: int) -
 def _make_prover() -> AgentProver:
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     config = AgentProverConfig(
-        image=DEFAULT_IMAGE,
-        supported_toolchain=DEFAULT_TOOLCHAIN,
         harness="axprover",
         model="claude-opus-4-8",
         effort="high",
@@ -90,8 +88,6 @@ def test_registered_and_from_config_carries_max_iterations() -> None:
     assert HARNESSES["axprover"] is AxProverHarness
 
     config = AgentProverConfig(
-        image=DEFAULT_IMAGE,
-        supported_toolchain=DEFAULT_TOOLCHAIN,
         harness="axprover",
         model="claude-opus-4-8",
         effort="high",
@@ -288,8 +284,6 @@ def test_live_axprover_solves_trivial_theorem(backend: str, tmp_path: Path) -> N
         pytest.skip(f"backend {backend} not available")
 
     config = AgentProverConfig(
-        image=DEFAULT_IMAGE,
-        supported_toolchain=DEFAULT_TOOLCHAIN,
         harness="axprover",
         model="claude-opus-4-8",
         effort="high",

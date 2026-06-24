@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
 from open_atp.verify import ProofResult
 
@@ -37,9 +37,7 @@ async def _noop_sleep(_seconds: float) -> None:
 
 def _make_prover() -> AristotleProver:
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    config = AristotleProverConfig(
-        image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN
-    )
+    config = AristotleProverConfig()
     return AristotleProver(config, backend)
 
 

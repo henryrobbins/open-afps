@@ -23,7 +23,7 @@ import pytest
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.harness import Harness
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.numina import NuminaProver, NuminaProverConfig
 from open_atp.provers.numina_tracker import (
@@ -131,9 +131,7 @@ def _result_line(reason: str | None, *, subtype: str = "success") -> str:
 
 def _make_prover(*, reuse: bool = False, **overrides: object) -> NuminaProver:
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    config = NuminaProverConfig(
-        image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN, **overrides
-    )
+    config = NuminaProverConfig(**overrides)
     # reuse=True runs the whole round loop + final verify in one sandbox; reuse=False
     # (default) gives generation its own backend so the round-loop unit tests (which
     # stub _run_agent) never touch a live backend.

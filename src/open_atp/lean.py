@@ -2,8 +2,8 @@
 
 The input contract is a *full lake project*: it must carry its own
 ``lean-toolchain`` and ``lake-manifest.json``. We reject up front when the
-project's pinned toolchain (and, eventually, Mathlib revision) does not match the
-sandbox image we are about to run it in, rather than failing deep inside a build.
+project's pinned toolchain (or Mathlib revision) does not match the sandbox image
+we are about to run it in, rather than failing deep inside a build.
 
 A full lake project on disk is already a :class:`LeanProject` (just
 ``LeanProject(Path(path))``); the only nontrivial case is staging one or more bare
@@ -24,6 +24,10 @@ from open_atp.images import SKELETON_DIR
 
 class ToolchainMismatch(ValueError):
     """Raised when an uploaded project's toolchain does not match the image's pin."""
+
+
+class MathlibRevMismatch(ValueError):
+    """Raised when an uploaded project's Mathlib revision differs from the image's."""
 
 
 @dataclass(frozen=True)
@@ -50,7 +54,7 @@ class LeanProject:
     >>> _ = (root / "lean-toolchain").write_text("leanprover/lean4:v4.31.0\\n")
     >>> _ = (root / "Demo.lean").write_text("theorem t : True := by sorry\\n")
     >>> project = LeanProject(root)
-    >>> project.toolchain
+    >>> project.lean_toolchain
     'leanprover/lean4:v4.31.0'
     >>> [p.name for p in project.lean_files()]
     ['Demo.lean']
@@ -75,20 +79,26 @@ class LeanProject:
         return None
 
     @property
-    def toolchain(self) -> str:
+    def lean_toolchain(self) -> str:
         """The pinned toolchain, e.g. ``leanprover/lean4:v4.31.0``."""
         return (self.root / "lean-toolchain").read_text().strip()
 
     @property
     def mathlib_rev(self) -> str | None:
-        """The locked Mathlib git revision from ``lake-manifest.json``, if present."""
+        """The pinned Mathlib revision from ``lake-manifest.json``, if present.
+
+        Prefers the human-declared ``inputRev`` (e.g. ``v4.28.0``) so it is
+        comparable to an :class:`~open_atp.images.Image`'s declared
+        :attr:`~open_atp.images.Image.mathlib_rev`, falling back to the resolved git
+        ``rev`` (a commit SHA) when no ``inputRev`` is recorded.
+        """
         manifest = self.root / "lake-manifest.json"
         if not manifest.is_file():
             return None
         data = json.loads(manifest.read_text())
         for pkg in data.get("packages", []):
             if pkg.get("name") == "mathlib":
-                rev = pkg.get("rev")
+                rev = pkg.get("inputRev") or pkg.get("rev")
                 return rev if isinstance(rev, str) else None
         return None
 
@@ -160,7 +170,7 @@ def stage_files(
     >>> _ = bare.write_text("theorem t : True := by sorry\\n")
     >>> dest = Path(tempfile.mkdtemp()) / "project"
     >>> project = stage_files([bare], dest, skeleton=skeleton)
-    >>> project.toolchain
+    >>> project.lean_toolchain
     'leanprover/lean4:v4.31.0'
     >>> [p.name for p in project.lean_files()]
     ['Bare.lean']

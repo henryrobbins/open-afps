@@ -27,7 +27,7 @@ from open_atp.harness import (
     resolve_plugin,
     resolve_skill,
 )
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
 from open_atp.verify import ProofResult
@@ -45,9 +45,7 @@ theorem mul_comm_assoc (a b c : ℝ) : a * b * c = b * (a * c) := by
 
 def _make_prover(*, reuse: bool = False) -> AgentProver:
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    config = AgentProverConfig(
-        image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN
-    )
+    config = AgentProverConfig()
     # reuse=True shares one backend so prove() runs the agent and the final verify in
     # a single sandbox; reuse=False (the default here) gives generation its own
     # backend so the pure prove()-diff unit tests never touch a live backend.
@@ -144,8 +142,6 @@ def test_config_overrides_select_skills_and_plugins() -> None:
     # Explicit lists override the bundle's defaults (names or paths).
     bundle = bundle_for_config(
         AgentProverConfig(
-            image=DEFAULT_IMAGE,
-            supported_toolchain=DEFAULT_TOOLCHAIN,
             skills=["lean-proof", "lean-setup"],
             plugins=[],
         )
@@ -153,9 +149,7 @@ def test_config_overrides_select_skills_and_plugins() -> None:
     assert [p.name for p in bundle.skills] == ["lean-proof", "lean-setup"]
     assert bundle.plugins == ()
     # Unset (None) keeps the default bundle's assets.
-    default = bundle_for_config(
-        AgentProverConfig(image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN)
-    )
+    default = bundle_for_config(AgentProverConfig())
     assert [p.name for p in default.skills] == ["lean-proof"]
     assert [p.name for p in default.plugins] == ["lean4"]
 

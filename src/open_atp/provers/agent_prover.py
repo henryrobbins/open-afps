@@ -92,8 +92,8 @@ _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
 class AgentProverConfig(AutomatedProverConfig):
     """Configuration for :class:`AgentProver`.
 
-    Extends :class:`~open_atp.provers.base.AutomatedProverConfig` (``image``,
-    ``supported_toolchain``, ``timeout_s``, ``env``) with the agent-harness knobs.
+    Extends :class:`~open_atp.provers.base.AutomatedProverConfig` (``timeout_s``,
+    ``env``) with the agent-harness knobs.
 
     Attributes
     ----------
@@ -163,12 +163,9 @@ class AgentProver(AutomatedProver):
     to the verify backend):
 
     >>> from open_atp.backends.docker import DockerBackend, DockerConfig
-    >>> from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
     >>> from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
-    >>> backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    >>> backend = DockerBackend(DockerConfig())
     >>> config = AgentProverConfig(
-    ...     image=DEFAULT_IMAGE,
-    ...     supported_toolchain=DEFAULT_TOOLCHAIN,
     ...     harness="claude_code",
     ...     model="claude-opus-4-8",
     ...     effort="high",

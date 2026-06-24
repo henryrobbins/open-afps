@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.images import DEFAULT_IMAGE, Image
 from open_atp.lean import LeanProject, ProofTask, ToolchainMismatch, stage_files
 from open_atp.provers import PROVERS, available_provers, get_prover
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
@@ -51,7 +51,7 @@ class FakeProver(AutomatedProver):
 
     Its ``_generate`` sets ``result.verification`` itself, so the inherited ``prove``
     never reaches the Docker verify; only :meth:`Verifier.check_compatible` (a pure
-    toolchain comparison) runs.
+    toolchain comparison against the backend image) runs.
     """
 
     def __init__(
@@ -60,15 +60,15 @@ class FakeProver(AutomatedProver):
         *,
         verified: bool = True,
         cost_usd: float | None = 1.0,
-        toolchain: str = DEFAULT_TOOLCHAIN,
+        toolchain: str = DEFAULT_IMAGE.lean_toolchain,
         raises: Exception | None = None,
     ) -> None:
         # Deliberately skip super().__init__: stand in a no-backend verifier whose
-        # check_compatible (a toolchain comparison) needs no Docker.
+        # check_compatible (a toolchain comparison against the image) needs no Docker.
+        # The ``toolchain`` knob rides on the backend image to simulate a mismatch.
         self.name = name
         self.verifier = Verifier(
-            DockerBackend(DockerConfig(image=DEFAULT_IMAGE)),
-            supported_toolchain=toolchain,
+            DockerBackend(DockerConfig(image=Image(lean_toolchain=toolchain)))
         )
         self._verified = verified
         self._cost = cost_usd
@@ -89,7 +89,7 @@ class FakeProver(AutomatedProver):
 
 
 def _task() -> ProofTask:
-    # mil_trivial pins v4.28.0, matching DEFAULT_TOOLCHAIN, so no mismatch up front.
+    # mil_trivial pins v4.28.0, matching DEFAULT_IMAGE, so no mismatch up front.
     return ProofTask(LeanProject(FIXTURE))
 
 
@@ -105,7 +105,8 @@ def test_get_prover_constructs_each_registered_prover() -> None:
     aristotle = build(PROVERS.ARISTOTLE)
     assert isinstance(aristotle, AristotleProver)
     assert isinstance(aristotle.config, AristotleProverConfig)
-    assert aristotle.config.supported_toolchain == DEFAULT_TOOLCHAIN
+    # The toolchain contract now rides on the verify backend's image, not the config.
+    assert aristotle.verifier.image.lean_toolchain == DEFAULT_IMAGE.lean_toolchain
 
     agent = build(PROVERS.CLAUDE)
     assert isinstance(agent, AgentProver) and not isinstance(agent, NuminaProver)
@@ -132,7 +133,7 @@ def test_get_prover_accepts_string_value() -> None:
 
 def test_get_prover_applies_overrides_and_injects_agent_backend() -> None:
     verify = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    agent_be = DockerBackend(DockerConfig(image="other:tag"))
+    agent_be = DockerBackend(DockerConfig(image=Image(name="other:tag")))
 
     agent = get_prover(
         PROVERS.CLAUDE,
@@ -250,7 +251,7 @@ def test_stage_files_builds_a_project_from_bare_lean(tmp_path: Path) -> None:
     assert isinstance(project, LeanProject)
     assert (project.root / "MILExample.lean").is_file()
     assert (project.root / "lean-toolchain").is_file()
-    assert project.toolchain == DEFAULT_TOOLCHAIN
+    assert project.lean_toolchain == DEFAULT_IMAGE.lean_toolchain
 
 
 def test_stage_files_rejects_non_lean(tmp_path: Path) -> None:

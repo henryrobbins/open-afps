@@ -196,7 +196,9 @@ def main(argv: list[str] | None = None) -> int:
         "build-image", help="Build the sandbox Docker image from images/Dockerfile."
     )
     build.add_argument(
-        "--tag", default=DEFAULT_IMAGE, help=f"Image tag (default: {DEFAULT_IMAGE})."
+        "--tag",
+        default=DEFAULT_IMAGE.name,
+        help=f"Image tag (default: {DEFAULT_IMAGE.name}).",
     )
     build.add_argument(
         "--no-cache", action="store_true", help="Pass --no-cache to docker build."

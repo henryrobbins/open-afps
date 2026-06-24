@@ -311,7 +311,7 @@ class ModalBackend(ComputeBackend):
         import modal
 
         app = modal.App.lookup(self.config.app, create_if_missing=True)
-        image = modal.Image.from_name(_modal_image_name(self.config.image))
+        image = modal.Image.from_name(_modal_image_name(self.config.image.name))
 
         cpu = self.config.cpu
         secret_dict: dict[str, str | None] = {

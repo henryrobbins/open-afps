@@ -42,13 +42,11 @@ from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.lean import LeanProject, ProofTask
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 config = AgentProverConfig(
-    image=DEFAULT_IMAGE,
-    supported_toolchain=DEFAULT_TOOLCHAIN,
     harness="claude_code",
     model="claude-opus-4-8",
     effort="high",
@@ -80,13 +78,11 @@ from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.lean import LeanProject, ProofTask
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-config = AristotleProverConfig(
-    image=DEFAULT_IMAGE, supported_toolchain=DEFAULT_TOOLCHAIN
-)
+config = AristotleProverConfig()
 prover = AristotleProver(config, verification_backend=backend)
 
 task = ProofTask(project=LeanProject("path/to/lake/project"))

@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ToolchainMismatch
 from open_atp.verify import Verifier, docker_verifier
 
@@ -87,7 +87,7 @@ def test_verify_in_session_matches_standalone(tmp_path: Path) -> None:
     (proj / "MILExample.lean").write_text("import Mathlib\n\n" + SOLVED_PROOF)
 
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    verifier = Verifier(backend, supported_toolchain=DEFAULT_TOOLCHAIN)
+    verifier = Verifier(backend)
     with backend.session(proj) as session:
         report = verifier.verify(LeanProject(proj), session=session)
 

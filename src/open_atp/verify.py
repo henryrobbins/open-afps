@@ -9,8 +9,9 @@ Every prover -- agentic, Numina, *and* Aristotle -- funnels its output through t
 3. Extract the axiom dependency list via ``#print axioms`` and compare against
    :data:`STANDARD_AXIOMS`.
 
-It also enforces the input contract: the project's toolchain must match the
-backend image's pin, else we reject before spending compute.
+It also enforces the input contract: the project's toolchain (and locked Mathlib
+revision) must match the backend image's pins, else we reject before spending
+compute.
 """
 
 from __future__ import annotations
@@ -22,8 +23,8 @@ from pathlib import Path
 from open_atp.backends.base import ComputeBackend, ComputeSession
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.backends.modal import ModalBackend, ModalConfig
-from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_atp.lean import LeanProject, ToolchainMismatch
+from open_atp.images import DEFAULT_IMAGE, Image
+from open_atp.lean import LeanProject, MathlibRevMismatch, ToolchainMismatch
 
 # Axioms that a "clean" Mathlib proof is allowed to depend on. Anything else
 # (notably ``sorryAx``) means the proof is not actually complete.
@@ -172,43 +173,41 @@ class ProofResult:
         }
 
 
-def docker_verifier(
-    image: str = DEFAULT_IMAGE, toolchain: str = DEFAULT_TOOLCHAIN
-) -> Verifier:
+def docker_verifier(image: Image = DEFAULT_IMAGE) -> Verifier:
     """A :class:`Verifier` backed by a local Docker sandbox running ``image``."""
-    backend = DockerBackend(DockerConfig(image=image))
-    return Verifier(backend, supported_toolchain=toolchain)
+    return Verifier(DockerBackend(DockerConfig(image=image)))
 
 
-def modal_verifier(
-    image: str = DEFAULT_IMAGE, toolchain: str = DEFAULT_TOOLCHAIN
-) -> Verifier:
+def modal_verifier(image: Image = DEFAULT_IMAGE) -> Verifier:
     """A :class:`Verifier` backed by a Modal Sandbox running the published ``image``.
 
     Needs Modal credentials and the image published via ``open-atp
     build-modal-image``. The image's ``:tag`` is dropped for the Modal name lookup.
     """
-    backend = ModalBackend(ModalConfig(image=image))
-    return Verifier(backend, supported_toolchain=toolchain)
+    return Verifier(ModalBackend(ModalConfig(image=image)))
 
 
 class Verifier:
     """Compiles projects in a :class:`ComputeBackend` and reports their status."""
 
-    def __init__(
-        self, backend: ComputeBackend, *, supported_toolchain: str | None = None
-    ) -> None:
+    def __init__(self, backend: ComputeBackend) -> None:
         self.backend = backend
-        # The toolchain baked into ``backend.config.image``. When set, projects whose
-        # pin differs are rejected up front (the "reject if the image isn't correct"
-        # contract).
-        self.supported_toolchain = supported_toolchain
+
+    @property
+    def image(self) -> Image:
+        """The image the backend runs -- the compatibility contract projects match."""
+        return self.backend.config.image
 
     def check_compatible(self, project: LeanProject) -> None:
-        """Reject a project whose toolchain differs from the backend image's pin.
+        """Reject a project whose pins differ from the backend image's.
 
-        A no-op when no ``supported_toolchain`` was set or the project's pin matches
-        it; otherwise raises :class:`~open_atp.lean.ToolchainMismatch`.
+        Matches the project's :attr:`~open_atp.lean.LeanProject.lean_toolchain`
+        against the image's :attr:`~open_atp.images.Image.lean_toolchain`, and its
+        locked :attr:`~open_atp.lean.LeanProject.mathlib_rev` (when the project
+        records one) against the image's
+        :attr:`~open_atp.images.Image.mathlib_rev`. Raises
+        :class:`~open_atp.lean.ToolchainMismatch` or
+        :class:`~open_atp.lean.MathlibRevMismatch` on the first mismatch.
 
         Examples
         --------
@@ -216,32 +215,39 @@ class Verifier:
         >>> import tempfile
         >>> from pathlib import Path
         >>> from open_atp.backends.docker import DockerBackend, DockerConfig
-        >>> from open_atp.images import DEFAULT_IMAGE
+        >>> from open_atp.images import Image
         >>> from open_atp.lean import LeanProject
         >>> from open_atp.verify import Verifier
         >>> root = Path(tempfile.mkdtemp())
         >>> _ = (root / "lakefile.toml").write_text('name = "demo"\\n')
         >>> _ = (root / "lean-toolchain").write_text("leanprover/lean4:v4.31.0\\n")
         >>> project = LeanProject(root)
-        >>> backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 
         A matching pin passes silently:
 
-        >>> ok = Verifier(backend, supported_toolchain="leanprover/lean4:v4.31.0")
+        >>> image = Image(lean_toolchain="leanprover/lean4:v4.31.0")
+        >>> ok = Verifier(DockerBackend(DockerConfig(image=image)))
         >>> ok.check_compatible(project)
 
         A differing pin is rejected up front:
 
-        >>> bad = Verifier(backend, supported_toolchain="leanprover/lean4:v4.28.0")
+        >>> bad = Verifier(DockerBackend(DockerConfig(image=Image())))
         >>> bad.check_compatible(project)  # doctest: +ELLIPSIS
         Traceback (most recent call last):
             ...
         open_atp.lean.ToolchainMismatch: Project pins ...
         """
-        if self.supported_toolchain and project.toolchain != self.supported_toolchain:
+        image = self.image
+        if project.lean_toolchain != image.lean_toolchain:
             raise ToolchainMismatch(
-                f"Project pins {project.toolchain!r} but backend image supports "
-                f"{self.supported_toolchain!r}. Re-submit against a matching image."
+                f"Project pins toolchain {project.lean_toolchain!r} but backend image "
+                f"supports {image.lean_toolchain!r}. Re-submit against a matching "
+                "image."
+            )
+        if project.mathlib_rev is not None and project.mathlib_rev != image.mathlib_rev:
+            raise MathlibRevMismatch(
+                f"Project pins Mathlib {project.mathlib_rev!r} but backend image "
+                f"supports {image.mathlib_rev!r}. Re-submit against a matching image."
             )
 
     def verify(
@@ -263,13 +269,14 @@ class Verifier:
         >>> import tempfile
         >>> from pathlib import Path
         >>> from open_atp.backends.docker import DockerBackend, DockerConfig
-        >>> from open_atp.images import DEFAULT_IMAGE
+        >>> from open_atp.images import Image
         >>> from open_atp.lean import LeanProject
         >>> from open_atp.verify import Verifier
         >>> root = Path(tempfile.mkdtemp())
         >>> _ = (root / "lakefile.toml").write_text('name = "demo"\\n')
         >>> _ = (root / "lean-toolchain").write_text("leanprover/lean4:v4.31.0\\n")
-        >>> verifier = Verifier(DockerBackend(DockerConfig(image=DEFAULT_IMAGE)))
+        >>> image = Image(lean_toolchain="leanprover/lean4:v4.31.0")
+        >>> verifier = Verifier(DockerBackend(DockerConfig(image=image)))
         >>> report = verifier.verify(LeanProject(root))
         >>> report.verified
         True
