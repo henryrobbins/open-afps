@@ -97,7 +97,19 @@ class ComputeSession(AbstractContextManager["ComputeSession"]):
 
 @dataclass
 class BackendConfig:
-    """Shared backend knobs. Subclasses add their own (Docker mounts, Modal CPU…)."""
+    """Shared backend knobs. Subclasses add their own (Docker mounts, Modal CPU…).
+
+    Attributes
+    ----------
+    image : str
+        Container image carrying Lean + Mathlib that the sandbox runs.
+    timeout_s : int
+        Wall-clock cap applied to a command when its call site does not pass an
+        explicit ``timeout_s``. Default ``1800``.
+    env : Mapping[str, str]
+        Environment variables baked into every command run in the sandbox. Default
+        empty.
+    """
 
     image: str
     timeout_s: int = 1800

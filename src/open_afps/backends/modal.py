@@ -89,10 +89,24 @@ def _modal_image_name(image: str) -> str:
 
 @dataclass
 class ModalConfig(BackendConfig):
+    """Configuration for :class:`ModalBackend`.
+
+    Extends :class:`~open_afps.backends.base.BackendConfig` (``image``, ``timeout_s``,
+    ``env``) with Modal-specific knobs.
+
+    Attributes
+    ----------
+    cpu : float
+        CPU cores requested for the Modal Sandbox. Default ``2.0``.
+    memory_mib : int
+        Memory (MiB) requested for the Modal Sandbox. Default ``4096``.
+    app : str
+        Modal app the Sandbox is associated with (also the publish target of
+        ``open-afps build-modal-image``). Default ``open-afps``.
+    """
+
     cpu: float = 2.0
     memory_mib: int = 4096
-    #: Modal app the Sandbox is associated with (also the publish target of
-    #: ``open-afps build-modal-image``).
     app: str = "open-afps"
 
 

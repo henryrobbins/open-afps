@@ -33,11 +33,25 @@ from open_afps.backends.base import (
 
 @dataclass
 class DockerConfig(BackendConfig):
-    # Path inside the container where the workdir is bind-mounted.
+    """Configuration for :class:`DockerBackend`.
+
+    Extends :class:`~open_afps.backends.base.BackendConfig` (``image``, ``timeout_s``,
+    ``env``) with Docker-specific knobs.
+
+    Attributes
+    ----------
+    workdir_mount : str
+        Path inside the container where the workdir is bind-mounted. Default
+        ``/workspace/wd``.
+    baked_lake : str
+        Image-baked warm cache to symlink the workdir's ``.lake`` to. Empty skips the
+        symlink. Default ``/workspace/.lake``.
+    volumes : tuple[tuple[str, str], ...]
+        Extra ``-v host:container`` mounts (e.g. agent credential dirs). Default empty.
+    """
+
     workdir_mount: str = "/workspace/wd"
-    # Image-baked warm cache to symlink the workdir's .lake to (skip if empty).
     baked_lake: str = "/workspace/.lake"
-    # Extra ``-v host:container`` mounts (e.g. agent credential dirs, in later phases).
     volumes: tuple[tuple[str, str], ...] = ()
 
 
