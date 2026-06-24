@@ -58,6 +58,36 @@ html_title = "open-afps"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 
+# Lean-inspired Furo theme. ``custom.css`` overrides the full set of Furo
+# variables; the brand colors are surfaced here too so they stay in sync even
+# before the stylesheet loads. See ``design_handoff_furo_lean_theme/``.
+html_theme_options = {
+    "sidebar_hide_name": False,
+    "light_css_variables": {
+        "color-brand-primary": "#3D6AC9",
+        "color-brand-content": "#3D6AC9",
+    },
+    "dark_css_variables": {
+        "color-brand-primary": "#7ba2ea",
+        "color-brand-content": "#8fb1ef",
+    },
+    "source_repository": "https://github.com/henryrobbins/open-afps/",
+    "source_branch": "main",
+    "source_directory": "docs/",
+    "footer_icons": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/henryrobbins/open-afps",
+            "html": "",
+            "class": "fa-brands fa-github",
+        },
+    ],
+}
+
+# Pygments themes the tokens inside code blocks; these pair with the Lean palette.
+pygments_style = "friendly"
+pygments_dark_style = "github-dark"
+
 autodoc_default_options = {"members": True, "undoc-members": True}
 autodoc_typehints = "none"
 numpydoc_class_members_toctree = False

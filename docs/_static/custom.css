@@ -1,7 +1,200 @@
+/* =============================================================================
+   custom.css — Lean-inspired Furo theme for open-afps
+   -----------------------------------------------------------------------------
+   Standard Furo customization: this file ONLY overrides Furo's documented CSS
+   variables plus a handful of element rules. It does NOT fork Furo's templates.
+
+   Wire-up (see conf.py snippet in the handoff README):
+     html_theme = "furo"
+     html_static_path = ["_static"]
+     html_css_files = ["custom.css"]
+
+   Fonts: headings/title use Libertinus Math (served from Google Fonts via the
+   @font-face below — no template edits needed); body uses the system sans stack.
+   ============================================================================= */
+
+/* ---- Libertinus Math (headings / title only) --------------------------------
+   Pulled from Google Fonts. If you prefer to vendor it, drop the .woff2 into
+   _static/fonts/ and change the src url() to _static/fonts/<file>.woff2.       */
+@import url('https://fonts.googleapis.com/css2?family=Libertinus+Math&family=JetBrains+Mono:wght@400;600&display=swap');
+
+/* =============================================================================
+   1. LIGHT THEME TOKENS  (Furo reads these from :root / body)
+   ============================================================================= */
+body {
+  /* fonts */
+  --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-stack--monospace: "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  /* custom token consumed by the heading rules in section 4 */
+  --font-heading: "Libertinus Math", "Libertinus Serif", Georgia, "Times New Roman", serif;
+
+  /* brand (Lean royal blue) */
+  --color-brand-primary: #3D6AC9;
+  --color-brand-content: #3D6AC9;
+  --color-brand-visited: #6a52c4;
+
+  /* foreground */
+  --color-foreground-primary: #1b2435;
+  --color-foreground-secondary: #56617a;
+  --color-foreground-muted: #7682a0;
+  --color-foreground-border: #cdd5e6;
+
+  /* background */
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f4f7fd;
+  --color-background-hover: #e9f0fb;
+  --color-background-hover--transparent: #e9f0fb00;
+  --color-background-border: #e3e9f4;
+  --color-sidebar-background: #f4f7fd;
+  --color-sidebar-background-border: #e3e9f4;
+
+  /* code + API */
+  --color-code-background: #f5f8fd;
+  --color-code-foreground: #26314a;
+  --color-inline-code-background: #eaf0fb;
+  --color-api-background: #f5f8fd;
+  --color-api-background-hover: #e9f0fb;
+  --color-api-name: var(--color-brand-content);
+  --color-api-pre-name: #7682a0;
+  --color-api-keyword: #7682a0;
+  --color-highlight-on-target: #fff6d6;
+
+  /* admonitions */
+  --color-admonition-title--note: #3D6AC9;
+  --color-admonition-title-background--note: #3d6ac918;
+  --color-admonition-title--tip: #0f9d8f;
+  --color-admonition-title-background--tip: #0f9d8f18;
+  --color-admonition-title--warning: #c2810c;
+  --color-admonition-title-background--warning: #c2810c18;
+  --color-admonition-title--danger: #d23f4b;
+  --color-admonition-title-background--danger: #d23f4b18;
+}
+
+/* =============================================================================
+   2. DARK THEME TOKENS  (Lean navy)
+   Furo toggles between body[data-theme="light"|"dark"|"auto"]. These two blocks
+   cover the explicit dark choice AND the OS-auto case.
+   ============================================================================= */
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="light"]) {
+    --color-brand-primary: #7ba2ea;
+    --color-brand-content: #8fb1ef;
+    --color-brand-visited: #b69bf0;
+    --color-foreground-primary: #e7ecf6;
+    --color-foreground-secondary: #aab4ca;
+    --color-foreground-muted: #8893ab;
+    --color-foreground-border: #33405a;
+    --color-background-primary: #0f1420;
+    --color-background-secondary: #161d2c;
+    --color-background-hover: #1d2740;
+    --color-background-hover--transparent: #1d274000;
+    --color-background-border: #232d44;
+    --color-sidebar-background: #0c111b;
+    --color-sidebar-background-border: #1d2638;
+    --color-code-background: #141b2a;
+    --color-code-foreground: #cfd8ec;
+    --color-inline-code-background: #1b2336;
+    --color-api-background: #141b2a;
+    --color-api-background-hover: #1d2740;
+    --color-highlight-on-target: #2c3a1a;
+  }
+}
+body[data-theme="dark"] {
+  --color-brand-primary: #7ba2ea;
+  --color-brand-content: #8fb1ef;
+  --color-brand-visited: #b69bf0;
+  --color-foreground-primary: #e7ecf6;
+  --color-foreground-secondary: #aab4ca;
+  --color-foreground-muted: #8893ab;
+  --color-foreground-border: #33405a;
+  --color-background-primary: #0f1420;
+  --color-background-secondary: #161d2c;
+  --color-background-hover: #1d2740;
+  --color-background-hover--transparent: #1d274000;
+  --color-background-border: #232d44;
+  --color-sidebar-background: #0c111b;
+  --color-sidebar-background-border: #1d2638;
+  --color-code-background: #141b2a;
+  --color-code-foreground: #cfd8ec;
+  --color-inline-code-background: #1b2336;
+  --color-api-background: #141b2a;
+  --color-api-background-hover: #1d2740;
+  --color-highlight-on-target: #2c3a1a;
+}
+
+/* =============================================================================
+   3. BASE
+   ============================================================================= */
+body {
+  font-size: 17px;
+}
+
+/* =============================================================================
+   4. HEADINGS / TITLE — Libertinus Math
+   Furo renders content headings as h1..h6 inside .content / article.
+   ============================================================================= */
+.content h1,
+.content h2,
+.content h3,
+.content h4,
+.content h5,
+.content h6,
+.sidebar-brand-text {
+  font-family: var(--font-heading);
+  letter-spacing: -0.005em;
+}
+.content h1 { font-size: 2.7rem;  line-height: 1.1; letter-spacing: -0.01em; }
+.content h2 { font-size: 1.92rem; }
+.content h3 { font-size: 1.4rem; }
+.sidebar-brand-text { font-size: 1.3em; }
+
+/* Lead paragraph (use the `.lede` class, or `.. rst-class:: lede`) */
+.content .lede {
+  font-size: 1.16em;
+  color: var(--color-foreground-secondary);
+  line-height: 1.6;
+}
+
+/* =============================================================================
+   5. ACCENTS — small touches that read as "Lean"
+   ============================================================================= */
+
+/* brand badge / logo bubble in the sidebar, if you use a text brand */
+.sidebar-brand { gap: 0.6em; }
+
+/* API signature blocks: Lean-blue left rule (Furo already boxes these) */
+dl.py > dt.sig,
+dl.c > dt.sig,
+dl.cpp > dt.sig {
+  border-left: 3px solid var(--color-brand-primary);
+}
+
+/* Rounded code blocks to match the Lean site's soft cards */
+.highlight { border-radius: 9px; }
+div.highlight,
+pre { border-radius: 9px; }
+
+/* Inline code pill */
+code.literal,
+.rst-content code.literal {
+  border: 1px solid var(--color-background-border);
+  border-radius: 5px;
+}
+
+/* Custom round bullets in brand color (optional flourish).
+   Remove this block if you prefer Furo's default list markers. */
+.content article ul > li::marker {
+  color: var(--color-brand-primary);
+}
+
+/* =============================================================================
+   6. UTILITIES
+   ============================================================================= */
+
 /* Wrap long lines in literal blocks tagged with :class: wrap */
 .highlight-wrap pre,
 div.literal-block-wrapper.wrap pre,
 .wrap pre {
-    white-space: pre-wrap;
-    word-break: break-word;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
