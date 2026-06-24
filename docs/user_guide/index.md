@@ -6,8 +6,6 @@ installed `open-afps` (see {doc}`../installation`).
 ```{toctree}
 :maxdepth: 1
 
-docker
-modal
 run_provers
 ```
 
