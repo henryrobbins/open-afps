@@ -1,10 +1,10 @@
 """The prover registry: name -> a constructed :class:`AutomatedProver`.
 
 The package is a library: a caller picks a prover, constructs it against a compute
-backend, and calls :meth:`~open_afps.provers.base.AutomatedProver.prove` directly::
+backend, and calls :meth:`~open_atp.provers.base.AutomatedProver.prove` directly::
 
-    from open_afps import PROVERS, get_prover
-    from open_afps.backends.docker import DockerBackend, DockerConfig
+    from open_atp import PROVERS, get_prover
+    from open_atp.backends.docker import DockerBackend, DockerConfig
 
     backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     prover = get_prover(PROVERS.CLAUDE, verification_backend=backend)
@@ -27,12 +27,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from open_afps.backends.base import ComputeBackend
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
-from open_afps.provers.aristotle import AristotleProver, AristotleProverConfig
-from open_afps.provers.base import AutomatedProver, AutomatedProverConfig
-from open_afps.provers.numina import NuminaProver, NuminaProverConfig
+from open_atp.backends.base import ComputeBackend
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
+from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
+from open_atp.provers.base import AutomatedProver, AutomatedProverConfig
+from open_atp.provers.numina import NuminaProver, NuminaProverConfig
 
 # --- prover registry / factory ---------------------------------------------
 
@@ -41,7 +41,7 @@ class PROVERS(StrEnum):
     """The provers :func:`get_prover` accepts.
 
     Each member's value is the registry key. ``agent:<harness>`` members select an
-    :class:`~open_afps.provers.agent_prover.AgentProver` harness; :attr:`CLAUDE` is the
+    :class:`~open_atp.provers.agent_prover.AgentProver` harness; :attr:`CLAUDE` is the
     bare ``agent`` (config default, ``claude_code``).
     """
 

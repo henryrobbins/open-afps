@@ -1,19 +1,19 @@
 (prover-codex)=
 # Codex
 
-The Codex prover is the {class}`~open_afps.provers.agent_prover.AgentProver` on the
-{class}`~open_afps.harness.codex.CodexHarness` — OpenAI's
+The Codex prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on the
+{class}`~open_atp.harness.codex.CodexHarness` — OpenAI's
 [Codex](https://chatgpt.com/codex) CLI driving the `sorry`s in a sandbox with the
 [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp) server. The shared
-{class}`~open_afps.core.verifier.Verifier` does the final compile / sorry / axiom
+{class}`~open_atp.core.verifier.Verifier` does the final compile / sorry / axiom
 check. See {doc}`index` for the staging/diff lifecycle every agent harness shares.
 
 ## Usage
 
 ```python
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers import AgentProver, AgentProverConfig
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 config = AgentProverConfig(
@@ -26,7 +26,7 @@ config = AgentProverConfig(
 prover = AgentProver(config, verification_backend=backend)
 ```
 
-Or by registry spec through {func}`~open_afps.provers.get_prover` / the CLI:
+Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
 `agent:codex`. Because Codex authenticates through ChatGPT/OpenAI it must run an
 OpenAI model, so the `agent:codex` spec defaults `model` to `gpt-5.5` rather than the
 `AgentProverConfig` Anthropic default.
@@ -55,11 +55,11 @@ via the `model_reasoning_effort` override, not a `--effort` flag. The `--json` e
 stream goes to stdout.
 
 `$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
-prompt baked into the {class}`~open_afps.provers.agent_prover.AgentProver`:
+prompt baked into the {class}`~open_atp.provers.agent_prover.AgentProver`:
 
 :::{dropdown} Default agent prompt
 :icon: code
-```{literalinclude} ../../src/open_afps/provers/agent_prover.py
+```{literalinclude} ../../src/open_atp/provers/agent_prover.py
 :language: text
 :start-after: _DEFAULT_PROMPT = """
 :end-before: END _DEFAULT_PROMPT
@@ -87,5 +87,5 @@ The Codex CLI does not report per-run USD. `parse` sums token totals from the
 `turn.completed` events (tolerating the `input_tokens` / `inputTokens` /
 `prompt_tokens` field-name variants) and leaves `cost_usd` `None`, so the prover
 estimates USD from the pricing table in
-{data}`~open_afps.harness.cost.COST_PER_MTOK`. Keep that table aligned with current
+{data}`~open_atp.harness.cost.COST_PER_MTOK`. Keep that table aligned with current
 OpenAI API prices.

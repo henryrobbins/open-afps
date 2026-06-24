@@ -1,6 +1,6 @@
 """Compute backends: the sandbox primitive used for agent execution and verification."""
 
-from open_afps.backends.base import (
+from open_atp.backends.base import (
     BackendConfig,
     CommandHandle,
     CommandResult,

@@ -4,7 +4,7 @@ Fast unit layer (no Docker, no creds, no API):
 
 * ``configure_wd`` writes ``axprover.yaml`` overriding only the deltas (model +
   provider_config, optional max_iterations) over ax-prover's bundled default.yaml.
-* ``_render_config`` maps the open-afps model id to ax-prover's ``provider:model``
+* ``_render_config`` maps the open-atp model id to ax-prover's ``provider:model``
   string and ``effort`` to each provider's reasoning knob.
 * ``_agent_command`` is the self-discovering launch script (no <<MODEL>> subst).
 * ``parse`` sums tokens from the per-target ``ax_output.*.json`` ``-o`` files (the
@@ -23,12 +23,12 @@ from pathlib import Path
 
 import pytest
 
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.core.result import ProofResult
-from open_afps.core.task import LeanProject, ProofTask
-from open_afps.harness import HARNESSES, AxProverHarness, Harness
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.core.result import ProofResult
+from open_atp.core.task import LeanProject, ProofTask
+from open_atp.harness import HARNESSES, AxProverHarness, Harness
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 
@@ -135,8 +135,8 @@ def test_render_config_anthropic_model_and_effort(tmp_path: Path) -> None:
     # prover_llm points at a FRESH llm_configs key via interpolation so default.yaml's
     # claude_opus_4_5 config can't deep-merge stale keys (e.g. thinking.budget_tokens)
     # into ours -- see _render_config for the full rationale.
-    assert cfg["prover"]["prover_llm"] == "${llm_configs.open_afps}"
-    llm = cfg["llm_configs"]["open_afps"]
+    assert cfg["prover"]["prover_llm"] == "${llm_configs.open_atp}"
+    llm = cfg["llm_configs"]["open_atp"]
     assert llm["model"] == "anthropic:claude-opus-4-8"
     assert llm["provider_config"]["effort"] == "high"
     assert llm["provider_config"]["thinking"] == {"type": "adaptive"}
@@ -271,7 +271,7 @@ def _make_live_backend(backend: str):
     if backend == "docker":
         return DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     if backend == "modal":
-        from open_afps.backends.modal import ModalBackend, ModalConfig
+        from open_atp.backends.modal import ModalBackend, ModalConfig
 
         return ModalBackend(ModalConfig(image=DEFAULT_IMAGE))
     raise AssertionError(backend)

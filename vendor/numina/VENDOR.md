@@ -1,10 +1,10 @@
 # Vendored: numina-lean-agent
 
 The `skills/` and `prompts/` directories here are copied from the upstream
-**numina-lean-agent** project and adapted for open-afps. Numina's value for this
+**numina-lean-agent** project and adapted for open-atp. Numina's value for this
 project is its skills + prompt toolkit (the actual proving "product"); we deliberately
 do **not** vendor its `scripts/runner.py` -- that orchestration is re-implemented by
-`open_afps.provers.numina.NuminaProver` on top of our own `AgentProver` + backend.
+`open_atp.provers.numina.NuminaProver` on top of our own `AgentProver` + backend.
 
 ## Provenance
 
@@ -23,7 +23,7 @@ do **not** vendor its `scripts/runner.py` -- that orchestration is re-implemente
 ## Adaptations applied at copy time (deliberate, reviewable drift)
 
 1. **Skill location.** Numina invoked its CLI scripts from the project-root
-   `skills/cli/`. open-afps stages this bundle into the agent workdir's
+   `skills/cli/`. open-atp stages this bundle into the agent workdir's
    `.claude/skills/` (Claude Code skill discovery), so every `skills/...`
    reference in the vendored markdown was rewritten to `.claude/skills/...`, and
    `prompts/autosearch/subagent_prompts/` to `.claude/prompts/subagent_prompts/`
@@ -49,14 +49,14 @@ re-sync `git diff` against the upstream SHA has a record of what is ours:
   the Gemini/GPT discussion-partner spend into the run's `cost_usd` (previously
   untracked). Added `_record_usage()` + two call sites; no change to the
   discussion logic itself.
-  [`49ea116`](https://github.com/henryrobbins/open-afps/commit/49ea116c9013f0d12fbafe6baf855fd5df255b08)
+  [`49ea116`](https://github.com/henryrobbins/open-atp/commit/49ea116c9013f0d12fbafe6baf855fd5df255b08)
 
 ## What was re-implemented instead of copied
 
 - The round-continuation loop (was `scripts/runner.py`) -> `NuminaProver.prove`.
 - Statement-change guarding (was `scripts/statement_tracker.py` +
   `scripts/extract_sublemmas.py`) -> ported to
-  `src/open_afps/provers/numina_tracker.py` (same upstream SHA as above).
+  `src/open_atp/provers/numina_tracker.py` (same upstream SHA as above).
 
 ## Re-syncing with upstream
 

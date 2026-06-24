@@ -1,4 +1,4 @@
-# Base sandbox image for open-afps: Lean + Mathlib, with the olean cache pre-baked.
+# Base sandbox image for open-atp: Lean + Mathlib, with the olean cache pre-baked.
 #
 # Mirrors milp_flare's assets/docker/Dockerfile, minus the MILP-specific Lean
 # skeleton. As of phase 3 it also carries the agent CLIs (claude-code / codex /
@@ -7,14 +7,14 @@
 #
 # This Dockerfile backs the *Docker* compute backend (runs as the non-root `agent`
 # user). The *Modal* backend uses a separate, programmatically-built image that
-# installs the same toolchain globally as root -- see `open-afps build-modal-image`
-# (src/open_afps/__main__.py). Keep the two recipes in sync when bumping versions.
+# installs the same toolchain globally as root -- see `open-atp build-modal-image`
+# (src/open_atp/__main__.py). Keep the two recipes in sync when bumping versions.
 #
 # The toolchain pinned in images/lean/lean-toolchain is the contract: the verifier
 # rejects any uploaded project whose lean-toolchain differs. Bump it (and the mathlib
 # rev in images/lean/lakefile.toml) and rebuild to support a new pin.
 #
-# Build context is images/ :  docker build -t open-afps:latest images/
+# Build context is images/ :  docker build -t open-atp:latest images/
 
 FROM ubuntu:24.04
 
@@ -64,13 +64,13 @@ RUN pipx install lean-lsp-mcp \
 
 # ax-prover (LangGraph Lean agent) backing the AxProverHarness. pipx keeps its heavy
 # stack (langgraph, langchain-*, lean-interact, omegaconf, tavily) fully isolated from
-# open-afps and the other CLIs. Pinned to a commit on our fork
+# open-atp and the other CLIs. Pinned to a commit on our fork
 # (henryrobbins/ax-prover-base) rather than the 0.1.1 PyPI release, for two fixes the
 # release lacks: (1) lean_interact-based target discovery -- 0.1.1's regex discovery
 # lists `import Mathlib` as a theorem `Mathlib` and flags it unproven when a nearby
 # docstring mentions the word `sorry`, burning a prove loop on a phantom target; and
 # (2) per-target token usage in the `-o` JSON that AxProverHarness.parse reads for cost.
-# Keep AX_PROVER_REF in sync with src/open_afps/__main__.py. Fork is public; the HTTPS
+# Keep AX_PROVER_REF in sync with src/open_atp/__main__.py. Fork is public; the HTTPS
 # clone needs no credentials.
 ARG AX_PROVER_REF=361e5b3451267785bfd70f173e7ab0be667d4987
 RUN pipx install "git+https://github.com/henryrobbins/ax-prover-base@${AX_PROVER_REF}"

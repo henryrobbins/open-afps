@@ -2,14 +2,14 @@
 
 An ``AgentProver`` composes:
 
-* a :class:`~open_afps.harness.Harness` (claude_code / codex / opencode) -- the
+* a :class:`~open_atp.harness.Harness` (claude_code / codex / opencode) -- the
   *agent* concern: launch script, auth forwarding, output parsing; and
-* a :class:`~open_afps.backends.base.ComputeBackend` -- the *compute* concern:
+* a :class:`~open_atp.backends.base.ComputeBackend` -- the *compute* concern:
   where the agent runs, with Lean+Mathlib and the lean-lsp MCP server.
 
 ``prove`` stages the project into the workdir, lets the agent fill the sorrys in
 place, then diffs the ``.lean`` files against the staged originals to report what
-changed. The shared :class:`~open_afps.core.verifier.Verifier` (owned by the base
+changed. The shared :class:`~open_atp.core.verifier.Verifier` (owned by the base
 ``run``) does the final compile/sorry/axiom check.
 """
 
@@ -22,16 +22,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TextIO
 
-from open_afps.backends.base import (
+from open_atp.backends.base import (
     CommandHandle,
     CommandResult,
     ComputeBackend,
     ComputeSession,
 )
-from open_afps.core.result import ProofResult
-from open_afps.core.task import LeanProject, ProofTask
-from open_afps.harness import HARNESSES, Harness, bundle_for_config, compute_cost_usd
-from open_afps.provers.base import AutomatedProver, AutomatedProverConfig
+from open_atp.core.result import ProofResult
+from open_atp.core.task import LeanProject, ProofTask
+from open_atp.harness import HARNESSES, Harness, bundle_for_config, compute_cost_usd
+from open_atp.provers.base import AutomatedProver, AutomatedProverConfig
 
 log = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
 class AgentProverConfig(AutomatedProverConfig):
     """Configuration for :class:`AgentProver`.
 
-    Extends :class:`~open_afps.provers.base.AutomatedProverConfig` (``image``,
+    Extends :class:`~open_atp.provers.base.AutomatedProverConfig` (``image``,
     ``supported_toolchain``, ``timeout_s``, ``env``) with the agent-harness knobs.
 
     Attributes

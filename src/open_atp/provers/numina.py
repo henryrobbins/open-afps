@@ -33,18 +33,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from open_afps.backends.base import ComputeSession
-from open_afps.core.result import ProofResult
-from open_afps.core.task import LeanProject, ProofTask
-from open_afps.harness import (
+from open_atp.backends.base import ComputeSession
+from open_atp.core.result import ProofResult
+from open_atp.core.task import LeanProject, ProofTask
+from open_atp.harness import (
     HARNESSES,
     Harness,
     HarnessRunResult,
     compute_cost_usd,
     resolve_bundle,
 )
-from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
-from open_afps.provers.numina_tracker import StatementTracker
+from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
+from open_atp.provers.numina_tracker import StatementTracker
 
 # Directories never worth copying into the agent workdir (mirrors AgentProver).
 _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
@@ -56,7 +56,7 @@ _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
 _END_REASON_PROTOCOL = """
 
 ---
-SESSION CONTROL PROTOCOL (open-afps round loop)
+SESSION CONTROL PROTOCOL (open-atp round loop)
 
 When you finish this turn, the VERY LAST line of your final message MUST be
 exactly one of the following, on its own line, with no surrounding markdown,
@@ -93,7 +93,7 @@ _HELPER_USAGE_FILE = Path(".claude") / "helper_usage.jsonl"
 class NuminaProverConfig(AgentProverConfig):
     """Configuration for :class:`NuminaProver`.
 
-    Extends :class:`~open_afps.provers.agent_prover.AgentProverConfig` with the
+    Extends :class:`~open_atp.provers.agent_prover.AgentProverConfig` with the
     Numina coordinator's round-loop and helper-skill knobs.
 
     Attributes

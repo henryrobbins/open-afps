@@ -3,7 +3,7 @@ trivial Mathematics-in-Lean fixture (one sorry'd theorem).
 
 This is the *single* live test the project needs: one parametrized function over
 ``backend (docker, modal) x prover``, routed through :func:`get_prover` +
-:meth:`~open_afps.provers.base.AutomatedProver.prove` (so it exercises the backend
+:meth:`~open_atp.provers.base.AutomatedProver.prove` (so it exercises the backend
 factory, the registry, and the shared verifier exactly as a caller would). It replaces
 the per-prover ``test_live_*_solves_trivial`` copies that used to live in each prover's
 test module.
@@ -12,7 +12,7 @@ Each case is gated two ways and skips (never fails) when its prerequisites are
 absent:
 
 * the **compute** marker (``docker`` / ``modal``) -- opt out with ``-m 'not modal'``;
-  Modal also needs credentials + a published image (``open-afps build-modal-image``).
+  Modal also needs credentials + a published image (``open-atp build-modal-image``).
 * the **API** marker (``aristotle_api`` / ``agent_api`` / ``numina_api``) -- excluded
   by default (billable), opt in with e.g. ``-m agent_api``. That selects the prover's
   rows on *both* backends; add ``and docker`` to pin one.
@@ -29,12 +29,12 @@ from pathlib import Path
 
 import pytest
 
-from open_afps.backends.base import ComputeBackend
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.backends.modal import ModalBackend, ModalConfig
-from open_afps.core.task import LeanProject, ProofTask
-from open_afps.images import DEFAULT_IMAGE
-from open_afps.provers import available_provers, get_prover
+from open_atp.backends.base import ComputeBackend
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.modal import ModalBackend, ModalConfig
+from open_atp.core.task import LeanProject, ProofTask
+from open_atp.images import DEFAULT_IMAGE
+from open_atp.provers import available_provers, get_prover
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
 

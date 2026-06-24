@@ -8,7 +8,7 @@ bootstrap scripts, or required environment variables -- so they mount cleanly
 into any harness's skill location (`.claude/skills`, `.agents/skills`,
 `VIBE_HOME/skills`) and work under a headless `-p` launch.
 
-`open_afps.harness.bundles` mounts a *subset* of these into the agent workdir
+`open_atp.harness.bundles` mounts a *subset* of these into the agent workdir
 (the default bundle enables `lean-proof`); the rest are vendored so they can be
 opted into by name without a re-sync.
 

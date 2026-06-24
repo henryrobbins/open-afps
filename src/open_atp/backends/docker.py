@@ -21,7 +21,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from open_afps.backends.base import (
+from open_atp.backends.base import (
     BackendConfig,
     CommandHandle,
     CommandResult,
@@ -35,7 +35,7 @@ from open_afps.backends.base import (
 class DockerConfig(BackendConfig):
     """Configuration for :class:`DockerBackend`.
 
-    Extends :class:`~open_afps.backends.base.BackendConfig` (``image``, ``timeout_s``,
+    Extends :class:`~open_atp.backends.base.BackendConfig` (``image``, ``timeout_s``,
     ``env``) with Docker-specific knobs.
 
     Attributes

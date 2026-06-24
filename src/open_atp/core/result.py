@@ -14,7 +14,7 @@ STANDARD_AXIOMS = frozenset({"propext", "Classical.choice", "Quot.sound"})
 class VerificationReport:
     """Result of compiling a candidate project in a sandbox.
 
-    Produced by :class:`~open_afps.core.verifier.Verifier` and shared by every
+    Produced by :class:`~open_atp.core.verifier.Verifier` and shared by every
     prover, including Aristotle.
 
     Attributes
@@ -66,7 +66,7 @@ class VerificationReport:
 
 @dataclass
 class ProofResult:
-    """What a prover returns from :meth:`~open_afps.provers.base.AutomatedProver.prove`.
+    """What a prover returns from :meth:`~open_atp.provers.base.AutomatedProver.prove`.
 
     The prover writes its artifacts into the caller-chosen :attr:`output_dir`, laid
     out as ``output_dir/{wd,logs}/``: ``wd`` is the completed lake project (the proof

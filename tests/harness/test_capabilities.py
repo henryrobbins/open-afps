@@ -34,7 +34,7 @@ Prerequisites:
     integration spend off the Anthropic bill)
   - vibe: ``MISTRAL_API_KEY`` in env (tests run the non-Labs ``lean-standin``
     stand-in so they don't need Labs access to the builtin ``lean`` agent)
-  - docker backend: docker on PATH + the ``open-afps:latest`` image
+  - docker backend: docker on PATH + the ``open-atp:latest`` image
   - modal backend: ``MODAL_TOKEN_*`` env or ``~/.modal.toml`` + the published image
 """
 
@@ -48,9 +48,9 @@ from pathlib import Path
 
 import pytest
 
-from open_afps.backends.base import ComputeBackend
-from open_afps.harness import HARNESSES, AssetBundle, Harness, VibeHarness
-from open_afps.images import DEFAULT_IMAGE
+from open_atp.backends.base import ComputeBackend
+from open_atp.harness import HARNESSES, AssetBundle, Harness, VibeHarness
+from open_atp.images import DEFAULT_IMAGE
 
 pytestmark = pytest.mark.agent_api
 
@@ -145,11 +145,11 @@ def _backend_available(backend: str) -> bool:
 
 def _make_backend(backend: str) -> ComputeBackend:
     if backend == "docker":
-        from open_afps.backends.docker import DockerBackend, DockerConfig
+        from open_atp.backends.docker import DockerBackend, DockerConfig
 
         return DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     if backend == "modal":
-        from open_afps.backends.modal import ModalBackend, ModalConfig
+        from open_atp.backends.modal import ModalBackend, ModalConfig
 
         return ModalBackend(ModalConfig(image=DEFAULT_IMAGE))
     raise AssertionError(backend)

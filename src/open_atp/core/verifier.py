@@ -6,7 +6,7 @@ this. The checks are lifted from milp_flare's ``entrypoint.sh`` + ``FLARE._evalu
 1. Compile each target file with ``lake env lean <file>``.
 2. Scan the compile log for ``sorry`` warnings.
 3. Extract the axiom dependency list via ``#print axioms`` and compare against
-   :data:`~open_afps.core.result.STANDARD_AXIOMS`.
+   :data:`~open_atp.core.result.STANDARD_AXIOMS`.
 
 It also enforces the input contract: the project's toolchain must match the
 backend image's pin, else we reject before spending compute.
@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import re
 
-from open_afps.backends.base import ComputeBackend, ComputeSession
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.backends.modal import ModalBackend, ModalConfig
-from open_afps.core.result import VerificationReport
-from open_afps.core.task import LeanProject, ToolchainMismatch
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.backends.base import ComputeBackend, ComputeSession
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.modal import ModalBackend, ModalConfig
+from open_atp.core.result import VerificationReport
+from open_atp.core.task import LeanProject, ToolchainMismatch
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 
 _SORRY_RE = re.compile(r"declaration uses 'sorry'|uses `sorry`")
 _AXIOMS_RE = re.compile(r"depends on axioms: \[([^\]]*)\]")
@@ -40,7 +40,7 @@ def modal_verifier(
 ) -> Verifier:
     """A :class:`Verifier` backed by a Modal Sandbox running the published ``image``.
 
-    Needs Modal credentials and the image published via ``open-afps
+    Needs Modal credentials and the image published via ``open-atp
     build-modal-image``. The image's ``:tag`` is dropped for the Modal name lookup.
     """
     backend = ModalBackend(ModalConfig(image=image))

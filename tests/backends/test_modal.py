@@ -3,7 +3,7 @@
 The live tests are marked ``modal`` and skip unless Modal credentials are present
 (``MODAL_TOKEN_ID`` / ``MODAL_TOKEN_SECRET`` in the env -- read from ``.env`` by
 ``conftest`` -- or a ``~/.modal.toml`` profile from ``modal token set``) and require
-the image published via ``open-afps build-modal-image``. They mirror
+the image published via ``open-atp build-modal-image``. They mirror
 ``core/test_verifier.py`` so the shared ``Verifier`` is exercised on Modal exactly
 as on Docker. The tar round-trip test needs no Sandbox and always runs.
 """
@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from open_afps.backends.modal import _modal_image_name, _tar_dir
-from open_afps.core.task import LeanProject, ToolchainMismatch
+from open_atp.backends.modal import _modal_image_name, _tar_dir
+from open_atp.core.task import LeanProject, ToolchainMismatch
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 
@@ -75,8 +75,8 @@ def test_tar_dir_round_trips(tmp_path: Path) -> None:
 
 
 def test_modal_image_name_strips_tag() -> None:
-    assert _modal_image_name("open-afps:latest") == "open-afps"
-    assert _modal_image_name("open-afps") == "open-afps"
+    assert _modal_image_name("open-atp:latest") == "open-atp"
+    assert _modal_image_name("open-atp") == "open-atp"
     assert _modal_image_name("registry/org/img:v1") == "registry/org/img"
 
 
@@ -95,8 +95,8 @@ def _live(fn: object) -> object:
 @_live
 def test_backend_run_smoke(tmp_path: Path) -> None:
     """``ModalBackend.run`` executes a command over a pushed workdir on Modal."""
-    from open_afps.backends.modal import ModalBackend, ModalConfig
-    from open_afps.images import DEFAULT_IMAGE
+    from open_atp.backends.modal import ModalBackend, ModalConfig
+    from open_atp.images import DEFAULT_IMAGE
 
     proj = _stage(tmp_path)
     backend = ModalBackend(ModalConfig(image=DEFAULT_IMAGE))
@@ -110,7 +110,7 @@ def test_backend_run_smoke(tmp_path: Path) -> None:
 
 @_live
 def test_sorry_theorem_compiles_but_is_not_verified(tmp_path: Path) -> None:
-    from open_afps.core.verifier import modal_verifier
+    from open_atp.core.verifier import modal_verifier
 
     project = LeanProject(_stage(tmp_path))
     report = modal_verifier().verify(project)
@@ -122,7 +122,7 @@ def test_sorry_theorem_compiles_but_is_not_verified(tmp_path: Path) -> None:
 
 @_live
 def test_completed_theorem_is_verified(tmp_path: Path) -> None:
-    from open_afps.core.verifier import modal_verifier
+    from open_atp.core.verifier import modal_verifier
 
     proj = _stage(tmp_path)
     (proj / "MILExample.lean").write_text("import Mathlib\n\n" + SOLVED_PROOF)
@@ -136,7 +136,7 @@ def test_completed_theorem_is_verified(tmp_path: Path) -> None:
 
 @_live
 def test_toolchain_mismatch_is_rejected(tmp_path: Path) -> None:
-    from open_afps.core.verifier import modal_verifier
+    from open_atp.core.verifier import modal_verifier
 
     proj = _stage(tmp_path)
     (proj / "lean-toolchain").write_text("leanprover/lean4:v4.99.0\n")
@@ -148,9 +148,9 @@ def test_toolchain_mismatch_is_rejected(tmp_path: Path) -> None:
 @_live
 def test_session_runs_many_commands_in_one_sandbox(tmp_path: Path) -> None:
     """One Sandbox, two execs: an edit then an in-session verify, terminated once."""
-    from open_afps.backends.modal import ModalBackend, ModalConfig
-    from open_afps.core.verifier import Verifier
-    from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+    from open_atp.backends.modal import ModalBackend, ModalConfig
+    from open_atp.core.verifier import Verifier
+    from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 
     proj = _stage(tmp_path)
     (proj / "MILExample.lean").write_text("import Mathlib\n\n" + SOLVED_PROOF)

@@ -1,6 +1,6 @@
 # Docker
 
-`open-afps` uses Docker to isolate agent working directories and to provide a
+`open-atp` uses Docker to isolate agent working directories and to provide a
 [Lean](https://lean-lang.org/) + [Mathlib](https://leanprover-community.github.io/)
 sandbox with a warm `olean` cache. The same image backs both *generation* (the agent
 runs inside it) and *verification* (the shared verifier compiles candidate files
@@ -19,24 +19,24 @@ docker images
 ## Build the base image
 
 The image is built from the `Dockerfile` under `images/`. It pins the supported Lean
-toolchain ({data}`~open_afps.images.DEFAULT_TOOLCHAIN`) and pre-builds a Mathlib
+toolchain ({data}`~open_atp.images.DEFAULT_TOOLCHAIN`) and pre-builds a Mathlib
 `olean` cache, so the first build is expected to take a while.
 
 ```bash
-docker build -t open-afps:latest images/
+docker build -t open-atp:latest images/
 ```
 
-Run `docker images` to verify the `open-afps` image was created. The large size is
+Run `docker images` to verify the `open-atp` image was created. The large size is
 mostly attributable to the bundled Mathlib library.
 
 ```
 $ docker images
 REPOSITORY   TAG       IMAGE ID       CREATED         SIZE
-open-afps    latest    8c164dafcbc3   26 hours ago    12GB
+open-atp    latest    8c164dafcbc3   26 hours ago    12GB
 ```
 
 The image bakes a warm Mathlib `olean` cache at `/workspace/.lake`; the
-{class}`~open_afps.backends.docker.DockerBackend` symlinks each workdir's `.lake` to
+{class}`~open_atp.backends.docker.DockerBackend` symlinks each workdir's `.lake` to
 it so projects build against the cache instead of compiling Mathlib from scratch. See
 the `Dockerfile` below.
 
@@ -49,18 +49,18 @@ the `Dockerfile` below.
 
 ## Using the Docker backend
 
-The {func}`~open_afps.core.verifier.docker_verifier` helper wires up a verifier
-against a local Docker sandbox running `open-afps:latest`:
+The {func}`~open_atp.core.verifier.docker_verifier` helper wires up a verifier
+against a local Docker sandbox running `open-atp:latest`:
 
 ```python
-from open_afps.core.task import LeanProject
-from open_afps.core.verifier import docker_verifier
+from open_atp.core.task import LeanProject
+from open_atp.core.verifier import docker_verifier
 
 report = docker_verifier().verify(LeanProject("path/to/lake/project"))
 ```
 
 Provers take a verification backend explicitly. Construct a
-{class}`~open_afps.backends.docker.DockerBackend` and pass it in (see
+{class}`~open_atp.backends.docker.DockerBackend` and pass it in (see
 {doc}`run_provers`).
 
 ## Docker resources

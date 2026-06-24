@@ -1,6 +1,6 @@
 """Phase-1 end-to-end test: verify a trivial Mathematics-in-Lean project in Docker.
 
-Requires the ``open-afps:latest`` image (``docker build -t open-afps:latest images/``).
+Requires the ``open-atp:latest`` image (``docker build -t open-atp:latest images/``).
 Marked ``docker`` so it can be skipped with ``-m 'not docker'``.
 """
 
@@ -11,10 +11,10 @@ from pathlib import Path
 
 import pytest
 
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.core.task import LeanProject, ToolchainMismatch
-from open_afps.core.verifier import Verifier, docker_verifier
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.core.task import LeanProject, ToolchainMismatch
+from open_atp.core.verifier import Verifier, docker_verifier
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 

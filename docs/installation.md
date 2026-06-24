@@ -2,35 +2,35 @@
 
 ## Install the package
 
-`open-afps` targets Python 3.12+. Install it from source with
+`open-atp` targets Python 3.12+. Install it from source with
 [uv](https://docs.astral.sh/uv/) (recommended for development):
 
 ```bash
-git clone https://github.com/henryrobbins/open-afps.git
-cd open-afps
+git clone https://github.com/henryrobbins/open-atp.git
+cd open-atp
 uv sync
 ```
 
 or with `pip`:
 
 ```bash
-pip install open-afps
+pip install open-atp
 ```
 
 ## Quickstart
 
 This quickstart compiles and checks a complete lake project in a local Docker
-sandbox via the shared {class}`~open_afps.core.verifier.Verifier`. It requires:
+sandbox via the shared {class}`~open_atp.core.verifier.Verifier`. It requires:
 
-- **Docker** installed and the `open-afps:latest` image built (see
+- **Docker** installed and the `open-atp:latest` image built (see
   {doc}`compute_backend/docker`).
 - A **complete lake project** — a directory carrying its own `lean-toolchain` and
   `lake-manifest.json` — whose toolchain matches the image's pin
-  ({data}`~open_afps.images.DEFAULT_TOOLCHAIN`).
+  ({data}`~open_atp.images.DEFAULT_TOOLCHAIN`).
 
 ```python
-from open_afps.core.task import LeanProject
-from open_afps.core.verifier import docker_verifier
+from open_atp.core.task import LeanProject
+from open_atp.core.verifier import docker_verifier
 
 report = docker_verifier().verify(LeanProject("path/to/lake/project"))
 print(report.verified, report.sorry_free, report.axioms)
@@ -43,6 +43,6 @@ a prover. See {doc}`provers/index` for the prover catalogue and
 :::{note}
 The input contract is a **full lake project**. The verifier rejects projects whose
 pinned toolchain does not match the sandbox image
-({class}`~open_afps.core.task.ToolchainMismatch`) rather than failing deep in a
+({class}`~open_atp.core.task.ToolchainMismatch`) rather than failing deep in a
 build.
 :::

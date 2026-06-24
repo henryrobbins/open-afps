@@ -5,8 +5,8 @@ compiles, is `sorry`-free, and is axiom-clean. Every prover funnels its output
 through this.
 
 ```{eval-rst}
-.. autofunction:: open_afps.core.verifier.docker_verifier
+.. autofunction:: open_atp.core.verifier.docker_verifier
 
-.. autoclass:: open_afps.core.verifier.Verifier
+.. autoclass:: open_atp.core.verifier.Verifier
    :members: check_compatible, verify
 ```

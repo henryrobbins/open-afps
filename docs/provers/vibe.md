@@ -1,12 +1,12 @@
 (prover-vibe)=
 # Vibe / Leanstral
 
-The Vibe prover is the {class}`~open_afps.provers.agent_prover.AgentProver` on the
-{class}`~open_afps.harness.vibe.VibeHarness` — it drives Mistral
+The Vibe prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on the
+{class}`~open_atp.harness.vibe.VibeHarness` — it drives Mistral
 [Vibe](https://docs.mistral.ai/mistral-vibe/)'s builtin `lean` agent in a sandbox.
 Vibe's `lean` agent *is* Leanstral (`vibe -p ... --agent lean` pins the model to
 `leanstral`; there is no `--model` flag). The shared
-{class}`~open_afps.core.verifier.Verifier` does the final compile / sorry / axiom
+{class}`~open_atp.core.verifier.Verifier` does the final compile / sorry / axiom
 check. See {doc}`index` for the lifecycle every agent harness shares.
 
 ## The Leanstral stand-in
@@ -22,9 +22,9 @@ Lean scaffold on a non-Labs **reasoning** model any La Plateforme key can reach
 ## Usage
 
 ```python
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers import AgentProver, AgentProverConfig
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 config = AgentProverConfig(
@@ -39,7 +39,7 @@ config = AgentProverConfig(
 prover = AgentProver(config, verification_backend=backend)
 ```
 
-Or by registry spec through {func}`~open_afps.provers.get_prover` / the CLI: `vibe`
+Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI: `vibe`
 (defaults: `agent="lean-standin"`, `model="magistral-medium-latest"`). Swap the model
 with `overrides={"model": "devstral-medium-latest"}`. The `agent`, `max_turns`, and
 `max_price` fields are Vibe-specific.
@@ -74,11 +74,11 @@ vibe -p "$PROMPT" --agent <AGENT> --output streaming --workdir "$PWD" <EXTRA>
 NDJSON message stream (one message per line) goes to stdout.
 
 `$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
-prompt baked into the {class}`~open_afps.provers.agent_prover.AgentProver`:
+prompt baked into the {class}`~open_atp.provers.agent_prover.AgentProver`:
 
 :::{dropdown} Default agent prompt
 :icon: code
-```{literalinclude} ../../src/open_afps/provers/agent_prover.py
+```{literalinclude} ../../src/open_atp/provers/agent_prover.py
 :language: text
 :start-after: _DEFAULT_PROMPT = """
 :end-before: END _DEFAULT_PROMPT
@@ -97,5 +97,5 @@ The streaming output carries only conversation messages — no token/cost totals
 live in Vibe's per-session `meta.json`; `parse` reads `session_cost`,
 `session_prompt_tokens`, and `session_completion_tokens` from its `stats` to populate
 `cost_usd` and the token totals in
-{class}`~open_afps.harness.base.HarnessRunResult`. `collect_logs` relocates the
+{class}`~open_atp.harness.base.HarnessRunResult`. `collect_logs` relocates the
 `.vibe/logs` tree to `logs/vibe-session`.

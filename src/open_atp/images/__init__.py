@@ -6,8 +6,8 @@ verifier enforces: an uploaded project must pin :data:`DEFAULT_TOOLCHAIN`.
 
 from pathlib import Path
 
-#: Tag produced by ``docker build -t open-afps:latest images/``.
-DEFAULT_IMAGE = "open-afps:latest"
+#: Tag produced by ``docker build -t open-atp:latest images/``.
+DEFAULT_IMAGE = "open-atp:latest"
 
 #: Lean toolchain baked into ``DEFAULT_IMAGE`` (see ``images/lean/lean-toolchain``).
 DEFAULT_TOOLCHAIN = "leanprover/lean4:v4.28.0"

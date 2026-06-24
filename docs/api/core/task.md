@@ -5,11 +5,11 @@ fill. A project is a *full lake project* carrying its own `lean-toolchain` and
 `lake-manifest.json`.
 
 ```{eval-rst}
-.. autoclass:: open_afps.core.task.LeanProject
+.. autoclass:: open_atp.core.task.LeanProject
 
-.. autoclass:: open_afps.core.task.ProofTask
+.. autoclass:: open_atp.core.task.ProofTask
 
-.. autoexception:: open_afps.core.task.ToolchainMismatch
+.. autoexception:: open_atp.core.task.ToolchainMismatch
    :no-members:
 ```
 
@@ -19,9 +19,9 @@ The constants describing the baked sandbox image (the contract the verifier
 enforces).
 
 ```{eval-rst}
-.. autodata:: open_afps.images.DEFAULT_IMAGE
+.. autodata:: open_atp.images.DEFAULT_IMAGE
 
-.. autodata:: open_afps.images.DEFAULT_TOOLCHAIN
+.. autodata:: open_atp.images.DEFAULT_TOOLCHAIN
 
-.. autodata:: open_afps.images.DEFAULT_MATHLIB_REV
+.. autodata:: open_atp.images.DEFAULT_MATHLIB_REV
 ```

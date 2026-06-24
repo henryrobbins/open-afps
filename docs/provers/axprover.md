@@ -1,22 +1,22 @@
 (prover-axprover)=
 # AxProver
 
-The AxProver prover is the {class}`~open_afps.provers.agent_prover.AgentProver` on the
-{class}`~open_afps.harness.axprover.AxProverHarness` — it drives
+The AxProver prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on the
+{class}`~open_atp.harness.axprover.AxProverHarness` — it drives
 [ax-prover-base](https://github.com/henryrobbins/ax-prover-base), a self-contained
 LangGraph Lean agent with its own proposer → builder → reviewer → memory loop, via the
 `ax-prover prove` CLI in a sandbox. ax-prover edits the target `.lean` file in place;
-{class}`~open_afps.provers.agent_prover.AgentProver` supplies the staging, snapshot /
-diff, key forwarding, and the shared {class}`~open_afps.core.verifier.Verifier` remains
+{class}`~open_atp.provers.agent_prover.AgentProver` supplies the staging, snapshot /
+diff, key forwarding, and the shared {class}`~open_atp.core.verifier.Verifier` remains
 the source of truth for the compile / sorry / axiom check (we do not trust ax-prover's
 own reviewer). See {doc}`index` for the lifecycle every agent harness shares.
 
 ## Usage
 
 ```python
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers import AgentProver, AgentProverConfig
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 config = AgentProverConfig(
@@ -30,7 +30,7 @@ config = AgentProverConfig(
 prover = AgentProver(config, verification_backend=backend)
 ```
 
-Or by registry spec through {func}`~open_afps.provers.get_prover` / the CLI:
+Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
 `agent:axprover` (defaults: `claude-opus-4-8`, `effort="high"`). The
 `max_iterations` field is AxProver-specific and caps ax-prover's
 proposer → builder → reviewer loop.
@@ -43,7 +43,7 @@ Two things differ from the CLI harnesses:
   `axprover.yaml` (emitted as JSON, which is valid YAML) selecting the model, effort,
   and optional `max_iterations`. ax-prover's `--config` *appends* to its bundled
   `default.yaml`, so only the deltas are set: the model is defined under a fresh
-  `llm_configs.open_afps` key that `prover.prover_llm` references by interpolation
+  `llm_configs.open_atp` key that `prover.prover_llm` references by interpolation
   (a fresh key avoids OmegaConf deep-merging stale `thinking` settings from the
   default's Claude config into ours).
 - **The free-text prompt is ignored** — ax-prover ships its own prompts. The launch
@@ -75,7 +75,7 @@ env). At least one must be set or the harness raises.
 ax-prover streams human-readable logs, not a JSON event stream, so cost is not on
 stdout. `parse` sums `input_tokens` / `output_tokens` across the per-target
 `ax_output.<target>.json` files written by the `-o` flag and leaves `cost_usd` `None`,
-so the prover converts tokens → USD via {data}`~open_afps.harness.cost.COST_PER_MTOK`
+so the prover converts tokens → USD via {data}`~open_atp.harness.cost.COST_PER_MTOK`
 (as with Codex). `collect_logs` relocates the `ax_output.*.json` and
 `ax_prover.*.log` files to `logs/`. On an ax-prover build without the usage fields the
 tokens are simply absent and the run reports zero cost.

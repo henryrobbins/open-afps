@@ -1,5 +1,5 @@
 [project]
-name = "open-afps"
+name = "open-atp"
 version = "0.0.1"
 description = "Open Automated Formal Proof Synthesis: upload Lean files with sorrys, get verified completed proofs across multiple proving backends."
 requires-python = ">=3.12"
@@ -27,7 +27,7 @@ docs = [
 ]
 
 [project.scripts]
-open-afps = "open_afps.__main__:main"
+open-atp = "open_atp.__main__:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -37,20 +37,20 @@ build-backend = "hatchling.build"
 # package directory, so ``packages`` already ships them in the wheel as package data.
 # (A ``force-include`` here would re-add them at the same path and crash the build.)
 [tool.hatch.build.targets.wheel]
-packages = ["src/open_afps"]
+packages = ["src/open_atp"]
 
 # The Numina bundle (skills + prompts) lives at the repo root, outside the package
 # tree, so force-include it into the package as data. Mapping to a *different* dest
 # than its source path means it does not collide with ``packages`` above.
-# NuminaProver resolves it at runtime (open_afps/vendor/numina in a wheel, repo-root
+# NuminaProver resolves it at runtime (open_atp/vendor/numina in a wheel, repo-root
 # vendor/numina in a source checkout).
 [tool.hatch.build.targets.wheel.force-include]
-"vendor/numina" = "open_afps/vendor/numina"
+"vendor/numina" = "open_atp/vendor/numina"
 # Host-agnostic skills (leanprover/skills) and the Claude `lean4` plugin
-# (lean4-skills), resolved at runtime by open_afps.harness._paths the same way as
-# numina (open_afps/vendor/<name> in a wheel, repo-root vendor/<name> in a checkout).
-"vendor/leanprover-skills" = "open_afps/vendor/leanprover-skills"
-"vendor/lean4-skills" = "open_afps/vendor/lean4-skills"
+# (lean4-skills), resolved at runtime by open_atp.harness._paths the same way as
+# numina (open_atp/vendor/<name> in a wheel, repo-root vendor/<name> in a checkout).
+"vendor/leanprover-skills" = "open_atp/vendor/leanprover-skills"
+"vendor/lean4-skills" = "open_atp/vendor/lean4-skills"
 
 [tool.ruff]
 line-length = 88
@@ -62,7 +62,7 @@ select = ["E", "F", "I", "UP"]
 
 [tool.mypy]
 strict = true
-files = ["src/open_afps"]
+files = ["src/open_atp"]
 
 # Third-party deps that ship no type information (no py.typed).
 [[tool.mypy.overrides]]
@@ -76,7 +76,7 @@ testpaths = ["tests"]
 # parallelise; mirrors flare. Override with e.g. `-n 0` for serial debugging.
 addopts = "-m 'not aristotle_api and not agent_api and not numina_api' -n 5"
 markers = [
-    "docker: tests that require the open-afps Docker image (opt-out: -m 'not docker')",
+    "docker: tests that require the open-atp Docker image (opt-out: -m 'not docker')",
     "modal: tests that launch a Modal sandbox (opt-out: -m 'not modal')",
     "aristotle_api: live Aristotle API test (opt-in: run with -m aristotle_api)",
     "agent_api: live agent CLI test, billable + needs creds (opt-in: -m agent_api)",

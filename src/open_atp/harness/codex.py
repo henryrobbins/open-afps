@@ -7,8 +7,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from open_afps.harness._paths import _SCRIPTS
-from open_afps.harness.base import AuthSpec, Harness, HarnessRunResult
+from open_atp.harness._paths import _SCRIPTS
+from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
 
 
 class CodexHarness(Harness):

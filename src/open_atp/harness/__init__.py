@@ -3,18 +3,18 @@
 Each harness adapts one agent CLI (Claude Code / Codex / OpenCode / Vibe /
 ax-prover) to the sandbox: launch script, credential forwarding, and token/cost
 parsing. The *compute* concern (where the command runs, with Lean+Mathlib) lives
-in the injected :class:`~open_afps.backends.base.ComputeBackend`.
+in the injected :class:`~open_atp.backends.base.ComputeBackend`.
 """
 
-from open_afps.harness.axprover import AxProverHarness
-from open_afps.harness.base import (
+from open_atp.harness.axprover import AxProverHarness
+from open_atp.harness.base import (
     PROMPT_FILE,
     SCRIPT_FILE,
     AuthSpec,
     Harness,
     HarnessRunResult,
 )
-from open_afps.harness.bundles import (
+from open_atp.harness.bundles import (
     BUNDLES,
     DEFAULT_BUNDLE,
     AssetBundle,
@@ -23,11 +23,11 @@ from open_afps.harness.bundles import (
     resolve_plugin,
     resolve_skill,
 )
-from open_afps.harness.claude_code import ClaudeCodeHarness
-from open_afps.harness.codex import CodexHarness
-from open_afps.harness.cost import COST_PER_MTOK, compute_cost_usd
-from open_afps.harness.opencode import OpenCodeHarness
-from open_afps.harness.vibe import VibeHarness
+from open_atp.harness.claude_code import ClaudeCodeHarness
+from open_atp.harness.codex import CodexHarness
+from open_atp.harness.cost import COST_PER_MTOK, compute_cost_usd
+from open_atp.harness.opencode import OpenCodeHarness
+from open_atp.harness.vibe import VibeHarness
 
 #: Harness registry selected by ``AgentProverConfig.harness``.
 HARNESSES: dict[str, type[Harness]] = {

@@ -1,4 +1,4 @@
-# Common dev commands for the open-afps package.
+# Common dev commands for the open-atp package.
 
 .PHONY: help install test test-docker test-modal test-aristotle test-agent cov cov-open cov-clean lint format typecheck check build-image docs docs-serve docs-clean clean
 
@@ -17,7 +17,7 @@ help:
 	@echo "  format          Run ruff format + ruff check --fix"
 	@echo "  typecheck       Run mypy"
 	@echo "  check           Run lint + typecheck + test"
-	@echo "  build-image     Build the open-afps:latest Docker image"
+	@echo "  build-image     Build the open-atp:latest Docker image"
 	@echo "  docs            Build the Sphinx docs once"
 	@echo "  docs-serve      Live-reload docs in browser"
 	@echo "  docs-clean      Remove built docs"
@@ -43,7 +43,7 @@ test-agent:
 
 cov:
 	uv run pytest \
-		--cov=open_afps \
+		--cov=open_atp \
 		--cov-report=term-missing \
 		--cov-report=html \
 		--cov-report=xml
@@ -67,7 +67,7 @@ typecheck:
 check: lint typecheck test
 
 build-image:
-	docker build -t open-afps:latest images/
+	docker build -t open-atp:latest images/
 
 docs:
 	uv run --extra docs sphinx-build -W -b html docs docs/_build/html

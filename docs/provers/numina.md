@@ -1,10 +1,10 @@
 (prover-numina)=
 # NuminaProver
 
-The {class}`~open_afps.provers.numina.NuminaProver` is a configured variant of the
-{class}`~open_afps.provers.agent_prover.AgentProver`. Structurally, Numina is
+The {class}`~open_atp.provers.numina.NuminaProver` is a configured variant of the
+{class}`~open_atp.provers.agent_prover.AgentProver`. Structurally, Numina is
 "Claude Code + a specific skills/prompts/search toolkit, run in a multi-round loop in
-a sandbox", so rather than re-implement it, `open-afps` extends `AgentProver` pinned
+a sandbox", so rather than re-implement it, `open-atp` extends `AgentProver` pinned
 to the `claude_code` harness with Numina's vendored assets and adds the two genuinely
 different behaviours:
 
@@ -15,12 +15,12 @@ different behaviours:
 
 Numina's helper skills call out to Leandex / Gemini / GPT, so its config carries
 those API keys
-({attr}`~open_afps.provers.numina.NuminaProverConfig.helper_env_keys`) to forward
+({attr}`~open_atp.provers.numina.NuminaProverConfig.helper_env_keys`) to forward
 into the sandbox.
 
 The `discussion_partner` skill (Gemini/GPT) appends a per-call token-usage record
 to a workdir ledger (`.claude/helper_usage.jsonl`); after the run `prove()` prices
-it via the {mod}`~open_afps.harness.cost` table and folds it into
+it via the {mod}`~open_atp.harness.cost` table and folds it into
 `cost_usd`, so the reported cost includes discussion-partner spend rather than only
 the Claude agent. The split is preserved in metadata (`agent_cost_usd`,
 `helper_cost_usd`, `helper_breakdown`). Helper models absent from the price table
@@ -30,7 +30,7 @@ that should be verified against the provider pricing pages.
 
 :::{warning}
 The `NuminaProver` is currently a **stub**:
-{meth}`~open_afps.provers.numina.NuminaProver.prove` raises `NotImplementedError`.
+{meth}`~open_atp.provers.numina.NuminaProver.prove` raises `NotImplementedError`.
 The config surface below is stable, but the round loop and statement tracker are
 still being implemented.
 :::
@@ -38,8 +38,8 @@ still being implemented.
 ## Configuration
 
 ```python
-from open_afps.provers.numina import NuminaProverConfig
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.provers.numina import NuminaProverConfig
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 
 config = NuminaProverConfig(
     image=DEFAULT_IMAGE,
@@ -50,5 +50,5 @@ config = NuminaProverConfig(
 ```
 
 The `harness` is fixed to `claude_code` and `assets` to `numina`. See
-{class}`~open_afps.provers.numina.NuminaProverConfig` in the {doc}`../api/provers`
+{class}`~open_atp.provers.numina.NuminaProverConfig` in the {doc}`../api/provers`
 reference for the full set of fields.

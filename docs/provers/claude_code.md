@@ -1,20 +1,20 @@
 (prover-claude-code)=
 # Claude Code
 
-The Claude Code prover is the {class}`~open_afps.provers.agent_prover.AgentProver` on
-the {class}`~open_afps.harness.claude_code.ClaudeCodeHarness` — Anthropic's
+The Claude Code prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on
+the {class}`~open_atp.harness.claude_code.ClaudeCodeHarness` — Anthropic's
 [Claude Code](https://claude.com/claude-code) CLI driving the `sorry`s in a sandbox
 with the [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp) server. It is the
 default harness: the bare `agent` registry spec selects it, and the shared
-{class}`~open_afps.core.verifier.Verifier` does the final compile / sorry / axiom
+{class}`~open_atp.core.verifier.Verifier` does the final compile / sorry / axiom
 check. See {doc}`index` for the staging/diff lifecycle every agent harness shares.
 
 ## Usage
 
 ```python
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers import AgentProver, AgentProverConfig
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.provers import AgentProver, AgentProverConfig
 
 backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 config = AgentProverConfig(
@@ -27,7 +27,7 @@ config = AgentProverConfig(
 prover = AgentProver(config, verification_backend=backend)
 ```
 
-Or by registry spec through {func}`~open_afps.provers.get_prover` / the CLI: `agent`
+Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI: `agent`
 (Claude Code is the default harness, so no `:harness` suffix is needed).
 
 ## Harness details
@@ -57,11 +57,11 @@ container); the prover sets `IS_SANDBOX=1` so that mode runs non-interactively, 
 stream goes to stdout.
 
 `$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
-prompt baked into the {class}`~open_afps.provers.agent_prover.AgentProver`:
+prompt baked into the {class}`~open_atp.provers.agent_prover.AgentProver`:
 
 :::{dropdown} Default agent prompt
 :icon: code
-```{literalinclude} ../../src/open_afps/provers/agent_prover.py
+```{literalinclude} ../../src/open_atp/provers/agent_prover.py
 :language: text
 :start-after: _DEFAULT_PROMPT = """
 :end-before: END _DEFAULT_PROMPT
@@ -92,5 +92,5 @@ against your Claude plan rather than the API.
 
 The Claude Code CLI's JSON event stream reports per-run USD directly (`total_cost_usd`
 in the final `result` object), so `cost_usd` in
-{class}`~open_afps.harness.base.HarnessRunResult` is read straight from the stream
+{class}`~open_atp.harness.base.HarnessRunResult` is read straight from the stream
 along with input/output token totals.

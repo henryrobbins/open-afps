@@ -8,9 +8,9 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from open_afps.harness._paths import _SCRIPTS, _VIBE_ASSETS
-from open_afps.harness.base import AuthSpec, Harness, HarnessRunResult
-from open_afps.harness.bundles import AssetBundle
+from open_atp.harness._paths import _SCRIPTS, _VIBE_ASSETS
+from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
+from open_atp.harness.bundles import AssetBundle
 
 
 class VibeHarness(Harness):

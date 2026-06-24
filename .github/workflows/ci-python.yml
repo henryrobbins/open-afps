@@ -103,7 +103,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Coverage — src
-        run: uv run pytest -m 'not docker and not modal' --cov=open_afps --cov-report=term-missing --cov-report=xml
+        run: uv run pytest -m 'not docker and not modal' --cov=open_atp --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

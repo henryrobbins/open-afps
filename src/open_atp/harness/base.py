@@ -10,10 +10,10 @@ A :class:`Harness` knows, for one agent CLI (Claude Code / Codex / OpenCode):
   -- :meth:`Harness.parse`.
 
 The *compute* concern (where that command runs, with Lean+Mathlib and a warm
-cache) lives in the injected :class:`~open_afps.backends.base.ComputeBackend`.
+cache) lives in the injected :class:`~open_atp.backends.base.ComputeBackend`.
 
 Ported from milp_flare's ``harness/`` package; skills/plugins to mount are
-carried by the injected :class:`~open_afps.harness.bundles.AssetBundle` (the
+carried by the injected :class:`~open_atp.harness.bundles.AssetBundle` (the
 default mounts the vendored ``lean-proof`` skill, plus the ``lean4`` plugin for
 the Claude harness).
 """
@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, ClassVar
 
-from open_afps.harness.bundles import DEFAULT_BUNDLE, AssetBundle
+from open_atp.harness.bundles import DEFAULT_BUNDLE, AssetBundle
 
 #: Files the harness writes into the workdir; named so they never collide with a
 #: project's own sources.

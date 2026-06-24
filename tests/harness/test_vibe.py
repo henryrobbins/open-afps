@@ -23,12 +23,12 @@ from pathlib import Path
 
 import pytest
 
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.core.result import ProofResult
-from open_afps.core.task import LeanProject, ProofTask
-from open_afps.harness import HARNESSES, Harness, VibeHarness
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.core.result import ProofResult
+from open_atp.core.task import LeanProject, ProofTask
+from open_atp.harness import HARNESSES, Harness, VibeHarness
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 

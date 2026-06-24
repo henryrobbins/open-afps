@@ -1,4 +1,4 @@
-# open-afps
+# open-atp
 
 **Open Automated Formal Proof Synthesis.** Upload one or more
 [Lean](https://lean-lang.org/) files containing `sorry`, run them through leading
@@ -8,9 +8,9 @@ proof-synthesis backends, and get back verified completed proofs with metadata
 The whole platform reduces to two reusable primitives plus thin candidate
 generators:
 
-1. A {class}`~open_afps.backends.base.ComputeBackend` (`docker` | `modal`) — run a
+1. A {class}`~open_atp.backends.base.ComputeBackend` (`docker` | `modal`) — run a
    command over a working directory in a Lean+Mathlib sandbox.
-2. A {class}`~open_afps.core.verifier.Verifier` — compile a candidate project in a
+2. A {class}`~open_atp.core.verifier.Verifier` — compile a candidate project in a
    backend and report whether it compiles, is `sorry`-free, and is axiom-clean.
 
 Every prover funnels its output through the **shared verifier**, including the

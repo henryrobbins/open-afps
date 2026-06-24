@@ -7,9 +7,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from open_afps.harness._paths import _SCRIPTS
-from open_afps.harness.base import AuthSpec, Harness, HarnessRunResult, _infer_provider
-from open_afps.harness.bundles import AssetBundle
+from open_atp.harness._paths import _SCRIPTS
+from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult, _infer_provider
+from open_atp.harness.bundles import AssetBundle
 
 
 class OpenCodeHarness(Harness):

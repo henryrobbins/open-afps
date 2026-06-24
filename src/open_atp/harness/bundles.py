@@ -25,7 +25,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from open_afps.harness._paths import (
+from open_atp.harness._paths import (
     _vendor_lean4_skills_dir,
     _vendor_leanprover_skills_dir,
     _vendor_numina_dir,

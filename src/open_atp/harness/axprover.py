@@ -8,9 +8,9 @@ import shutil
 from pathlib import Path
 from typing import Any, ClassVar
 
-from open_afps.harness._paths import _SCRIPTS
-from open_afps.harness.base import AuthSpec, Harness, HarnessRunResult, _infer_provider
-from open_afps.harness.bundles import AssetBundle
+from open_atp.harness._paths import _SCRIPTS
+from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult, _infer_provider
+from open_atp.harness.bundles import AssetBundle
 
 #: Cap on ax-prover's per-call LLM retries (its ``DEFAULT_LLM_RETRY_CONFIG`` ships
 #: ``stop_after_attempt=10000`` -- ~8h20m). That ``with_retry`` fires on *any* exception
@@ -49,7 +49,7 @@ class AxProverHarness(Harness):
 
     name = "axprover"
 
-    #: open-afps provider name -> ax-prover's LangChain ``provider:model`` prefix.
+    #: open-atp provider name -> ax-prover's LangChain ``provider:model`` prefix.
     _AX_PROVIDER_PREFIX: ClassVar[dict[str, str]] = {
         "anthropic": "anthropic",
         "openai": "openai",
@@ -140,7 +140,7 @@ class AxProverHarness(Harness):
         missing TAVILY_API_KEY or blocked egress degrades a tool to a no-op rather
         than failing the run.
 
-        The LLM is defined under a *fresh* ``llm_configs.open_afps`` key and
+        The LLM is defined under a *fresh* ``llm_configs.open_atp`` key and
         ``prover_llm`` points at it via interpolation, rather than inlining the dict.
         ax-prover's ``--config`` argparse flag *appends* to its ``["default.yaml"]``
         default (it does not replace it), so default.yaml's
@@ -151,7 +151,7 @@ class AxProverHarness(Harness):
         rejects ("Extra inputs are not permitted") under our ``thinking.type: adaptive``
         and which sends every request into a retry storm (no usage, just 400s). A
         brand-new key has nothing to merge with, so our provider config is used
-        verbatim; ``${llm_configs.open_afps}`` (a string node) cleanly *replaces*
+        verbatim; ``${llm_configs.open_atp}`` (a string node) cleanly *replaces*
         default.yaml's interpolation, and ``llm_configs`` is stripped after resolution
         as a non-Config temporary key.
 
@@ -163,13 +163,13 @@ class AxProverHarness(Harness):
         """
         config: dict[str, Any] = {
             "llm_configs": {
-                "open_afps": {
+                "open_atp": {
                     "model": self._ax_model(),
                     "provider_config": self._provider_config(),
                     "retry_config": {"stop_after_attempt": _LLM_MAX_RETRIES},
                 }
             },
-            "prover": {"prover_llm": "${llm_configs.open_afps}"},
+            "prover": {"prover_llm": "${llm_configs.open_atp}"},
         }
         if self.max_iterations is not None:
             config["prover"]["max_iterations"] = int(self.max_iterations)

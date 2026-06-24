@@ -1,7 +1,7 @@
 # User Guides
 
 We provide user guides for common workflows. Each guide assumes you have already
-installed `open-afps` (see {doc}`../installation`).
+installed `open-atp` (see {doc}`../installation`).
 
 ```{toctree}
 :maxdepth: 1

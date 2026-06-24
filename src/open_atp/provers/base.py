@@ -1,15 +1,15 @@
 """Base prover abstraction.
 
 An :class:`AutomatedProver` is a *candidate generator*: it takes a
-:class:`~open_afps.core.task.ProofTask` and a caller-chosen output directory, fills
+:class:`~open_atp.core.task.ProofTask` and a caller-chosen output directory, fills
 the project's ``sorry``\\s, verifies the result in a shared sandbox, and returns a
-:class:`~open_afps.core.result.ProofResult`. The base class owns the shared lifecycle
+:class:`~open_atp.core.result.ProofResult`. The base class owns the shared lifecycle
 -- stage the output layout, generate, then verify -- so subclasses only implement
 ``_generate`` and every prover (including Aristotle) gets the same final check for
-free. Concrete provers live alongside this base in ``open_afps.provers``.
+free. Concrete provers live alongside this base in ``open_atp.provers``.
 
 The public entry point is :meth:`AutomatedProver.prove`. A caller constructs a prover
-directly (or via :func:`open_afps.provers.get_prover`) and calls it::
+directly (or via :func:`open_atp.provers.get_prover`) and calls it::
 
     result = prover.prove(task, output_dir)
 
@@ -25,10 +25,10 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from open_afps.backends.base import ComputeBackend
-from open_afps.core.result import ProofResult
-from open_afps.core.task import LeanProject, ProofTask
-from open_afps.core.verifier import Verifier
+from open_atp.backends.base import ComputeBackend
+from open_atp.core.result import ProofResult
+from open_atp.core.task import LeanProject, ProofTask
+from open_atp.core.verifier import Verifier
 
 
 @dataclass
@@ -37,11 +37,11 @@ class AutomatedProverConfig:
 
     Subclasses extend with their own knobs:
 
-    * :class:`~open_afps.provers.agent_prover.AgentProverConfig`: harness
+    * :class:`~open_atp.provers.agent_prover.AgentProverConfig`: harness
       (claude/opencode/codex), effort, skills, MCP.
-    * :class:`~open_afps.provers.numina.NuminaProverConfig`: extends the agent config
+    * :class:`~open_atp.provers.numina.NuminaProverConfig`: extends the agent config
       + max_rounds, helper API keys.
-    * :class:`~open_afps.provers.aristotle.AristotleProverConfig`: api key, mode,
+    * :class:`~open_atp.provers.aristotle.AristotleProverConfig`: api key, mode,
       poll interval.
 
     Attributes

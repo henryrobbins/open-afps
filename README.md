@@ -1,11 +1,11 @@
-# open-afps
+# open-atp
 
-[![CI](https://github.com/henryrobbins/open-afps/actions/workflows/ci-python.yml/badge.svg)](https://github.com/henryrobbins/open-afps/actions/workflows/ci-python.yml)
-[![codecov](https://codecov.io/gh/henryrobbins/open-afps/branch/main/graph/badge.svg?flag=src)](https://codecov.io/gh/henryrobbins/open-afps)
+[![CI](https://github.com/henryrobbins/open-atp/actions/workflows/ci-python.yml/badge.svg)](https://github.com/henryrobbins/open-atp/actions/workflows/ci-python.yml)
+[![codecov](https://codecov.io/gh/henryrobbins/open-atp/branch/main/graph/badge.svg?flag=src)](https://codecov.io/gh/henryrobbins/open-atp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Docs](https://readthedocs.org/projects/open-afps/badge/?version=latest)](https://open-afps.readthedocs.io/en/latest/)
+[![Docs](https://readthedocs.org/projects/open-atp/badge/?version=latest)](https://open-atp.readthedocs.io/en/latest/)
 
 **Open Automated Formal Proof Synthesis.** Upload one or more Lean files containing
 `sorry`, run them through leading proof-synthesis backends, and get back verified
@@ -70,24 +70,24 @@ programmatically with the same toolchain installed globally (`build-modal-image`
 
 ```bash
 # Build the Mathlib base image (pins Lean/Mathlib v4.28.0).
-docker build -t open-afps:latest images/
+docker build -t open-atp:latest images/
 
 # Run the verifier test (compiles a trivial Mathematics-in-Lean file).
 uv run pytest -m docker
 
 # Modal backend: publish the same image to Modal, then run its parity suite.
-uv run open-afps build-modal-image --name open-afps --app open-afps
+uv run open-atp build-modal-image --name open-atp --app open-atp
 uv run pytest -m modal   # needs MODAL_TOKEN_ID / MODAL_TOKEN_SECRET
 
 # Pick a backend (or split: Modal for generation, Docker for the cheap verify).
-uv run open-afps solve path/to/project --provers agent --backend modal
-uv run open-afps solve path/to/project --provers agent \
+uv run open-atp solve path/to/project --provers agent --backend modal
+uv run open-atp solve path/to/project --provers agent \
     --agent-backend modal --backend docker
 ```
 
 ```python
-from open_afps.core.task import LeanProject
-from open_afps.core.verifier import docker_verifier
+from open_atp.core.task import LeanProject
+from open_atp.core.verifier import docker_verifier
 
 report = docker_verifier().verify(LeanProject("path/to/lake/project"))
 print(report.verified, report.sorry_free, report.axioms)
@@ -96,9 +96,9 @@ print(report.verified, report.sorry_free, report.axioms)
 ## Layout
 
 ```
-src/open_afps/
+src/open_atp/
   api.py     Platform + prover registry (the dispatch/orchestration layer)
-  __main__.py  `open-afps solve` / `build-image` / `build-modal-image` CLI
+  __main__.py  `open-atp solve` / `build-image` / `build-modal-image` CLI
   core/      task.py result.py prover.py verifier.py
   backends/  base.py docker.py modal.py
   provers/   agent.py numina.py aristotle.py

@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from open_afps.backends.base import (
+from open_atp.backends.base import (
     BackendConfig,
     CommandHandle,
     CommandResult,
@@ -64,7 +64,7 @@ def _require_modal() -> None:
     except ModuleNotFoundError as exc:  # pragma: no cover
         raise RuntimeError(
             "the modal compute backend requires the `modal` package; "
-            "install it with `pip install open-afps` (modal is a core dependency)"
+            "install it with `pip install open-atp` (modal is a core dependency)"
         ) from exc
 
 
@@ -80,7 +80,7 @@ def _modal_image_name(image: str) -> str:
     """Map an image ref to a Modal named-image lookup.
 
     The platform shares one ``image`` string across backends and it carries a
-    Docker-style ``:tag`` (e.g. ``open-afps:latest``). Modal published images are
+    Docker-style ``:tag`` (e.g. ``open-atp:latest``). Modal published images are
     looked up by bare name (``modal.Image.from_name`` takes no tag and Modal names
     can't contain ``:``), so strip a trailing tag.
     """
@@ -91,7 +91,7 @@ def _modal_image_name(image: str) -> str:
 class ModalConfig(BackendConfig):
     """Configuration for :class:`ModalBackend`.
 
-    Extends :class:`~open_afps.backends.base.BackendConfig` (``image``, ``timeout_s``,
+    Extends :class:`~open_atp.backends.base.BackendConfig` (``image``, ``timeout_s``,
     ``env``) with Modal-specific knobs.
 
     Attributes
@@ -102,12 +102,12 @@ class ModalConfig(BackendConfig):
         Memory (MiB) requested for the Modal Sandbox. Default ``4096``.
     app : str
         Modal app the Sandbox is associated with (also the publish target of
-        ``open-afps build-modal-image``). Default ``open-afps``.
+        ``open-atp build-modal-image``). Default ``open-atp``.
     """
 
     cpu: float = 2.0
     memory_mib: int = 4096
-    app: str = "open-afps"
+    app: str = "open-atp"
 
 
 @dataclass

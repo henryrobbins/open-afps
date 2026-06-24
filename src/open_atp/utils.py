@@ -1,6 +1,6 @@
 """Small input-staging helpers for the *"upload"* contract.
 
-A full lake project on disk is already a :class:`~open_afps.core.task.LeanProject`
+A full lake project on disk is already a :class:`~open_atp.core.task.LeanProject`
 (just ``LeanProject(Path(path))``); the only nontrivial case is staging one or more
 bare ``.lean`` files into the pinned Mathlib skeleton, which :func:`stage_files` does.
 """
@@ -11,8 +11,8 @@ import shutil
 from collections.abc import Sequence
 from pathlib import Path
 
-from open_afps.core.task import LeanProject
-from open_afps.images import SKELETON_DIR
+from open_atp.core.task import LeanProject
+from open_atp.images import SKELETON_DIR
 
 
 def stage_files(

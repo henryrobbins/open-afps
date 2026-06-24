@@ -23,17 +23,17 @@ from pathlib import Path
 
 import pytest
 
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.core.result import ProofResult, VerificationReport
-from open_afps.core.task import LeanProject, ProofTask, ToolchainMismatch
-from open_afps.core.verifier import Verifier
-from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
-from open_afps.provers import PROVERS, available_provers, get_prover
-from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
-from open_afps.provers.aristotle import AristotleProver, AristotleProverConfig
-from open_afps.provers.base import AutomatedProver
-from open_afps.provers.numina import NuminaProver, NuminaProverConfig
-from open_afps.utils import stage_files
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.core.result import ProofResult, VerificationReport
+from open_atp.core.task import LeanProject, ProofTask, ToolchainMismatch
+from open_atp.core.verifier import Verifier
+from open_atp.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_atp.provers import PROVERS, available_provers, get_prover
+from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
+from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
+from open_atp.provers.base import AutomatedProver
+from open_atp.provers.numina import NuminaProver, NuminaProverConfig
+from open_atp.utils import stage_files
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
 

@@ -1,9 +1,9 @@
-"""``open-afps`` CLI: a thin shell over the prover API.
+"""``open-atp`` CLI: a thin shell over the prover API.
 
-    open-afps prove <prover> <lean-dir> <output-dir>
+    open-atp prove <prover> <lean-dir> <output-dir>
 
-The core stays a plain Python API (:func:`open_afps.provers.get_prover` ->
-:meth:`~open_afps.provers.base.AutomatedProver.prove`); this is just the terminal
+The core stays a plain Python API (:func:`open_atp.provers.get_prover` ->
+:meth:`~open_atp.provers.base.AutomatedProver.prove`); this is just the terminal
 front door, deliberately minimal: pick a registered prover, point at a lake project,
 and choose where the ``{wd,logs}`` output lands. Generation + verification run on the
 local Docker backend with the default image/toolchain.
@@ -17,10 +17,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.core.task import LeanProject, ProofTask
-from open_afps.images import DEFAULT_IMAGE
-from open_afps.provers import PROVERS, available_provers, get_prover
+from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.core.task import LeanProject, ProofTask
+from open_atp.images import DEFAULT_IMAGE
+from open_atp.provers import PROVERS, available_provers, get_prover
 
 #: ax-prover baked into the Modal image (mirrors the images/Dockerfile ARG). Pinned
 #: to a commit on our fork (henryrobbins/ax-prover-base) rather than the 0.1.1 PyPI
@@ -87,7 +87,7 @@ def _build_modal_image(args: argparse.Namespace) -> int:
     except ModuleNotFoundError:
         print(
             "the modal compute backend requires the `modal` package; "
-            "install it with `pip install open-afps`.",
+            "install it with `pip install open-atp`.",
             file=sys.stderr,
         )
         return 1
@@ -133,7 +133,7 @@ def _build_modal_image(args: argparse.Namespace) -> int:
             "pipx install lean-lsp-mcp && pipx install uv && pipx install mistral-vibe"
         )
         # ax-prover (LangGraph Lean agent) backing the AxProverHarness, pipx-isolated
-        # from open-afps and the CLIs. Keep AX_PROVER_REF in sync with the
+        # from open-atp and the CLIs. Keep AX_PROVER_REF in sync with the
         # images/Dockerfile ARG. Pinned to a git commit (not a PyPI release) for the
         # lean_interact target discovery -- see AX_PROVER_SPEC above.
         .run_commands(f"pipx install '{AX_PROVER_SPEC}'")
@@ -174,7 +174,7 @@ def _build_modal_image(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="open-afps")
+    parser = argparse.ArgumentParser(prog="open-atp")
     sub = parser.add_subparsers(dest="command", required=True)
 
     prove = sub.add_parser(
@@ -208,14 +208,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     build_modal.add_argument(
         "--name",
-        default="open-afps",
-        help="Name to publish the Modal image under (default: open-afps). "
+        default="open-atp",
+        help="Name to publish the Modal image under (default: open-atp). "
         "ModalConfig.image (sans :tag) must match this.",
     )
     build_modal.add_argument(
         "--app",
-        default="open-afps",
-        help="Modal app to associate the image build with (default: open-afps).",
+        default="open-atp",
+        help="Modal app to associate the image build with (default: open-atp).",
     )
     build_modal.add_argument(
         "--force",

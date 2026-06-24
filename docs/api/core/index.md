@@ -1,6 +1,6 @@
 # `core`
 
-The `open_afps.core` package holds the input/output contracts and the shared verifier
+The `open_atp.core` package holds the input/output contracts and the shared verifier
 every prover builds on:
 
 - {doc}`task` — the input contract (`LeanProject`, `ProofTask`).
