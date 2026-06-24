@@ -39,7 +39,7 @@ config = AgentProverConfig(
 prover = AgentProver(config, verification_backend=backend)
 ```
 
-Or by registry spec through {func}`~open_afps.api.get_prover` / the CLI: `vibe`
+Or by registry spec through {func}`~open_afps.provers.get_prover` / the CLI: `vibe`
 (defaults: `agent="lean-standin"`, `model="magistral-medium-latest"`). Swap the model
 with `overrides={"model": "devstral-medium-latest"}`. The `agent`, `max_turns`, and
 `max_price` fields are Vibe-specific.

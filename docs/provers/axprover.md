@@ -30,7 +30,7 @@ config = AgentProverConfig(
 prover = AgentProver(config, verification_backend=backend)
 ```
 
-Or by registry spec through {func}`~open_afps.api.get_prover` / the CLI:
+Or by registry spec through {func}`~open_afps.provers.get_prover` / the CLI:
 `agent:axprover` (defaults: `claude-opus-4-8`, `effort="high"`). The
 `max_iterations` field is AxProver-specific and caps ax-prover's
 proposer → builder → reviewer loop.

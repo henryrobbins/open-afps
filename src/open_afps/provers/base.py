@@ -9,7 +9,7 @@ the project's ``sorry``\\s, verifies the result in a shared sandbox, and returns
 free. Concrete provers live alongside this base in ``open_afps.provers``.
 
 The public entry point is :meth:`AutomatedProver.prove`. A caller constructs a prover
-directly (or via :func:`open_afps.api.get_prover`) and calls it::
+directly (or via :func:`open_afps.provers.get_prover`) and calls it::
 
     result = prover.prove(task, output_dir)
 

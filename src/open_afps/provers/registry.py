@@ -28,8 +28,6 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from open_afps.backends.base import ComputeBackend
-from open_afps.backends.docker import DockerBackend, DockerConfig
-from open_afps.backends.modal import ModalBackend, ModalConfig
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
 from open_afps.provers.aristotle import AristotleProver, AristotleProverConfig
@@ -149,12 +147,3 @@ def get_prover(
     if isinstance(config, AgentProverConfig):
         return entry.prover_cls(config, verification_backend, agent_backend)  # type: ignore[call-arg]
     return entry.prover_cls(config, verification_backend)
-
-
-def make_backend(kind: str, image: str = DEFAULT_IMAGE) -> ComputeBackend:
-    """Construct a compute backend by name (``docker`` | ``modal``)."""
-    if kind == "docker":
-        return DockerBackend(DockerConfig(image=image))
-    if kind == "modal":
-        return ModalBackend(ModalConfig(image=image))
-    raise ValueError(f"Unknown backend {kind!r}; choose 'docker' or 'modal'.")

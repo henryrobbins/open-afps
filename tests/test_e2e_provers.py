@@ -29,11 +29,23 @@ from pathlib import Path
 
 import pytest
 
-from open_afps.api import available_provers, get_prover, make_backend
+from open_afps.backends.base import ComputeBackend
+from open_afps.backends.docker import DockerBackend, DockerConfig
+from open_afps.backends.modal import ModalBackend, ModalConfig
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.images import DEFAULT_IMAGE
+from open_afps.provers import available_provers, get_prover
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
+
+
+def make_backend(kind: str, image: str = DEFAULT_IMAGE) -> ComputeBackend:
+    """Construct a compute backend by name (``docker`` | ``modal``)."""
+    if kind == "docker":
+        return DockerBackend(DockerConfig(image=image))
+    if kind == "modal":
+        return ModalBackend(ModalConfig(image=image))
+    raise ValueError(f"Unknown backend {kind!r}; choose 'docker' or 'modal'.")
 
 
 # --- credential gates: each returns a skip reason, or None when ready ---------

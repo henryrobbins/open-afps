@@ -16,9 +16,9 @@ Everything else is a candidate generator
 are then funnelled through the shared verifier.
 """
 
-from open_afps.api import PROVERS, available_provers, get_prover
 from open_afps.core.result import ProofResult, VerificationReport
 from open_afps.core.task import LeanProject, ProofTask
+from open_afps.provers import PROVERS, available_provers, get_prover
 from open_afps.provers.base import AutomatedProver, AutomatedProverConfig
 from open_afps.utils import stage_files
 

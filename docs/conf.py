@@ -96,8 +96,8 @@ numpydoc_xref_param_type = True
 numpydoc_xref_ignore = {"of", "or", "optional", "default"}
 numpydoc_xref_aliases = {
     # Registry
-    "PROVERS": "open_afps.api.PROVERS",
-    "get_prover": "open_afps.api.get_prover",
+    "PROVERS": "open_afps.provers.PROVERS",
+    "get_prover": "open_afps.provers.get_prover",
     "stage_files": "open_afps.utils.stage_files",
     # Core
     "LeanProject": "open_afps.core.task.LeanProject",

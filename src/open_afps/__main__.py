@@ -2,7 +2,7 @@
 
     open-afps prove <prover> <lean-dir> <output-dir>
 
-The core stays a plain Python API (:func:`open_afps.api.get_prover` ->
+The core stays a plain Python API (:func:`open_afps.provers.get_prover` ->
 :meth:`~open_afps.provers.base.AutomatedProver.prove`); this is just the terminal
 front door, deliberately minimal: pick a registered prover, point at a lake project,
 and choose where the ``{wd,logs}`` output lands. Generation + verification run on the
@@ -17,9 +17,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from open_afps.api import PROVERS, available_provers, get_prover, make_backend
+from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.core.task import LeanProject, ProofTask
 from open_afps.images import DEFAULT_IMAGE
+from open_afps.provers import PROVERS, available_provers, get_prover
 
 #: ax-prover baked into the Modal image (mirrors the images/Dockerfile ARG). Pinned
 #: to a commit on our fork (henryrobbins/ax-prover-base) rather than the 0.1.1 PyPI
@@ -40,7 +41,7 @@ def _prove(args: argparse.Namespace) -> int:
     project = LeanProject(Path(args.lean_dir))
     task = ProofTask(project)
 
-    backend = make_backend("docker", DEFAULT_IMAGE)
+    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
     prover = get_prover(PROVERS(args.prover), verification_backend=backend)
     result = prover.prove(task, Path(args.output_dir))
 

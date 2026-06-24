@@ -23,12 +23,12 @@ from pathlib import Path
 
 import pytest
 
-from open_afps.api import PROVERS, available_provers, get_prover
 from open_afps.backends.docker import DockerBackend, DockerConfig
 from open_afps.core.result import ProofResult, VerificationReport
 from open_afps.core.task import LeanProject, ProofTask, ToolchainMismatch
 from open_afps.core.verifier import Verifier
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
+from open_afps.provers import PROVERS, available_provers, get_prover
 from open_afps.provers.agent_prover import AgentProver, AgentProverConfig
 from open_afps.provers.aristotle import AristotleProver, AristotleProverConfig
 from open_afps.provers.base import AutomatedProver
