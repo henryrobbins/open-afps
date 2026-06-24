@@ -60,7 +60,8 @@ back out with it. The written `.vibe/config.toml`:
   call that loads the full Mathlib import closure).
 
 The stand-in profile is written to `.vibe/agents/<agent>.toml`, and the bundle's
-skills are mounted under `.vibe/skills` (Vibe's user skills dir, which loads
+skills — the host-agnostic [`leanprover/skills`](https://github.com/leanprover/skills)
+— are mounted under `.vibe/skills` (Vibe's user skills dir, which loads
 regardless of project-folder trust). The launch script
 (`assets/scripts/vibe_agent.sh`) runs:
 
@@ -71,6 +72,18 @@ vibe -p "$PROMPT" --agent <AGENT> --output streaming --workdir "$PWD" <EXTRA>
 
 `<EXTRA>` appends `--max-turns` / `--max-price` when set. The `--output streaming`
 NDJSON message stream (one message per line) goes to stdout.
+
+`$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
+prompt baked into the {class}`~open_afps.provers.agent_prover.AgentProver`:
+
+:::{dropdown} Default agent prompt
+:icon: code
+```{literalinclude} ../../src/open_afps/provers/agent_prover.py
+:language: text
+:start-after: _DEFAULT_PROMPT = """
+:end-before: END _DEFAULT_PROMPT
+```
+:::
 
 ## Authentication
 

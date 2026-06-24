@@ -41,6 +41,19 @@ touching the network or an API key. See {doc}`../user_guide/run_provers` for an
 end-to-end run and {class}`~open_afps.provers.aristotle.AristotleProverConfig` in the
 {doc}`../api/provers` reference for configuration.
 
+The prompt submitted to the hosted agent is the task's `instructions` when set,
+otherwise Aristotle's own default prompt (the agent CLI harnesses share a longer,
+tool-specific prompt instead):
+
+:::{dropdown} Default Aristotle prompt
+:icon: code
+```{literalinclude} ../../src/open_afps/provers/aristotle.py
+:language: python
+:start-after: _DEFAULT_PROMPT = (
+:end-before: END _DEFAULT_PROMPT
+```
+:::
+
 :::{note}
 Aristotle runs are billed by Harmonic against your `ARISTOTLE_API_KEY`. Verification
 still happens locally in your own Docker sandbox.

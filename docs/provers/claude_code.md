@@ -33,8 +33,11 @@ Or by registry spec through {func}`~open_afps.api.build_prover` / the CLI: `agen
 ## Harness details
 
 `configure_wd` writes a project-scope `.mcp.json` registering the lean-lsp MCP server
-and mounts the bundle's skills under `.claude/skills/`. Claude Code is the only
-harness that also loads **plugins** — the default bundle's `lean4` plugin is staged
+and mounts the bundle's skills — the host-agnostic
+[`leanprover/skills`](https://github.com/leanprover/skills) — under `.claude/skills/`.
+Claude Code is the only harness that also loads **plugins** — the default bundle's
+`lean4` plugin, vendored from
+[`cameronfreer/lean4-skills`](https://github.com/cameronfreer/lean4-skills), is staged
 under `.plugins/<name>/`. The launch script
 (`assets/scripts/claude_code_agent.sh`) runs:
 
@@ -52,6 +55,18 @@ hooks and subagents fire. `bypassPermissions` skips approval prompts (safe in th
 container); the prover sets `IS_SANDBOX=1` so that mode runs non-interactively, and
 `CLAUDE_CODE_FORK_SUBAGENT=1` when plugins are mounted. The `stream-json` event
 stream goes to stdout.
+
+`$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
+prompt baked into the {class}`~open_afps.provers.agent_prover.AgentProver`:
+
+:::{dropdown} Default agent prompt
+:icon: code
+```{literalinclude} ../../src/open_afps/provers/agent_prover.py
+:language: text
+:start-after: _DEFAULT_PROMPT = """
+:end-before: END _DEFAULT_PROMPT
+```
+:::
 
 ## Authentication
 

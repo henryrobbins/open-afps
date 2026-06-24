@@ -39,6 +39,7 @@ _DEFAULT_PROMPT = (
     "sorry-free without introducing new axioms; do not weaken or delete the stated "
     "theorems."
 )
+# END _DEFAULT_PROMPT (docs literalinclude end marker -- keep adjacent)
 
 # Directories never worth shipping to Aristotle / copying into the workdir.
 _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")

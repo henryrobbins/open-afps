@@ -34,7 +34,8 @@ OpenAI model, so the `agent:codex` spec defaults `model` to `gpt-5.5` rather tha
 ## Harness details
 
 Codex does not auto-discover `.mcp.json`, so `configure_wd` mounts the bundle's skills
-under `.agents/skills/` and the lean-lsp MCP server is wired through `-c` overrides on
+— the host-agnostic [`leanprover/skills`](https://github.com/leanprover/skills) — under
+`.agents/skills/` and the lean-lsp MCP server is wired through `-c` overrides on
 the command line instead of a config file. The launch script
 (`assets/scripts/codex_agent.sh`) runs:
 
@@ -52,6 +53,18 @@ codex exec --json --skip-git-repo-check \
 permissions the in-place edits need (safe in the container). Note `effort` is passed
 via the `model_reasoning_effort` override, not a `--effort` flag. The `--json` event
 stream goes to stdout.
+
+`$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
+prompt baked into the {class}`~open_afps.provers.agent_prover.AgentProver`:
+
+:::{dropdown} Default agent prompt
+:icon: code
+```{literalinclude} ../../src/open_afps/provers/agent_prover.py
+:language: text
+:start-after: _DEFAULT_PROMPT = """
+:end-before: END _DEFAULT_PROMPT
+```
+:::
 
 ## Authentication
 

@@ -76,6 +76,7 @@ Tips:
   changing the statement — finish the proof as stated.
 - Non-trivial proofs routinely take many rounds of compile-error fixing. Keep
   iterating against the diagnostics rather than guessing."""
+# END _DEFAULT_PROMPT (docs literalinclude end marker -- keep adjacent)
 
 # Directories never worth copying into the agent workdir.
 _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")

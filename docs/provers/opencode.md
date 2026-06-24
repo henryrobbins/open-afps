@@ -37,7 +37,8 @@ name through the same `model` knob.
 
 `configure_wd` writes an `opencode.json` carrying the inferred provider, the model and
 its reasoning-effort config, and the lean-lsp MCP server, plus mounts the bundle's
-skills under `.agents/skills/`. The MCP `timeout` is raised to **180 000 ms (180 s)**
+skills — the host-agnostic [`leanprover/skills`](https://github.com/leanprover/skills)
+— under `.agents/skills/`. The MCP `timeout` is raised to **180 000 ms (180 s)**
 — the first `lean_diagnostic_messages` call starts `lake serve` and loads the file's
 full Mathlib import closure, which blows past the 60 s default on a cold, few-CPU
 sandbox. Reasoning effort maps per provider: Anthropic gets `thinking: {type:
@@ -51,6 +52,18 @@ opencode run --dir /workspace/wd --format json \
 ```
 
 The `--format json` event stream goes to stdout.
+
+`$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
+prompt baked into the {class}`~open_afps.provers.agent_prover.AgentProver`:
+
+:::{dropdown} Default agent prompt
+:icon: code
+```{literalinclude} ../../src/open_afps/provers/agent_prover.py
+:language: text
+:start-after: _DEFAULT_PROMPT = """
+:end-before: END _DEFAULT_PROMPT
+```
+:::
 
 ## Authentication
 
