@@ -50,6 +50,12 @@ class OpenCodeHarness(Harness):
                     "type": "local",
                     "command": ["lean-lsp-mcp"],
                     "enabled": True,
+                    # The first lean_diagnostic_messages call starts `lake serve` and
+                    # loads the file's full import closure (Mathlib) into the LSP, which
+                    # routinely exceeds opencode's 60s default MCP request timeout on a
+                    # cold, few-CPU sandbox -- surfacing as `MCP error -32001: Request
+                    # timed out`. Raise it so the slow first diagnostic can return.
+                    "timeout": 180_000,
                 }
             },
         }
