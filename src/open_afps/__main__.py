@@ -23,9 +23,19 @@ from open_afps.api import (
 from open_afps.core.task import ProofTask
 from open_afps.images import DEFAULT_IMAGE, DEFAULT_TOOLCHAIN
 
-#: ax-prover PyPI version baked into the Modal image (mirrors the images/Dockerfile
-#: ARG AX_PROVER_VERSION). Bump to a release that emits token usage to report cost.
-AX_PROVER_VERSION = "0.1.1"
+#: ax-prover baked into the Modal image (mirrors the images/Dockerfile ARG). Pinned
+#: to a commit on our fork (henryrobbins/ax-prover-base) rather than the 0.1.1 PyPI
+#: release, for two fixes the release lacks:
+#:   * lean_interact-based target discovery -- 0.1.1's regex discovery lists
+#:     ``import Mathlib`` as a theorem ``Mathlib`` and flags it "unproven" whenever a
+#:     nearby docstring contains the word ``sorry``, wasting a prove loop on a phantom
+#:     target; the rewrite asks the Lean server for real declarations + ``Sorry`` terms.
+#:   * per-target token usage in the ``-o`` JSON, which ``AxProverHarness.parse`` reads
+#:     to report cost (the PyPI release emits no usage).
+#: Fork is public; HTTPS clone needs no credentials in the image build.
+AX_PROVER_REPO = "https://github.com/henryrobbins/ax-prover-base"
+AX_PROVER_REF = "361e5b3451267785bfd70f173e7ab0be667d4987"
+AX_PROVER_SPEC = f"git+{AX_PROVER_REPO}@{AX_PROVER_REF}"
 
 
 def _solve(args: argparse.Namespace) -> int:
@@ -142,10 +152,10 @@ def _build_modal_image(args: argparse.Namespace) -> int:
             "pipx install lean-lsp-mcp && pipx install uv && pipx install mistral-vibe"
         )
         # ax-prover (LangGraph Lean agent) backing the AxProverHarness, pipx-isolated
-        # from open-afps and the CLIs. Keep AX_PROVER_VERSION in sync with the
-        # images/Dockerfile ARG; bump to a release that emits token usage so cost is
-        # reported (AX_PROVER_HARNESS_PLAN.md step 3).
-        .run_commands(f"pipx install 'ax-prover=={AX_PROVER_VERSION}'")
+        # from open-afps and the CLIs. Keep AX_PROVER_REF in sync with the
+        # images/Dockerfile ARG. Pinned to a git commit (not a PyPI release) for the
+        # lean_interact target discovery -- see AX_PROVER_SPEC above.
+        .run_commands(f"pipx install '{AX_PROVER_SPEC}'")
         # Modal's .env() sets literal values (no ${PATH} expansion like Dockerfile
         # ENV), so set an explicit PATH with /opt/elan/bin ahead of the standard dirs.
         .env(

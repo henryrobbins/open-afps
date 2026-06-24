@@ -11,6 +11,14 @@ from open_afps.harness._paths import _SCRIPTS
 from open_afps.harness.base import AuthSpec, Harness, HarnessRunResult, _infer_provider
 from open_afps.harness.bundles import AssetBundle
 
+#: Cap on ax-prover's per-call LLM retries (its ``DEFAULT_LLM_RETRY_CONFIG`` ships
+#: ``stop_after_attempt=10000`` -- ~8h20m). That ``with_retry`` fires on *any* exception
+#: and ignores Anthropic's ``x-should-retry: false``, so a non-retryable ``400`` (e.g. a
+#: bad request from a model/langchain-anthropic mismatch) gets retried 10k times and the
+#: run silently hangs for hours instead of failing fast. Three is plenty to ride out a
+#: transient blip while turning any hard error into a prompt, visible failure.
+_LLM_MAX_RETRIES = 3
+
 
 class AxProverHarness(Harness):
     """ax-prover-base (LangGraph Lean agent), driven by ``ax-prover prove`` in-sandbox.
@@ -28,14 +36,14 @@ class AxProverHarness(Harness):
       ``axprover.yaml`` selecting the model/effort/iterations; it layers on top of
       ax-prover's bundled ``default.yaml`` (auto-prepended by the CLI), so it only
       needs to override the deltas.
-    * **Cost is not on stdout.** ax-prover streams human-readable logs, and its ``-o``
-      JSON carries only ``{success, error, summary}``. Token totals come from the
-      per-target ``ax_usage.*.json`` files written by the launch script (see
-      ``axprover_agent.sh``); :meth:`parse` sums them and leaves ``cost_usd`` ``None``
-      so the prover converts tokens->USD via the fallback table, exactly like
-      :class:`CodexHarness`. Emitting those usage files requires a small upstream
-      ax-prover patch (see ``AX_PROVER_HARNESS_PLAN.md`` step 3); until it lands the
-      files are absent and the run reports zero tokens / no cost.
+    * **Cost is not on stdout.** ax-prover streams human-readable logs; token usage
+      comes from its ``-o`` JSON (the per-target ``ax_output.<target>.json`` files the
+      launch script writes), which carries ``input_tokens``/``output_tokens`` alongside
+      ``{success, error, summary}`` as of the pinned fork commit (see ``AX_PROVER_REF``
+      in ``__main__.py``). :meth:`parse` sums those across every target and leaves
+      ``cost_usd`` ``None`` so the prover converts tokens->USD via the fallback table,
+      exactly like :class:`CodexHarness`. (On an ax-prover build without those fields
+      the tokens are simply absent and the run reports zero cost.)
     """
 
     name = "axprover"
@@ -130,37 +138,65 @@ class AxProverHarness(Harness):
         The bundled ``proposer_tools`` (lean + web search) are left untouched -- a
         missing TAVILY_API_KEY or blocked egress degrades a tool to a no-op rather
         than failing the run.
+
+        The LLM is defined under a *fresh* ``llm_configs.open_afps`` key and
+        ``prover_llm`` points at it via interpolation, rather than inlining the dict.
+        ax-prover's ``--config`` argparse flag *appends* to its ``["default.yaml"]``
+        default (it does not replace it), so default.yaml's
+        ``prover_llm: ${llm_configs.claude_opus_4_5}`` is always in the merge. An
+        inline ``prover_llm`` dict would then OmegaConf-*deep-merge* onto that resolved
+        config and silently inherit stale keys -- notably ``thinking.budget_tokens:
+        10000`` from ``claude_opus_4_5``'s ``thinking.type: enabled``, which the API
+        rejects ("Extra inputs are not permitted") under our ``thinking.type: adaptive``
+        and which sends every request into a retry storm (no usage, just 400s). A
+        brand-new key has nothing to merge with, so our provider config is used
+        verbatim; ``${llm_configs.open_afps}`` (a string node) cleanly *replaces*
+        default.yaml's interpolation, and ``llm_configs`` is stripped after resolution
+        as a non-Config temporary key.
+
+        ``retry_config`` overrides only ``stop_after_attempt`` (see
+        :data:`_LLM_MAX_RETRIES`); merge_configs' final merge onto the structured
+        ``LLMConfig`` schema deep-merges it over ax-prover's
+        ``DEFAULT_LLM_RETRY_CONFIG``, so the exponential-jitter wait is preserved --
+        we just refuse to retry 10k times.
         """
-        prover: dict[str, Any] = {
-            "prover_llm": {
-                "model": self._ax_model(),
-                "provider_config": self._provider_config(),
-            }
+        config: dict[str, Any] = {
+            "llm_configs": {
+                "open_afps": {
+                    "model": self._ax_model(),
+                    "provider_config": self._provider_config(),
+                    "retry_config": {"stop_after_attempt": _LLM_MAX_RETRIES},
+                }
+            },
+            "prover": {"prover_llm": "${llm_configs.open_afps}"},
         }
         if self.max_iterations is not None:
-            prover["max_iterations"] = int(self.max_iterations)
-        return json.dumps({"prover": prover}, indent=2)
+            config["prover"]["max_iterations"] = int(self.max_iterations)
+        return json.dumps(config, indent=2)
 
     def _agent_command(self) -> str:
         # No <<MODEL>>/<<EFFORT>> substitution: those live in axprover.yaml.
         return (_SCRIPTS / "axprover_agent.sh").read_text()
 
     def parse(self, lines: list[str]) -> HarnessRunResult:
-        # Tokens come from the per-target usage files (the stream has none); cost is
-        # left None so the prover derives USD from the token table (like Codex).
+        # Tokens come from the per-target ``-o`` files (ax_output.<target>.json), each
+        # a ``{location: {success, ..., input_tokens, output_tokens, ...}}`` map written
+        # by the launch script. Sum across every target in every file; the stream itself
+        # carries no usage. Leave cost_usd None so the prover derives USD from the token
+        # table (like CodexHarness).
         result = self._parse_lines(lines)
         if self._wd is not None and self._wd.is_dir():
-            for path in sorted(self._wd.glob("ax_usage.*.json")):
+            for path in sorted(self._wd.glob("ax_output.*.json")):
                 try:
                     data = json.loads(path.read_text())
                 except (OSError, json.JSONDecodeError):
                     continue
-                result.input_tokens += int(
-                    data.get("input_tokens", data.get("prompt_tokens", 0)) or 0
-                )
-                result.output_tokens += int(
-                    data.get("output_tokens", data.get("completion_tokens", 0)) or 0
-                )
+                entries = data.values() if isinstance(data, dict) else []
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    result.input_tokens += int(entry.get("input_tokens", 0) or 0)
+                    result.output_tokens += int(entry.get("output_tokens", 0) or 0)
         return result
 
     def _parse_lines(self, lines: list[str]) -> HarnessRunResult:

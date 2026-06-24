@@ -7,10 +7,10 @@ Fast unit layer (no Docker, no creds, no API):
 * ``_render_config`` maps the open-afps model id to ax-prover's ``provider:model``
   string and ``effort`` to each provider's reasoning knob.
 * ``_agent_command`` is the self-discovering launch script (no <<MODEL>> subst).
-* ``parse`` sums tokens from the per-target ``ax_usage.*.json`` side-channel files
-  (the stdout stream carries none) and leaves cost None for the prover to derive.
+* ``parse`` sums tokens from the per-target ``ax_output.*.json`` ``-o`` files (the
+  stdout stream carries none) and leaves cost None for the prover to derive.
 * ``prove`` diffs the workdir after a stubbed run that writes a solved file and a
-  synthetic usage file, with no Docker.
+  synthetic ``-o`` output file, with no Docker.
 
 The live path reuses the ``agent_api`` marker (opt-in, billable, needs an
 ANTHROPIC_API_KEY) and runs ax-prover end-to-end in the sandbox.
@@ -49,9 +49,21 @@ STREAM_LINES = [
 
 
 def _write_usage(wd: Path, target: str, input_tokens: int, output_tokens: int) -> None:
-    """Emulate the upstream usage patch: ax_usage.<target>.json in the workdir."""
-    (wd / f"ax_usage.{target}.json").write_text(
-        json.dumps({"input_tokens": input_tokens, "output_tokens": output_tokens})
+    """Emulate ax-prover's ``-o`` output: ax_output.<target>.json, a {location:
+    {success, ..., input_tokens, output_tokens}} map (parse sums across entries)."""
+    (wd / f"ax_output.{target}.json").write_text(
+        json.dumps(
+            {
+                f"MILExample:{target}": {
+                    "success": True,
+                    "error": None,
+                    "summary": "",
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": input_tokens + output_tokens,
+                }
+            }
+        )
     )
 
 
@@ -119,10 +131,17 @@ def test_render_config_anthropic_model_and_effort(tmp_path: Path) -> None:
 
     assert (tmp_path / "agent.sh").is_file()
     cfg = json.loads((tmp_path / "axprover.yaml").read_text())  # JSON is valid YAML
-    llm = cfg["prover"]["prover_llm"]
+    # prover_llm points at a FRESH llm_configs key via interpolation so default.yaml's
+    # claude_opus_4_5 config can't deep-merge stale keys (e.g. thinking.budget_tokens)
+    # into ours -- see _render_config for the full rationale.
+    assert cfg["prover"]["prover_llm"] == "${llm_configs.open_afps}"
+    llm = cfg["llm_configs"]["open_afps"]
     assert llm["model"] == "anthropic:claude-opus-4-8"
     assert llm["provider_config"]["effort"] == "high"
     assert llm["provider_config"]["thinking"] == {"type": "adaptive"}
+    # Regression: the adaptive-thinking config must not carry budget_tokens, which the
+    # API rejects under thinking.type: adaptive ("Extra inputs are not permitted").
+    assert "budget_tokens" not in llm["provider_config"]["thinking"]
     assert cfg["prover"]["max_iterations"] == 15
     # parse() looks here for the usage side-channel files.
     assert harness._wd == tmp_path
