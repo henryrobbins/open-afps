@@ -30,8 +30,8 @@ class OpenCodeHarness(Harness):
         """API provider, taken from config or inferred from the model prefix."""
         return self.config.provider or _infer_provider(self.config.model)
 
-    def configure_wd(self, wd: Path, prompt: str) -> None:
-        super().configure_wd(wd, prompt)
+    def stage(self, wd: Path) -> None:
+        super().stage(wd)
         # opencode.json configures the model provider + MCP server.
         (wd / "opencode.json").write_text(json.dumps(self._opencode_config(), indent=2))
         self._copy_skills(wd, ".agents/skills")

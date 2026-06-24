@@ -42,7 +42,7 @@ Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
 
 Two things differ from the CLI harnesses:
 
-- **Config lives in a workdir YAML, not flags.** `configure_wd` writes an
+- **Config lives in a workdir YAML, not flags.** `stage` writes an
   `axprover.yaml` (emitted as JSON, which is valid YAML) selecting the model, effort,
   and optional `max_iterations`. ax-prover's `--config` *appends* to its bundled
   `default.yaml`, so only the deltas are set: the model is defined under a fresh

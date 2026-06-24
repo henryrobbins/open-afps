@@ -7,7 +7,7 @@ set -euo pipefail
 #
 # The Harness contract is project-wide, while ax-prover needs a target, so we
 # self-discover every .lean carrying a `sorry` (skipping the warm .lake cache)
-# and prove each in turn. No change to configure_wd's signature is needed.
+# and prove each in turn.
 #
 # Notes:
 #   * --config is a TOP-LEVEL flag and MUST precede the `prove` subcommand. The

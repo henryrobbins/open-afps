@@ -16,7 +16,7 @@ The bare `lean` profile is Labs-gated: the real model `labs-leanstral-2603` retu
 Lean scaffold on a non-Labs **reasoning** model any La Plateforme key can reach
 (default Magistral) through a vendored `lean-standin` agent profile. Since Vibe has no
 `--model` flag, the harness templates the configured model into the stand-in profile
-(`<<MODEL>>`) at `configure_wd` time — so the model is an ordinary knob. Repoint
+(`<<MODEL>>`) at `stage` time — so the model is an ordinary knob. Repoint
 `agent` to `lean` (and the model to `labs-leanstral-2603`) once Labs is enabled.
 
 ## Usage
@@ -51,7 +51,7 @@ directly (as above).
 
 ## Harness details
 
-`configure_wd` pins a workdir-local `VIBE_HOME` (`.vibe/`) so Vibe's config, the
+`stage` pins a workdir-local `VIBE_HOME` (`.vibe/`) so Vibe's config, the
 vendored stand-in profile, and the per-session log all live under the workdir and sync
 back out with it. The written `.vibe/config.toml`:
 
@@ -78,15 +78,16 @@ vibe -p "$PROMPT" --agent <AGENT> --output streaming --workdir "$PWD" <EXTRA>
 `<EXTRA>` appends `--max-turns` / `--max-price` when set. The `--output streaming`
 NDJSON message stream (one message per line) goes to stdout.
 
-`$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
-prompt baked into the {class}`~open_atp.provers.agent_prover.AgentProver`:
+`$PROMPT` is the shared agent prover prompt baked into the
+{class}`~open_atp.provers.agent_prover.AgentProver`, with the task's optional
+`user_prompt` appended under an *Additional instructions* heading when set:
 
-:::{dropdown} Default agent prompt
+:::{dropdown} Agent prover prompt
 :icon: code
 ```{literalinclude} ../../src/open_atp/provers/agent_prover.py
 :language: text
-:start-after: _DEFAULT_PROMPT = """
-:end-before: END _DEFAULT_PROMPT
+:start-after: PROVER_PROMPT = """
+:end-before: END PROVER_PROMPT
 ```
 :::
 

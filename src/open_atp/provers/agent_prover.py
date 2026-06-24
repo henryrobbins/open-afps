@@ -37,12 +37,12 @@ from open_atp.harness import (
     compute_cost_usd,
 )
 from open_atp.lean import LeanProject, ProofTask
-from open_atp.provers.base import AutomatedProver, AutomatedProverConfig
+from open_atp.provers.base import AutomatedProver, AutomatedProverConfig, compose_prompt
 from open_atp.verify import ProofResult
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_PROMPT = """\
+PROVER_PROMPT = """\
 The working directory is a complete Lean 4 lake project. One or more `.lean`
 files contain `sorry` (or `admit`) placeholders standing in for proofs that have
 not been written yet. Replace every such placeholder with a real proof so the
@@ -89,7 +89,7 @@ Tips:
   changing the statement — finish the proof as stated.
 - Non-trivial proofs routinely take many rounds of compile-error fixing. Keep
   iterating against the diagnostics rather than guessing."""
-# END _DEFAULT_PROMPT (docs literalinclude end marker -- keep adjacent)
+# END PROVER_PROMPT (docs literalinclude end marker -- keep adjacent)
 
 # Directories never worth copying into the agent workdir.
 _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
@@ -189,6 +189,11 @@ class AgentProver(AutomatedProver):
 
     config: AgentProverConfig
 
+    @property
+    def prover_prompt(self) -> str:
+        """The prover's own prompt handed to the agent, before any user prompt."""
+        return PROVER_PROMPT
+
     def _generate(
         self, task: ProofTask, wd: Path, logs_dir: Path, result: ProofResult
     ) -> None:
@@ -202,12 +207,13 @@ class AgentProver(AutomatedProver):
             if ".lake" not in p.parts
         }
 
-        # 3. Configure the workdir for the chosen harness + asset bundle.
+        # 3. Stage the workdir from the chosen harness + asset bundle, then write the
+        #    prompt: this prover's own prompt, with the task's optional user prompt
+        #    appended.
         bundle = bundle_for_config(self.config)
         harness = self.config.harness.build(assets=bundle)
-        # Prompt precedence: explicit task instructions > bundle default > generic.
-        prompt = task.instructions or bundle.default_prompt() or _DEFAULT_PROMPT
-        harness.configure_wd(wd, prompt)
+        harness.stage(wd)
+        harness.write_prompt(wd, compose_prompt(self.prover_prompt, task.user_prompt))
         stdout_path = logs_dir / "stdout.txt"
 
         # 4. Run the agent and the final check in one persistent sandbox: generation

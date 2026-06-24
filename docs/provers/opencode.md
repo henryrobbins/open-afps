@@ -35,7 +35,7 @@ name through the same `model` knob.
 
 ## Harness details
 
-`configure_wd` writes an `opencode.json` carrying the inferred provider, the model and
+`stage` writes an `opencode.json` carrying the inferred provider, the model and
 its reasoning-effort config, and the lean-lsp MCP server, plus mounts the bundle's
 skills — the host-agnostic [`leanprover/skills`](https://github.com/leanprover/skills)
 — under `.agents/skills/`. The MCP `timeout` is raised to **180 000 ms (180 s)**
@@ -53,15 +53,16 @@ opencode run --dir /workspace/wd --format json \
 
 The `--format json` event stream goes to stdout.
 
-`$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
-prompt baked into the {class}`~open_atp.provers.agent_prover.AgentProver`:
+`$PROMPT` is the shared agent prover prompt baked into the
+{class}`~open_atp.provers.agent_prover.AgentProver`, with the task's optional
+`user_prompt` appended under an *Additional instructions* heading when set:
 
-:::{dropdown} Default agent prompt
+:::{dropdown} Agent prover prompt
 :icon: code
 ```{literalinclude} ../../src/open_atp/provers/agent_prover.py
 :language: text
-:start-after: _DEFAULT_PROMPT = """
-:end-before: END _DEFAULT_PROMPT
+:start-after: PROVER_PROMPT = """
+:end-before: END PROVER_PROMPT
 ```
 :::
 

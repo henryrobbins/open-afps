@@ -2,7 +2,7 @@
 
 Fast unit layer (no Docker, no creds, no API):
 
-* ``configure_wd`` bootstraps a workdir-local VIBE_HOME (config that un-gates the
+* ``stage`` bootstraps a workdir-local VIBE_HOME (config that un-gates the
   builtin ``lean`` agent + the vendored ``lean-standin`` stand-in, with the model
   templated in).
 * ``_agent_command`` renders the chosen agent profile + the ``-p`` run guards.
@@ -140,14 +140,15 @@ def test_auth_spec_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     assert harness.auth_spec().env == ["MISTRAL_API_KEY"]
 
 
-# --- configure_wd ----------------------------------------------------------
+# --- stage -----------------------------------------------------------------
 
 
-def test_configure_wd_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None:
+def test_stage_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None:
     harness = VibeHarnessConfig(
         model="magistral-medium-latest", agent="lean-standin"
     ).build()
-    harness.configure_wd(tmp_path, "fill the sorrys")
+    harness.stage(tmp_path)
+    harness.write_prompt(tmp_path, "fill the sorrys")
 
     assert (tmp_path / "agent.sh").is_file()
     assert (tmp_path / "agent_prompt.txt").read_text() == "fill the sorrys"
@@ -186,7 +187,7 @@ def test_configure_wd_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None
 
 def test_parse_reads_cost_and_tokens_from_session_log(tmp_path: Path) -> None:
     harness = VibeHarnessConfig(model="labs-leanstral-2603").build()
-    harness.configure_wd(tmp_path, "prompt")
+    harness.stage(tmp_path)
     _write_session_log(harness._session_log_dir, _session_stats())
 
     result = harness.parse(STREAM_LINES)
@@ -198,7 +199,7 @@ def test_parse_reads_cost_and_tokens_from_session_log(tmp_path: Path) -> None:
 
 def test_parse_without_session_log_leaves_cost_none(tmp_path: Path) -> None:
     harness = VibeHarnessConfig(model="labs-leanstral-2603").build()
-    harness.configure_wd(tmp_path, "prompt")  # no log written
+    harness.stage(tmp_path)  # no log written
     result = harness.parse(STREAM_LINES)
     assert result.cost_usd is None
     assert result.input_tokens == 0

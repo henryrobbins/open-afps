@@ -38,7 +38,7 @@ harnesses are registered in {data}`~open_atp.harness.HARNESSES` and their config
 ```{eval-rst}
 .. autoclass:: open_atp.harness.claude_code.ClaudeCodeHarness
    :show-inheritance:
-   :exclude-members: configure_wd, name
+   :exclude-members: stage, name
 
 .. autoclass:: open_atp.harness.claude_code.ClaudeCodeHarnessConfig
    :show-inheritance:
@@ -46,7 +46,7 @@ harnesses are registered in {data}`~open_atp.harness.HARNESSES` and their config
 
 .. autoclass:: open_atp.harness.codex.CodexHarness
    :show-inheritance:
-   :exclude-members: configure_wd, name
+   :exclude-members: stage, name
 
 .. autoclass:: open_atp.harness.codex.CodexHarnessConfig
    :show-inheritance:
@@ -54,7 +54,7 @@ harnesses are registered in {data}`~open_atp.harness.HARNESSES` and their config
 
 .. autoclass:: open_atp.harness.opencode.OpenCodeHarness
    :show-inheritance:
-   :exclude-members: configure_wd, name
+   :exclude-members: stage, name
 
 .. autoclass:: open_atp.harness.opencode.OpenCodeHarnessConfig
    :show-inheritance:
@@ -62,7 +62,7 @@ harnesses are registered in {data}`~open_atp.harness.HARNESSES` and their config
 
 .. autoclass:: open_atp.harness.vibe.VibeHarness
    :show-inheritance:
-   :exclude-members: configure_wd, name
+   :exclude-members: stage, name
 
 .. autoclass:: open_atp.harness.vibe.VibeHarnessConfig
    :show-inheritance:
@@ -70,7 +70,7 @@ harnesses are registered in {data}`~open_atp.harness.HARNESSES` and their config
 
 .. autoclass:: open_atp.harness.axprover.AxProverHarness
    :show-inheritance:
-   :exclude-members: configure_wd, name
+   :exclude-members: stage, name
 
 .. autoclass:: open_atp.harness.axprover.AxProverHarnessConfig
    :show-inheritance:
@@ -84,8 +84,9 @@ harnesses are registered in {data}`~open_atp.harness.HARNESSES` and their config
 ## Asset bundles
 
 An {class}`~open_atp.harness.bundles.AssetBundle` is the selectable set of skills,
-default prompt, and extra directories mounted into the agent workdir (selected via
-`AgentProverConfig.assets`).
+plugins, and extra directories mounted into the agent workdir (selected via
+`AgentProverConfig.assets`). The prompt is not a bundle concern -- it is owned by the
+prover and the task.
 
 ```{eval-rst}
 .. autoclass:: open_atp.harness.bundles.AssetBundle

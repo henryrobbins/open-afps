@@ -31,6 +31,23 @@ from open_atp.backends.base import ComputeBackend
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.verify import ProofResult, Verifier
 
+#: Heading the optional per-task ``user_prompt`` is appended under.
+_ADDITIONAL_INSTRUCTIONS = "\n\n# Additional instructions\n\n{user_prompt}"
+
+
+def compose_prompt(prover_prompt: str, user_prompt: str | None) -> str:
+    """Combine a prover's own prompt with the task's optional user prompt.
+
+    ``prover_prompt`` is the prover-specific instruction set handed to the agent;
+    ``user_prompt`` is the optional per-task guidance from
+    :attr:`~open_atp.lean.ProofTask.user_prompt`. When present it is appended under an
+    ``# Additional instructions`` heading; when absent (the common case) the prover
+    prompt is returned unchanged.
+    """
+    if user_prompt:
+        return prover_prompt + _ADDITIONAL_INSTRUCTIONS.format(user_prompt=user_prompt)
+    return prover_prompt
+
 
 @dataclass
 class AutomatedProverConfig:

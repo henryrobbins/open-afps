@@ -12,10 +12,11 @@ catalog) or **by full path**:
   vendored ``lean4`` plugin. The other harnesses can't consume plugins and ignore
   them.
 
-A named :class:`AssetBundle` packages a coherent preset (skills + plugins +
-optional default prompt / extra dirs); :func:`bundle_for_config` resolves the
-active bundle for a config and applies any per-run ``skills`` / ``plugins``
-overrides.
+A named :class:`AssetBundle` packages a coherent preset (skills + plugins + extra
+dirs); :func:`bundle_for_config` resolves the active bundle for a config and applies
+any per-run ``skills`` / ``plugins`` overrides. The prompt is *not* a bundle concern:
+it is owned by the prover and the task (see
+:func:`~open_atp.provers.base.compose_prompt`).
 """
 
 from __future__ import annotations
@@ -83,9 +84,6 @@ class AssetBundle:
         Claude Code plugin source dirs (each a ``.claude-plugin/plugin.json``
         tree). Mounted and ``--plugin-dir``-loaded by the Claude harness only;
         ignored by the others.
-    prompt_file:
-        Optional default system prompt for the bundle, used when the task carries
-        no explicit ``instructions``.
     extra_dirs:
         Additional ``(src_dir, dest_relative_to_workdir)`` trees to copy in (e.g.
         Numina's coordinator/subagent prompts under ``.claude/prompts``).
@@ -99,14 +97,8 @@ class AssetBundle:
     name: str
     skills: tuple[Path, ...] = ()
     plugins: tuple[Path, ...] = ()
-    prompt_file: Path | None = None
     extra_dirs: tuple[tuple[Path, str], ...] = ()
     skills_dir: Path | None = None
-
-    def default_prompt(self) -> str | None:
-        if self.prompt_file is not None and self.prompt_file.is_file():
-            return self.prompt_file.read_text()
-        return None
 
 
 def _default_bundle() -> AssetBundle:
@@ -130,7 +122,6 @@ def _numina_bundle() -> AssetBundle:
         # Numina is one root-mounted skill (top-level SKILL.md + cli/ helpers), so
         # its whole skills/ tree is copied to the skill-location root.
         skills_dir=root / "skills",
-        prompt_file=root / "prompts" / "main_entry.md",
         # The coordinator prompt tells the agent to read its subagent prompts from
         # .claude/prompts/subagent_prompts/, so stage the whole prompt tree there.
         extra_dirs=((root / "prompts", ".claude/prompts"),),

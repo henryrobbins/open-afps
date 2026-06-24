@@ -35,7 +35,7 @@ Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI: `age
 
 ## Harness details
 
-`configure_wd` writes a project-scope `.mcp.json` registering the lean-lsp MCP server
+`stage` writes a project-scope `.mcp.json` registering the lean-lsp MCP server
 and mounts the bundle's skills — the host-agnostic
 [`leanprover/skills`](https://github.com/leanprover/skills) — under `.claude/skills/`.
 Claude Code is the only harness that also loads **plugins** — the default bundle's
@@ -59,15 +59,16 @@ container); the prover sets `IS_SANDBOX=1` so that mode runs non-interactively, 
 `CLAUDE_CODE_FORK_SUBAGENT=1` when plugins are mounted. The `stream-json` event
 stream goes to stdout.
 
-`$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
-prompt baked into the {class}`~open_atp.provers.agent_prover.AgentProver`:
+`$PROMPT` is the shared agent prover prompt baked into the
+{class}`~open_atp.provers.agent_prover.AgentProver`, with the task's optional
+`user_prompt` appended under an *Additional instructions* heading when set:
 
-:::{dropdown} Default agent prompt
+:::{dropdown} Agent prover prompt
 :icon: code
 ```{literalinclude} ../../src/open_atp/provers/agent_prover.py
 :language: text
-:start-after: _DEFAULT_PROMPT = """
-:end-before: END _DEFAULT_PROMPT
+:start-after: PROVER_PROMPT = """
+:end-before: END PROVER_PROMPT
 ```
 :::
 

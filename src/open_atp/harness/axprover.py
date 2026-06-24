@@ -40,7 +40,7 @@ class AxProverHarness(Harness):
 
     Two things differ from the CLI harnesses (it mirrors :class:`VibeHarness` here):
 
-    * **Config lives in a workdir YAML, not flags.** :meth:`configure_wd` writes
+    * **Config lives in a workdir YAML, not flags.** :meth:`stage` writes
       ``axprover.yaml`` selecting the model/effort/iterations; it layers on top of
       ax-prover's bundled ``default.yaml`` (auto-prepended by the CLI), so it only
       needs to override the deltas.
@@ -70,7 +70,7 @@ class AxProverHarness(Harness):
         self, config: AxProverHarnessConfig, assets: AssetBundle | None = None
     ) -> None:
         super().__init__(config, assets)
-        #: Set in :meth:`configure_wd`; where :meth:`parse` looks for usage files.
+        #: Set in :meth:`stage`; where :meth:`parse` looks for usage files.
         self._wd: Path | None = None
 
     def auth_spec(self) -> AuthSpec:
@@ -88,10 +88,10 @@ class AxProverHarness(Harness):
             )
         return AuthSpec(env=env)
 
-    def configure_wd(self, wd: Path, prompt: str) -> None:
-        # The free-text prompt is ignored: ax-prover has its own prompts. We still let
-        # the base write agent.sh + agent_prompt.txt for a uniform contract.
-        super().configure_wd(wd, prompt)
+    def stage(self, wd: Path) -> None:
+        # ax-prover has its own prompts and ignores the written prompt, but the base
+        # launch contract still cats it, so the prover writes it via write_prompt.
+        super().stage(wd)
         (wd / "axprover.yaml").write_text(self._render_config())
         self._wd = wd
 

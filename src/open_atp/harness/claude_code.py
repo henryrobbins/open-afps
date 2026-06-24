@@ -22,8 +22,8 @@ class ClaudeCodeHarness(Harness):
     #: ``--plugin-dir`` flags reference this, so the two must agree).
     PLUGINS_DIR = ".plugins"
 
-    def configure_wd(self, wd: Path, prompt: str) -> None:
-        super().configure_wd(wd, prompt)
+    def stage(self, wd: Path) -> None:
+        super().stage(wd)
         # Project-scope MCP config (passed via --mcp-config), skills, and plugins.
         shutil.copy2(_MCP_JSON, wd / ".mcp.json")
         self._copy_skills(wd, ".claude/skills")

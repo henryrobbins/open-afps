@@ -42,8 +42,10 @@ from open_atp.harness import (
     compute_cost_usd,
     resolve_bundle,
 )
+from open_atp.harness._paths import _vendor_numina_dir
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
+from open_atp.provers.base import compose_prompt
 from open_atp.provers.numina_tracker import StatementTracker
 from open_atp.verify import ProofResult
 
@@ -70,10 +72,18 @@ If you emit END_REASON:LIMIT you will be re-invoked to continue from the proof
 state currently on disk, so leave the project in the best state you can.
 """
 
-_FALLBACK_PROMPT = (
-    "Complete every `sorry` in this Lean project so it compiles and is sorry-free "
-    "without introducing new axioms; do not weaken or delete the stated theorems."
-)
+
+def _coordinator_prompt() -> str:
+    """Numina's prover prompt: the coordinator (main_entry.md) + the round protocol.
+
+    The coordinator scaffold is a vendored asset (``vendor/numina/prompts``); the
+    session-control protocol is appended so the round loop can tell "done" from "out
+    of budget". This is the *prover* prompt -- the task's optional ``user_prompt`` is
+    layered on top by :func:`~open_atp.provers.base.compose_prompt`.
+    """
+    main_entry = _vendor_numina_dir() / "prompts" / "main_entry.md"
+    return main_entry.read_text() + _END_REASON_PROTOCOL
+
 
 # Match END_REASON:<reason> on a line of its own (case-insensitive), per upstream.
 _REASON_RE = re.compile(
@@ -166,6 +176,10 @@ class NuminaProver(AgentProver):
 
     config: NuminaProverConfig
 
+    @property
+    def prover_prompt(self) -> str:
+        return _coordinator_prompt()
+
     def _generate(
         self, task: ProofTask, wd: Path, logs_dir: Path, result: ProofResult
     ) -> None:
@@ -179,12 +193,13 @@ class NuminaProver(AgentProver):
             if ".lake" not in p.parts
         }
 
-        # 3. Configure the workdir with the Numina asset bundle (coordinator prompt
-        #    + vendored skills + subagent prompts).
+        # 3. Stage the workdir with the Numina asset bundle (vendored skills +
+        #    subagent prompts), then write the coordinator prompt (+ the task's
+        #    optional user prompt).
         bundle = resolve_bundle(self.config.assets)
         harness = self.config.harness.build(assets=bundle)
-        base_prompt = task.instructions or bundle.default_prompt() or _FALLBACK_PROMPT
-        harness.configure_wd(wd, base_prompt + _END_REASON_PROTOCOL)
+        harness.stage(wd)
+        harness.write_prompt(wd, compose_prompt(self.prover_prompt, task.user_prompt))
         stdout_path = logs_dir / "stdout.txt"
 
         # 4. Statement-change guard: snapshot the target theorems before the run.

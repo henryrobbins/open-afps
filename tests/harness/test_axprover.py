@@ -2,7 +2,7 @@
 
 Fast unit layer (no Docker, no creds, no API):
 
-* ``configure_wd`` writes ``axprover.yaml`` overriding only the deltas (model +
+* ``stage`` writes ``axprover.yaml`` overriding only the deltas (model +
   provider_config, optional max_iterations) over ax-prover's bundled default.yaml.
 * ``_render_config`` maps the open-atp model id to ax-prover's ``provider:model``
   string and ``effort`` to each provider's reasoning knob.
@@ -129,7 +129,7 @@ def test_render_config_anthropic_model_and_effort(tmp_path: Path) -> None:
     harness = AxProverHarnessConfig(
         model="claude-opus-4-8", effort="high", max_iterations=15
     ).build()
-    harness.configure_wd(tmp_path, "ignored prompt")
+    harness.stage(tmp_path)
 
     assert (tmp_path / "agent.sh").is_file()
     cfg = json.loads((tmp_path / "axprover.yaml").read_text())  # JSON is valid YAML
@@ -171,9 +171,7 @@ def test_render_config_provider_prefix_and_knob_per_provider() -> None:
 
 
 def test_render_config_omits_max_iterations_when_unset(tmp_path: Path) -> None:
-    AxProverHarnessConfig(model="claude-opus-4-8").build().configure_wd(
-        tmp_path, "prompt"
-    )
+    AxProverHarnessConfig(model="claude-opus-4-8").build().stage(tmp_path)
     cfg = json.loads((tmp_path / "axprover.yaml").read_text())
     assert "max_iterations" not in cfg["prover"]
 
@@ -183,7 +181,7 @@ def test_render_config_omits_max_iterations_when_unset(tmp_path: Path) -> None:
 
 def test_parse_sums_tokens_across_usage_files(tmp_path: Path) -> None:
     harness = AxProverHarnessConfig(model="claude-opus-4-8").build()
-    harness.configure_wd(tmp_path, "prompt")
+    harness.stage(tmp_path)
     _write_usage(tmp_path, "A_lean", 1000, 200)
     _write_usage(tmp_path, "B_lean", 500, 50)
 
@@ -197,7 +195,7 @@ def test_parse_sums_tokens_across_usage_files(tmp_path: Path) -> None:
 
 def test_parse_without_usage_files_reports_zero_tokens(tmp_path: Path) -> None:
     harness = AxProverHarnessConfig(model="claude-opus-4-8").build()
-    harness.configure_wd(tmp_path, "prompt")  # no usage files written
+    harness.stage(tmp_path)  # no usage files written
     result = harness.parse(STREAM_LINES)
     assert result.input_tokens == 0
     assert result.output_tokens == 0

@@ -30,7 +30,7 @@ Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
 
 ## Harness details
 
-Codex does not auto-discover `.mcp.json`, so `configure_wd` mounts the bundle's skills
+Codex does not auto-discover `.mcp.json`, so `stage` mounts the bundle's skills
 — the host-agnostic [`leanprover/skills`](https://github.com/leanprover/skills) — under
 `.agents/skills/` and the lean-lsp MCP server is wired through `-c` overrides on
 the command line instead of a config file. The launch script
@@ -51,15 +51,16 @@ permissions the in-place edits need (safe in the container). Note `effort` is pa
 via the `model_reasoning_effort` override, not a `--effort` flag. The `--json` event
 stream goes to stdout.
 
-`$PROMPT` is the task's `instructions` when set, otherwise the shared default agent
-prompt baked into the {class}`~open_atp.provers.agent_prover.AgentProver`:
+`$PROMPT` is the shared agent prover prompt baked into the
+{class}`~open_atp.provers.agent_prover.AgentProver`, with the task's optional
+`user_prompt` appended under an *Additional instructions* heading when set:
 
-:::{dropdown} Default agent prompt
+:::{dropdown} Agent prover prompt
 :icon: code
 ```{literalinclude} ../../src/open_atp/provers/agent_prover.py
 :language: text
-:start-after: _DEFAULT_PROMPT = """
-:end-before: END _DEFAULT_PROMPT
+:start-after: PROVER_PROMPT = """
+:end-before: END PROVER_PROMPT
 ```
 :::
 

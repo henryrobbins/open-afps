@@ -22,8 +22,8 @@ class CodexHarness(Harness):
     #: backend pushes/bind-mounts it; cleaned up when the harness is collected.
     _codex_home: tempfile.TemporaryDirectory[str] | None = None
 
-    def configure_wd(self, wd: Path, prompt: str) -> None:
-        super().configure_wd(wd, prompt)
+    def stage(self, wd: Path) -> None:
+        super().stage(wd)
         # Codex registers the MCP server via -c overrides in the launch script;
         # only the skills need copying. https://developers.openai.com/codex/skills
         self._copy_skills(wd, ".agents/skills")

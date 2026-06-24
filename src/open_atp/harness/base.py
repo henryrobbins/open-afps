@@ -2,8 +2,9 @@
 
 A :class:`Harness` knows, for one agent CLI (Claude Code / Codex / OpenCode):
 
-* how to populate the working directory (launch script, MCP config, skills,
-  prompt) -- :meth:`Harness.configure_wd`;
+* how to populate the working directory from its assets (launch script, MCP
+  config, skills) -- :meth:`Harness.stage` -- and where to write the prompt the
+  prover hands it -- :meth:`Harness.write_prompt`;
 * the bash command that launches the agent -- :attr:`Harness.command`;
 * which credentials to forward into the sandbox -- :meth:`Harness.auth_spec`; and
 * how to read token/cost totals out of the agent's streamed JSON
@@ -110,13 +111,25 @@ class Harness(ABC):
         """Credentials to forward into the sandbox for this harness."""
         return AuthSpec()
 
-    def configure_wd(self, wd: Path, prompt: str) -> None:
-        """Populate ``wd`` with the launch script, prompt, MCP config, and skills."""
+    def stage(self, wd: Path) -> None:
+        """Populate ``wd`` with the launch script, MCP config, skills, and extra dirs.
+
+        Everything the harness and its asset bundle own -- *not* the prompt, which the
+        prover and task own and write via :meth:`write_prompt`.
+        """
         if not wd.exists():
             raise RuntimeError("The agent working directory must be created first.")
         (wd / SCRIPT_FILE).write_text(self._agent_command())
-        (wd / PROMPT_FILE).write_text(prompt)
         self._copy_extra_dirs(wd)
+
+    def write_prompt(self, wd: Path, prompt: str) -> None:
+        """Write the composed prompt where this harness's launch script reads it.
+
+        The prompt's *content* is owned by the prover (its prover prompt) and the task
+        (the optional user prompt); the harness owns only the file location and the
+        ``cat $PROMPT`` launch contract, so it provides the write mechanism.
+        """
+        (wd / PROMPT_FILE).write_text(prompt)
 
     def _copy_extra_dirs(self, wd: Path) -> None:
         """Copy the bundle's extra asset trees (e.g. Numina's prompts) into ``wd``."""

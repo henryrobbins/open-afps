@@ -128,16 +128,18 @@ class ProofTask:
     targets : tuple[Path, ...]
         Optional explicit list of files (relative to ``project.root``) to focus on.
         When empty, every file containing ``sorry`` is fair game.
-    instructions : str | None
-        Optional natural-language guidance forwarded to provers that accept a prompt
-        (e.g. Aristotle, or the agent system prompt).
+    user_prompt : str | None
+        Optional per-task guidance appended below the prover's own prompt under an
+        ``# Additional instructions`` heading (see
+        :func:`~open_atp.provers.base.compose_prompt`). ``None`` (the common case)
+        leaves the prover prompt untouched.
     metadata : dict[str, str]
         Optional free-form metadata carried alongside the task.
     """
 
     project: LeanProject
     targets: tuple[Path, ...] = ()
-    instructions: str | None = None
+    user_prompt: str | None = None
     metadata: dict[str, str] = field(default_factory=dict)
 
     def resolved_targets(self) -> list[Path]:

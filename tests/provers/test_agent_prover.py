@@ -104,12 +104,13 @@ def test_codex_cost_falls_back_to_token_table() -> None:
     assert estimated == pytest.approx(20.0)
 
 
-# --- configure_wd ----------------------------------------------------------
+# --- stage / write_prompt --------------------------------------------------
 
 
-def test_claude_code_configure_wd_writes_assets(tmp_path: Path) -> None:
+def test_claude_code_stage_writes_assets(tmp_path: Path) -> None:
     harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high").build()
-    harness.configure_wd(tmp_path, "fill the sorrys")
+    harness.stage(tmp_path)
+    harness.write_prompt(tmp_path, "fill the sorrys")
 
     assert (tmp_path / "agent.sh").is_file()
     # Model/effort templated into the launch script.
@@ -164,7 +165,7 @@ def test_empty_plugins_mount_nothing_for_claude(tmp_path: Path) -> None:
     harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high").build(
         assets=bundle
     )
-    harness.configure_wd(tmp_path, "x")
+    harness.stage(tmp_path)
     assert not (tmp_path / ".plugins").exists()
     assert harness._plugin_flags() == ""
     # No plugin flag is appended: the launch command ends at the model/effort line
@@ -194,7 +195,7 @@ def test_non_claude_harnesses_mount_skills_not_plugins(
     harness = HARNESS_CONFIGS[harness_name](
         model="claude-opus-4-8", effort="high"
     ).build(assets=bundle)
-    harness.configure_wd(tmp_path, "x")
+    harness.stage(tmp_path)
     assert (tmp_path / dest / "lean-proof" / "SKILL.md").is_file()
     assert not (tmp_path / ".plugins").exists()
 

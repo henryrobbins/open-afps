@@ -23,7 +23,7 @@ class VibeHarness(Harness):
     under ``assets/vibe/``) runs the same Lean scaffold on a non-Labs model until Labs
     access is enabled. The selected profile is named by :attr:`agent`. Since vibe has
     no ``--model`` flag, the stand-in profile templates ``<<MODEL>>`` and the harness
-    substitutes :attr:`model` into it at :meth:`configure_wd` time -- so the model is a
+    substitutes :attr:`model` into it at :meth:`stage` time -- so the model is a
     knob (default Magistral) just like the other harnesses' ``--model``.
 
     Two things differ from the other harnesses:
@@ -48,7 +48,7 @@ class VibeHarness(Harness):
         self, config: VibeHarnessConfig, assets: AssetBundle | None = None
     ) -> None:
         super().__init__(config, assets)
-        #: Set in :meth:`configure_wd`; where :meth:`parse` looks for session logs.
+        #: Set in :meth:`stage`; where :meth:`parse` looks for session logs.
         self._session_log_dir: Path | None = None
 
     def auth_spec(self) -> AuthSpec:
@@ -60,8 +60,8 @@ class VibeHarness(Harness):
             )
         return AuthSpec(env=["MISTRAL_API_KEY"])
 
-    def configure_wd(self, wd: Path, prompt: str) -> None:
-        super().configure_wd(wd, prompt)
+    def stage(self, wd: Path) -> None:
+        super().stage(wd)
         # Workdir-local VIBE_HOME: a minimal config that un-gates the builtin `lean`
         # agent, plus the vendored stand-in agent profile. Session logs (with cost)
         # default to VIBE_HOME/logs/session, so they land here and sync back out.

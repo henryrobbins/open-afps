@@ -38,16 +38,17 @@ touching the network or an API key. See {doc}`../user_guide/run_provers` for an
 end-to-end run and {class}`~open_atp.provers.aristotle.AristotleProverConfig` in the
 {doc}`../api/provers` reference for configuration.
 
-The prompt submitted to the hosted agent is the task's `instructions` when set,
-otherwise Aristotle's own default prompt (the agent CLI harnesses share a longer,
-tool-specific prompt instead):
+The prompt submitted to the hosted agent is Aristotle's own prover prompt, with the
+task's optional `user_prompt` appended under an *Additional instructions* heading
+when set (the agent CLI harnesses share a longer, tool-specific prover prompt
+instead):
 
-:::{dropdown} Default Aristotle prompt
+:::{dropdown} Aristotle prover prompt
 :icon: code
 ```{literalinclude} ../../src/open_atp/provers/aristotle.py
 :language: python
-:start-after: _DEFAULT_PROMPT = (
-:end-before: END _DEFAULT_PROMPT
+:start-after: PROVER_PROMPT = (
+:end-before: END PROVER_PROMPT
 ```
 :::
 

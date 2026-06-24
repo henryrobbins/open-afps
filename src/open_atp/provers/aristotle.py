@@ -24,7 +24,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 from open_atp.lean import ProofTask
-from open_atp.provers.base import AutomatedProver, AutomatedProverConfig
+from open_atp.provers.base import (
+    AutomatedProver,
+    AutomatedProverConfig,
+    compose_prompt,
+)
 from open_atp.verify import ProofResult
 
 if TYPE_CHECKING:
@@ -34,12 +38,12 @@ log = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 
-_DEFAULT_PROMPT = (
+PROVER_PROMPT = (
     "Complete every `sorry` in this Lean project. Make the project compile and be "
     "sorry-free without introducing new axioms; do not weaken or delete the stated "
     "theorems."
 )
-# END _DEFAULT_PROMPT (docs literalinclude end marker -- keep adjacent)
+# END PROVER_PROMPT (docs literalinclude end marker -- keep adjacent)
 
 # Directories never worth shipping to Aristotle / copying into the workdir.
 _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
@@ -126,6 +130,11 @@ class AristotleProver(AutomatedProver):
 
     config: AristotleProverConfig
 
+    @property
+    def prover_prompt(self) -> str:
+        """The prover's own prompt handed to Aristotle, before any user prompt."""
+        return PROVER_PROMPT
+
     def _generate(
         self, task: ProofTask, wd: Path, logs_dir: Path, result: ProofResult
     ) -> None:
@@ -138,7 +147,7 @@ class AristotleProver(AutomatedProver):
             for p in task.project.lean_files()
         }
 
-        prompt = task.instructions or _DEFAULT_PROMPT
+        prompt = compose_prompt(self.prover_prompt, task.user_prompt)
         # The raw result archive and the full run record both belong with the run's
         # logs, not the proof project. ``prove`` already created ``logs_dir``; the
         # hosted agent has no live stdout stream, so its record (events, transcript,
