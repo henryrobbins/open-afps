@@ -146,7 +146,7 @@ body {
 .content h1 { font-size: 2.7rem;  line-height: 1.1; letter-spacing: -0.01em; }
 .content h2 { font-size: 1.92rem; }
 .content h3 { font-size: 1.4rem; }
-.sidebar-brand-text { font-size: 1.3em; }
+.sidebar-brand-text { font-size: 2.6em; }
 
 /* Lead paragraph (use the `.lede` class, or `.. rst-class:: lede`) */
 .content .lede {

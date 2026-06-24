@@ -1,4 +1,4 @@
-# OpenATP
+# OpenA⊢P
 
 **Open Automated Formal Proof Synthesis.** Upload one or more
 [Lean](https://lean-lang.org/) files containing `sorry`, run them through leading

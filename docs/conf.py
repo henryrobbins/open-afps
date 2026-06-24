@@ -54,7 +54,7 @@ templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "PHASE*.md"]
 
 html_theme = "furo"
-html_title = "OpenATP"
+html_title = "OpenA⊢P"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 
