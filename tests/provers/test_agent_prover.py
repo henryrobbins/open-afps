@@ -43,16 +43,21 @@ theorem mul_comm_assoc (a b c : ℝ) : a * b * c = b * (a * c) := by
 """
 
 
-def _make_prover(*, reuse: bool = False) -> AgentProver:
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    config = AgentProverConfig()
-    # reuse=True shares one backend so prove() runs the agent and the final verify in
-    # a single sandbox; reuse=False (the default here) gives generation its own
-    # backend so the pure prove()-diff unit tests never touch a live backend.
-    agent_backend = (
-        backend if reuse else DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    )
-    return AgentProver(config, backend, agent_backend)
+@pytest.fixture
+def make_prover(fake_session_backend: object) -> object:
+    """Build an :class:`AgentProver`. ``real=True`` uses a live Docker backend (the
+    ``docker``-marked tests); otherwise the in-process fake session keeps the
+    diff unit tests off Docker."""
+
+    def _make(*, real: bool = False) -> AgentProver:
+        backend = (
+            DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+            if real
+            else fake_session_backend
+        )
+        return AgentProver(AgentProverConfig(), backend)
+
+    return _make
 
 
 # --- stream parsing + cost -------------------------------------------------
@@ -212,7 +217,7 @@ def _run_generate(prover: AgentProver, tmp_path: Path) -> tuple[ProofResult, Pat
 
 
 def test_generate_reports_files_the_agent_changed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
     """_generate(): stage -> (stubbed) agent writes a solved file -> diff. No Docker."""
 
@@ -228,8 +233,8 @@ def test_generate_reports_files_the_agent_changed(
         return STREAM.read_text().splitlines(), ""
 
     monkeypatch.setattr(AgentProver, "_run_agent", _fake_run_agent)
-    # No CLAUDE_CODE_OAUTH_TOKEN needed: _run_agent (which calls auth) is stubbed.
-    prover = _make_prover()
+    # No creds needed: the agent run is stubbed and the in-session verify is a no-op.
+    prover = make_prover()
 
     result, wd = _run_generate(prover, tmp_path)
 
@@ -245,7 +250,7 @@ def test_generate_reports_files_the_agent_changed(
 
 
 def test_generate_reports_no_changes_when_agent_does_nothing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
     def _noop_run_agent(
         self: AgentProver,
@@ -257,7 +262,7 @@ def test_generate_reports_no_changes_when_agent_does_nothing(
         return [], ""
 
     monkeypatch.setattr(AgentProver, "_run_agent", _noop_run_agent)
-    prover = _make_prover()
+    prover = make_prover()
 
     result, _ = _run_generate(prover, tmp_path)
     assert result.completed_files == {}
@@ -269,12 +274,14 @@ def test_generate_reports_no_changes_when_agent_does_nothing(
 
 
 @pytest.mark.docker
-def test_prove_end_to_end_verifies_mocked_agent_result(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_prove_reuses_one_sandbox_for_generation_and_verify(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
-    """Full prove(): a mocked agent writes a real proof; the Docker verifier confirms.
+    """Full prove(): generation and the final verify run in ONE live sandbox.
 
-    Mocked agent, real local check -- the path every prover shares, with no creds.
+    A stubbed agent writes a real proof and auth is stubbed (no creds/credential
+    mounts); the shared verifier then compiles in the *same* session the agent ran
+    in -- the no-second-spin-up path every agentic prover takes -- and confirms it.
     """
 
     def _fake_run_agent(
@@ -284,11 +291,15 @@ def test_prove_end_to_end_verifies_mocked_agent_result(
         stdout_path: Path,
         session: object | None = None,
     ) -> tuple[list[str], str]:
+        # Generation hands the live session through to the agent run.
+        assert session is not None
         (workdir / "MILExample.lean").write_text(SOLVED_FILE)
         return STREAM.read_text().splitlines(), ""
 
     monkeypatch.setattr(AgentProver, "_run_agent", _fake_run_agent)
-    prover = _make_prover()
+    # No real credential resolution/mounts -- keeps the session sandbox dependency-free.
+    monkeypatch.setattr(AgentProver, "_auth", lambda self, harness: ({}, []))
+    prover = make_prover(real=True)
 
     result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
 
@@ -299,38 +310,3 @@ def test_prove_end_to_end_verifies_mocked_agent_result(
     # The proof landed in output_dir/wd and the run record in output_dir/logs.
     assert (result.wd / "MILExample.lean").is_file()
     assert (result.logs_dir / "result.json").is_file()
-
-
-@pytest.mark.docker
-def test_prove_reuses_one_sandbox_for_generation_and_verify(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """reuse=True: generation and the final verify run in ONE live sandbox.
-
-    A stubbed agent writes a real proof and auth is stubbed (no creds/credential
-    mounts); the shared verifier then compiles in the *same* session the agent ran
-    in -- the no-second-spin-up path -- and confirms it.
-    """
-
-    def _fake_run_agent(
-        self: AgentProver,
-        workdir: Path,
-        harness: Harness,
-        stdout_path: Path,
-        session: object | None = None,
-    ) -> tuple[list[str], str]:
-        # The reuse path hands the live session through to the agent run.
-        assert session is not None
-        (workdir / "MILExample.lean").write_text(SOLVED_FILE)
-        return STREAM.read_text().splitlines(), ""
-
-    monkeypatch.setattr(AgentProver, "_run_agent", _fake_run_agent)
-    # No real credential resolution/mounts -- keeps the session sandbox dependency-free.
-    monkeypatch.setattr(AgentProver, "_auth", lambda self, harness: ({}, []))
-    prover = _make_prover(reuse=True)
-
-    result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
-
-    assert result.success, result.verification and result.verification.compile_log
-    assert result.verification is not None and result.verification.verified
-    assert result.cost_usd == pytest.approx(0.4231)

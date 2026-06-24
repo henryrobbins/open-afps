@@ -42,7 +42,7 @@ while.
 A {class}`~open_atp.backends.modal.ModalBackend` is constructed from a
 {class}`~open_atp.backends.modal.ModalConfig` and is a drop-in
 {class}`~open_atp.backends.base.ComputeBackend` — substitute it for the
-`DockerBackend` anywhere a verification or generation backend is expected:
+`DockerBackend` anywhere a compute backend is expected:
 
 ```python
 from open_atp.backends.modal import ModalBackend, ModalConfig

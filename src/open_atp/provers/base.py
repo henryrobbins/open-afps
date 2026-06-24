@@ -98,10 +98,10 @@ class AutomatedProver(abc.ABC):
         self, config: AutomatedProverConfig, verification_backend: ComputeBackend
     ) -> None:
         self.config = config
-        # The backend used for the *final check*. Its image carries the toolchain +
-        # Mathlib pins the verifier rejects mismatched projects against. Agentic
-        # provers additionally run their generation in a backend; that is the
-        # subclass's concern.
+        # The one backend for this prover. Its image carries the toolchain + Mathlib
+        # pins the verifier rejects mismatched projects against. Agentic provers reuse
+        # this same backend (via a live session over it) for generation, then verify in
+        # that hot sandbox -- see ``AgentProver._generate``.
         self.verifier = Verifier(verification_backend)
 
     @abc.abstractmethod
@@ -138,10 +138,10 @@ class AutomatedProver(abc.ABC):
         self._generate(task, wd, logs_dir, result)
         result.duration_s = time.monotonic() - start
 
-        # A prover that ran generation and the final check in one shared sandbox (the
-        # agent/verify backend-reuse path) set ``result.verification`` itself; reuse it
-        # rather than spinning a second sandbox. Otherwise verify standalone --
-        # Aristotle (no sandbox) and the split-backend case land here.
+        # An agentic prover ran generation and the final check in one live session and
+        # set ``result.verification`` itself; reuse it rather than spinning a second
+        # sandbox. Only Aristotle (network generation, no session) lands here and gets
+        # the standalone check.
         if result.verification is None:
             result.verification = self.verifier.verify(LeanProject(wd))
 

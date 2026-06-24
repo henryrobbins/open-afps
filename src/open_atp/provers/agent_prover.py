@@ -26,7 +26,6 @@ from typing import Self, TextIO
 from open_atp.backends.base import (
     CommandHandle,
     CommandResult,
-    ComputeBackend,
     ComputeSession,
 )
 from open_atp.harness import (
@@ -174,8 +173,7 @@ class AgentProver(AutomatedProver):
     Examples
     --------
 
-    Build the config and construct the prover directly (the agent backend defaults
-    to the verify backend):
+    Build the config and construct the prover directly:
 
     >>> from open_atp.backends.docker import DockerBackend, DockerConfig
     >>> from open_atp.harness import CodexHarnessConfig
@@ -190,17 +188,6 @@ class AgentProver(AutomatedProver):
     name = "agent"
 
     config: AgentProverConfig
-
-    def __init__(
-        self,
-        config: AgentProverConfig,
-        verification_backend: ComputeBackend,
-        agent_backend: ComputeBackend | None = None,
-    ) -> None:
-        super().__init__(config, verification_backend)
-        # Generation may run in a different backend than verification (e.g. Modal for
-        # the agent, local Docker for the cheap final check) -- but defaults to shared.
-        self.agent_backend = agent_backend or verification_backend
 
     def _generate(
         self, task: ProofTask, wd: Path, logs_dir: Path, result: ProofResult
@@ -223,42 +210,29 @@ class AgentProver(AutomatedProver):
         harness.configure_wd(wd, prompt)
         stdout_path = logs_dir / "stdout.txt"
 
-        # 4. Run the agent. When generation and verification share a backend, keep the
-        #    sandbox alive and run the final check in it -- no second spin-up.
-        if self.agent_backend is self.verifier.backend:
-            # Mounts (credential dirs) must be pinned when the session sandbox is
-            # created; per-command env is forwarded by _run_agent's exec.
-            _, mounts = self._auth(harness)
-            with self.agent_backend.session(
-                wd, mounts=mounts, timeout_s=self.config.timeout_s
-            ) as session:
-                lines, stderr = self._run_agent(
-                    wd, harness, stdout_path, session=session
-                )
-                self._download_wd(wd, session=session)
-                # Parse (which reads harness usage files still in wd) before
-                # _download_logs relocates them out.
-                self._fill_result(result, harness, wd, original, lines)
-                self._download_logs(harness, wd, logs_dir, stderr)
-                result.verification = self.verifier.verify(
-                    LeanProject(wd), session=session
-                )
-                return
+        # 4. Run the agent and the final check in one persistent sandbox: generation
+        #    and verification share the backend, so we keep the container hot between
+        #    them and never pay a second spin-up. Mounts (credential dirs) are pinned
+        #    when the session is created; per-command env is forwarded by _run_agent.
+        _, mounts = self._auth(harness)
+        with self.verifier.backend.session(
+            wd, mounts=mounts, timeout_s=self.config.timeout_s
+        ) as session:
+            lines, stderr = self._run_agent(wd, harness, stdout_path, session)
+            self._download_wd(wd, session)
+            # Parse (which reads harness usage files still in wd) before
+            # _download_logs relocates them out.
+            self._fill_result(result, harness, wd, original, lines)
+            self._download_logs(harness, wd, logs_dir, stderr)
+            result.verification = self.verifier.verify(LeanProject(wd), session=session)
 
-        lines, stderr = self._run_agent(wd, harness, stdout_path)
-        self._download_wd(wd)
-        self._fill_result(result, harness, wd, original, lines)
-        self._download_logs(harness, wd, logs_dir, stderr)
-
-    def _download_wd(self, wd: Path, session: ComputeSession | None = None) -> None:
+    def _download_wd(self, wd: Path, session: ComputeSession) -> None:
         """Bring the agent's edits onto the host at ``wd``.
 
         A tar pull for a live Modal session; a no-op for bind-mounted Docker (where the
-        agent wrote ``wd`` directly) and for the one-shot path (whose backend syncs out
-        on context exit).
+        agent wrote ``wd`` directly).
         """
-        if session is not None:
-            session.sync_out()
+        session.sync_out()
 
     def _download_logs(
         self, harness: Harness, wd: Path, logs_dir: Path, stderr: str = ""
@@ -320,7 +294,7 @@ class AgentProver(AutomatedProver):
         env.update(harness.static_env())
         env.update(self.config.env)
         env.update(self.config.extra_env)
-        home = self.agent_backend.container_home
+        home = self.verifier.backend.container_home
         mounts = [(str(src), f"{home}/{dest}") for src, dest in spec.home_dirs]
         return env, mounts
 
@@ -329,26 +303,25 @@ class AgentProver(AutomatedProver):
         workdir: Path,
         harness: Harness,
         stdout_path: Path,
-        session: ComputeSession | None = None,
+        session: ComputeSession,
     ) -> tuple[list[str], str]:
-        """Resolve auth, launch the agent in the backend, and tee its stdout.
+        """Resolve auth, launch the agent in the live ``session``, and tee its stdout.
 
         Each streamed event line is written to ``stdout_path`` (opened in append mode,
         so a multi-round caller accumulates one transcript) as it arrives -- the live
         run log -- and collected to return for token/cost parsing. Returns
-        ``(stdout_lines, stderr)``: the lines plus the run's captured stderr (Modal's
-        ``modal_stderr.txt`` / the one-shot run's stderr), which the prover writes to
-        ``logs/stderr.txt``.
+        ``(stdout_lines, stderr)``: the lines plus the run's captured stderr (e.g.
+        Modal's ``modal_stderr.txt``), which the prover writes to ``logs/stderr.txt``.
+
+        The agent execs in the persistent ``session`` -- the same hot sandbox that
+        stays up for the verifier afterwards. Mounts (credential dirs) were pinned when
+        the session was created; only per-command env is forwarded here.
 
         Isolated (it owns credential resolution + the backend call) so tests can
         stand in a fake run -- write a solved file, return a captured stream --
         without Docker or credentials.
-
-        ``session`` given (the backend-reuse path): exec the agent in that live
-        sandbox, which stays up for the verifier afterwards. ``None``: the one-shot
-        path, a fresh sandbox via ``start`` that tears down on exit.
         """
-        env, mounts = self._auth(harness)
+        env, _ = self._auth(harness)
         lines: list[str] = []
 
         def drain(handle: CommandHandle, sink: TextIO) -> None:
@@ -358,24 +331,11 @@ class AgentProver(AutomatedProver):
                 lines.append(line)
 
         with stdout_path.open("a", encoding="utf-8") as sink:
-            if session is not None:
-                # Mounts were pinned at session creation; only per-command env here.
-                handle = session.exec(harness.command, env=env)
-                drain(handle, sink)
-                result = handle.wait()
-                self._log_agent_result(harness, result, lines)
-                return lines, result.stderr
-            with self.agent_backend.start(
-                workdir,
-                harness.command,
-                env=env,
-                mounts=mounts,
-                timeout_s=self.config.timeout_s,
-            ) as handle:
-                drain(handle, sink)
-                result = handle.wait()
-                self._log_agent_result(harness, result, lines)
-            return lines, result.stderr
+            handle = session.exec(harness.command, env=env)
+            drain(handle, sink)
+            result = handle.wait()
+            self._log_agent_result(harness, result, lines)
+        return lines, result.stderr
 
     def _log_agent_result(
         self, harness: Harness, result: CommandResult, lines: list[str]

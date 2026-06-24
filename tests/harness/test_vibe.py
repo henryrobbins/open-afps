@@ -23,7 +23,6 @@ from pathlib import Path
 
 import pytest
 
-from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.harness import (
     HARNESS_CONFIGS,
     HARNESSES,
@@ -31,7 +30,6 @@ from open_atp.harness import (
     VibeHarness,
     VibeHarnessConfig,
 )
-from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
 from open_atp.verify import ProofResult
@@ -81,15 +79,14 @@ def _write_session_log(log_dir: Path, stats: dict[str, object]) -> None:
     (sess / "meta.json").write_text(json.dumps({"stats": stats}))
 
 
-def _make_prover() -> AgentProver:
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+@pytest.fixture
+def prover(fake_session_backend: object) -> AgentProver:
+    # The in-process fake session keeps the diff unit test (which stubs _run_agent)
+    # off a live backend while _generate opens its session and verifies in it.
     config = AgentProverConfig(
         harness=VibeHarnessConfig(agent="lean-standin", model="magistral-medium-latest")
     )
-    # Distinct agent backend so prove() takes the non-reuse path (no live session) --
-    # the diff unit test stubs _run_agent and must not touch a real backend.
-    agent_backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    return AgentProver(config, backend, agent_backend)
+    return AgentProver(config, fake_session_backend)
 
 
 # --- construction / config -------------------------------------------------
@@ -211,7 +208,7 @@ def test_parse_without_session_log_leaves_cost_none(tmp_path: Path) -> None:
 
 
 def test_generate_reports_changes_and_session_cost(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prover: AgentProver
 ) -> None:
     """_generate(): stage -> stubbed agent writes a solved file + session log -> diff.
 
@@ -233,7 +230,6 @@ def test_generate_reports_changes_and_session_cost(
         return STREAM_LINES, ""
 
     monkeypatch.setattr(AgentProver, "_run_agent", _fake_run_agent)
-    prover = _make_prover()
     wd = tmp_path / "wd"
     logs_dir = tmp_path / "logs"
     wd.mkdir()

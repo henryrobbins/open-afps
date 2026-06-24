@@ -22,8 +22,9 @@ top-level surface re-exported from `open_atp` itself.
 {class}`~open_atp.provers.PROVERS` enumerates the available provers (e.g.
 `PROVERS.CLAUDE`, `PROVERS.CODEX`, `PROVERS.ARISTOTLE`).
 {func}`~open_atp.provers.get_prover` maps a member (or its string value) to a constructed
-{class}`~open_atp.provers.base.AutomatedProver`, wiring in the shared image/toolchain,
-the verify backend, and (for agentic provers) the agent backend.
+{class}`~open_atp.provers.base.AutomatedProver`, wiring in the shared image/toolchain and
+compute backend. Agentic provers run generation in a live session over that backend and
+verify in the same hot sandbox.
 
 ```{eval-rst}
 .. autoclass:: open_atp.provers.PROVERS

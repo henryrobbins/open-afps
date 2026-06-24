@@ -74,15 +74,14 @@ def _write_usage(wd: Path, target: str, input_tokens: int, output_tokens: int) -
     )
 
 
-def _make_prover() -> AgentProver:
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+@pytest.fixture
+def prover(fake_session_backend: object) -> AgentProver:
+    # The in-process fake session keeps the diff unit test (which stubs _run_agent)
+    # off a live backend while _generate opens its session and verifies in it.
     config = AgentProverConfig(
         harness=AxProverHarnessConfig(model="claude-opus-4-8", effort="high")
     )
-    # Distinct agent backend so prove() takes the non-reuse path (no live session) --
-    # the diff unit test stubs _run_agent and must not touch a real backend.
-    agent_backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    return AgentProver(config, backend, agent_backend)
+    return AgentProver(config, fake_session_backend)
 
 
 # --- construction / config -------------------------------------------------
@@ -209,7 +208,7 @@ def test_parse_without_usage_files_reports_zero_tokens(tmp_path: Path) -> None:
 
 
 def test_generate_reports_changes_and_token_cost(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prover: AgentProver
 ) -> None:
     """_generate(): stage -> stubbed agent writes a solved file + usage file -> diff.
 
@@ -231,7 +230,6 @@ def test_generate_reports_changes_and_token_cost(
         return STREAM_LINES, ""
 
     monkeypatch.setattr(AgentProver, "_run_agent", _fake_run_agent)
-    prover = _make_prover()
     wd = tmp_path / "wd"
     logs_dir = tmp_path / "logs"
     wd.mkdir()

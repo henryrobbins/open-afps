@@ -193,28 +193,19 @@ class NuminaProver(AgentProver):
         if self.config.guard_statements and tracked:
             tracker = StatementTracker(tracked)
 
-        # 5. Round-continuation loop. When generation and verification share a
-        #    backend, run the whole loop -- and the final check -- in one persistent
-        #    sandbox, so we pay neither per-round nor a separate verify spin-up.
-        if self.agent_backend is self.verifier.backend:
-            _, mounts = self._auth(harness)
-            with self.agent_backend.session(
-                wd, mounts=mounts, timeout_s=self.config.timeout_s
-            ) as session:
-                loop = self._run_rounds(
-                    wd, harness, stdout_path, tracker, session=session
-                )
-                # Final pull so the host workdir (helper-usage ledger, completed
-                # files) is current before pricing + diffing.
-                self._download_wd(wd, session=session)
-                self._finalize(result, wd, logs_dir, harness, loop, original)
-                result.verification = self.verifier.verify(
-                    LeanProject(wd), session=session
-                )
-                return
-
-        loop = self._run_rounds(wd, harness, stdout_path, tracker)
-        self._finalize(result, wd, logs_dir, harness, loop, original)
+        # 5. Round-continuation loop, with the final check, in one persistent sandbox:
+        #    generation and verification share the backend, so we pay neither a
+        #    per-round nor a separate verify spin-up.
+        _, mounts = self._auth(harness)
+        with self.verifier.backend.session(
+            wd, mounts=mounts, timeout_s=self.config.timeout_s
+        ) as session:
+            loop = self._run_rounds(wd, harness, stdout_path, tracker, session=session)
+            # Final pull so the host workdir (helper-usage ledger, completed files)
+            # is current before pricing + diffing.
+            self._download_wd(wd, session=session)
+            self._finalize(result, wd, logs_dir, harness, loop, original)
+            result.verification = self.verifier.verify(LeanProject(wd), session=session)
 
     def _finalize(
         self,
@@ -279,7 +270,7 @@ class NuminaProver(AgentProver):
         harness: Harness,
         stdout_path: Path,
         tracker: StatementTracker | None,
-        session: ComputeSession | None = None,
+        session: ComputeSession,
     ) -> dict[str, Any]:
         """Drive the agent for up to ``max_rounds``, continuing while it reports LIMIT.
 
@@ -287,10 +278,10 @@ class NuminaProver(AgentProver):
         the full multi-round transcript). Returns an accumulator dict (token totals,
         cost, per-round history, final end reason, statement-guard outcome).
 
-        ``session`` given: every round execs in the one persistent sandbox. We
-        ``sync_out`` after each round so the host-side statement tracker reads the
-        round's result, and ``sync_in`` after a restore so the sandbox picks it up for
-        the next round (both no-ops on bind-mounted Docker).
+        Every round execs in the one persistent ``session``. We ``sync_out`` after each
+        round so the host-side statement tracker reads the round's result, and
+        ``sync_in`` after a restore so the sandbox picks it up for the next round (both
+        no-ops on bind-mounted Docker).
         """
         stderrs: list[str] = []
         round_history: list[dict[str, Any]] = []
@@ -317,8 +308,7 @@ class NuminaProver(AgentProver):
                 stderrs.append(round_stderr)
             # Pull the round's edits to the host so the statement tracker (and the
             # next round's snapshot) see them (no-op on bind-mounted Docker).
-            if session is not None:
-                session.sync_out()
+            session.sync_out()
             parsed = harness.parse(round_lines)
 
             input_tokens += parsed.input_tokens
@@ -356,8 +346,7 @@ class NuminaProver(AgentProver):
                     tracker.restore_initial_statements(changes)
                     # Push the restored statements back so the sandbox reflects them
                     # for the next round (no-op on bind-mounted Docker).
-                    if session is not None:
-                        session.sync_in()
+                    session.sync_in()
                     if self.config.on_statement_change == "error":
                         end_reason = "STATEMENT_CHANGED"
                         record["end_reason"] = end_reason

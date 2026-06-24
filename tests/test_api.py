@@ -138,21 +138,17 @@ def test_get_prover_accepts_string_value() -> None:
     assert isinstance(prover.config.harness, CodexHarnessConfig)
 
 
-def test_get_prover_injects_agent_backend() -> None:
-    verify = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    agent_be = DockerBackend(DockerConfig(image=Image(name="other:tag")))
+def test_get_prover_uses_one_backend_for_generation_and_verify() -> None:
+    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
 
-    agent = get_prover(
-        PROVERS.CLAUDE,
-        verification_backend=verify,
-        agent_backend=agent_be,
-    )
+    agent = get_prover(PROVERS.CLAUDE, verification_backend=backend)
+
     assert isinstance(agent, AgentProver)
     # The factory builds the name's defaults; there is no override surface.
     assert agent.config.harness.model == "claude-opus-4-8"
-    # Generation backend is the injected one; verification stays the verify backend.
-    assert agent.agent_backend is agent_be
-    assert agent.verifier.backend is verify
+    # One backend: generation runs in a live session over it and verification reuses
+    # that same hot sandbox.
+    assert agent.verifier.backend is backend
 
 
 def test_get_prover_rejects_unknown_name() -> None:

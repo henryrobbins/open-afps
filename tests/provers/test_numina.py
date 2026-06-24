@@ -129,16 +129,21 @@ def _result_line(reason: str | None, *, subtype: str = "success") -> str:
     )
 
 
-def _make_prover(*, reuse: bool = False, **overrides: object) -> NuminaProver:
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    config = NuminaProverConfig(**overrides)
-    # reuse=True runs the whole round loop + final verify in one sandbox; reuse=False
-    # (default) gives generation its own backend so the round-loop unit tests (which
-    # stub _run_agent) never touch a live backend.
-    agent_backend = (
-        backend if reuse else DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    )
-    return NuminaProver(config, backend, agent_backend)
+@pytest.fixture
+def make_prover(fake_session_backend: object) -> object:
+    """Build a :class:`NuminaProver`. ``real=True`` uses a live Docker backend (the
+    ``docker``-marked tests); otherwise the in-process fake session keeps the
+    round-loop unit tests (which stub ``_run_agent``) off Docker."""
+
+    def _make(*, real: bool = False, **overrides: object) -> NuminaProver:
+        backend = (
+            DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+            if real
+            else fake_session_backend
+        )
+        return NuminaProver(NuminaProverConfig(**overrides), backend)
+
+    return _make
 
 
 def _run_generate(prover: NuminaProver, tmp_path: Path) -> ProofResult:
@@ -178,11 +183,11 @@ def _scripted_run_agent(
 
 
 def test_round_loop_continues_on_limit_then_stops_on_complete(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
     calls, stub = _scripted_run_agent(["LIMIT", "LIMIT", "COMPLETE"])
     monkeypatch.setattr(NuminaProver, "_run_agent", stub)
-    prover = _make_prover(max_rounds=20, guard_statements=False)
+    prover = make_prover(max_rounds=20, guard_statements=False)
 
     out = _run_generate(prover, tmp_path)
 
@@ -197,7 +202,7 @@ def test_round_loop_continues_on_limit_then_stops_on_complete(
 
 
 def test_helper_cost_is_folded_into_total(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
     """discussion_partner usage in the workdir ledger bills into cost_usd."""
 
@@ -226,7 +231,7 @@ def test_helper_cost_is_folded_into_total(
         return [_result_line("COMPLETE")], ""
 
     monkeypatch.setattr(NuminaProver, "_run_agent", _stub)
-    prover = _make_prover(max_rounds=20, guard_statements=False)
+    prover = make_prover(max_rounds=20, guard_statements=False)
 
     out = _run_generate(prover, tmp_path)
 
@@ -239,7 +244,7 @@ def test_helper_cost_is_folded_into_total(
 
 
 def test_helper_cost_flags_unpriced_model(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
     """An unknown helper model is flagged, not silently billed at zero."""
 
@@ -266,7 +271,7 @@ def test_helper_cost_flags_unpriced_model(
         return [_result_line("COMPLETE")], ""
 
     monkeypatch.setattr(NuminaProver, "_run_agent", _stub)
-    prover = _make_prover(max_rounds=20, guard_statements=False)
+    prover = make_prover(max_rounds=20, guard_statements=False)
 
     out = _run_generate(prover, tmp_path)
 
@@ -276,11 +281,11 @@ def test_helper_cost_flags_unpriced_model(
 
 
 def test_round_loop_respects_max_rounds(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
     calls, stub = _scripted_run_agent(["LIMIT"])  # never completes
     monkeypatch.setattr(NuminaProver, "_run_agent", stub)
-    prover = _make_prover(max_rounds=4, guard_statements=False)
+    prover = make_prover(max_rounds=4, guard_statements=False)
 
     out = _run_generate(prover, tmp_path)
 
@@ -290,11 +295,11 @@ def test_round_loop_respects_max_rounds(
 
 
 def test_round_loop_stops_immediately_on_complete(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
     calls, stub = _scripted_run_agent(["COMPLETE"])
     monkeypatch.setattr(NuminaProver, "_run_agent", stub)
-    prover = _make_prover(max_rounds=20, guard_statements=False)
+    prover = make_prover(max_rounds=20, guard_statements=False)
 
     out = _run_generate(prover, tmp_path)
 
@@ -303,7 +308,7 @@ def test_round_loop_stops_immediately_on_complete(
 
 
 def test_round_loop_falls_back_to_subtype_when_no_marker(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
     """No END_REASON marker: success subtype -> COMPLETE (stop)."""
     calls: list[int] = []
@@ -319,7 +324,7 @@ def test_round_loop_falls_back_to_subtype_when_no_marker(
         return [_result_line(None, subtype="success")], ""
 
     monkeypatch.setattr(NuminaProver, "_run_agent", _stub)
-    prover = _make_prover(max_rounds=20, guard_statements=False)
+    prover = make_prover(max_rounds=20, guard_statements=False)
 
     out = _run_generate(prover, tmp_path)
     assert len(calls) == 1
@@ -330,7 +335,7 @@ def test_round_loop_falls_back_to_subtype_when_no_marker(
 
 
 def test_guard_error_stops_and_restores_weakened_theorem(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
     """A round that guts the theorem is rejected; the original is restored."""
 
@@ -349,7 +354,7 @@ def test_guard_error_stops_and_restores_weakened_theorem(
         return [_result_line("COMPLETE")], ""
 
     monkeypatch.setattr(NuminaProver, "_run_agent", _weaken)
-    prover = _make_prover(
+    prover = make_prover(
         max_rounds=20, guard_statements=True, on_statement_change="error"
     )
 
@@ -377,46 +382,14 @@ theorem mul_comm_assoc (a b c : ℝ) : a * b * c = b * (a * c) := by
 
 @pytest.mark.docker
 def test_run_end_to_end_verifies_mocked_numina_result(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, make_prover: object
 ) -> None:
     """Full run(): a mocked round writes a real proof; the Docker verifier confirms.
 
-    Exercises Numina staging (vendored bundle), the round loop, the statement guard
-    (the proof fills the sorry without changing the statement), and the shared
-    verifier -- with no creds.
-    """
-
-    def _solve(
-        self: NuminaProver,
-        workdir: Path,
-        harness: Harness,
-        stdout_path: Path,
-        session: object | None = None,
-    ) -> tuple[list[str], str]:
-        (workdir / "MILExample.lean").write_text(_SOLVED_FILE)
-        return [_result_line("COMPLETE")], ""
-
-    monkeypatch.setattr(NuminaProver, "_run_agent", _solve)
-    prover = _make_prover(max_rounds=4)
-
-    result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
-
-    assert result.success, result.verification and result.verification.compile_log
-    assert result.verification is not None and result.verification.verified
-    assert result.prover == "numina"
-    assert result.metadata["end_reason"] == "COMPLETE"
-    assert result.metadata["statement_changed"] is False
-    assert list(result.completed_files) == ["MILExample.lean"]
-
-
-@pytest.mark.docker
-def test_run_reuses_one_sandbox_across_rounds_and_verify(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """reuse=True: the whole round loop + final verify run in one live sandbox.
-
-    Exercises ``_run_rounds`` exec'ing into the persistent session, the per-round
-    ``sync_out`` feeding the host-side statement guard, and the in-session verify.
+    Exercises Numina staging (vendored bundle), the round loop exec'ing into the
+    persistent session, the per-round ``sync_out`` feeding the host-side statement
+    guard (the proof fills the sorry without changing the statement), and the
+    in-session verify -- one live sandbox for the whole run, with no creds.
     """
 
     def _solve(
@@ -433,11 +406,13 @@ def test_run_reuses_one_sandbox_across_rounds_and_verify(
     monkeypatch.setattr(NuminaProver, "_run_agent", _solve)
     # Keep the session sandbox dependency-free (no real credential mounts).
     monkeypatch.setattr(NuminaProver, "_auth", lambda self, harness: ({}, []))
-    prover = _make_prover(reuse=True, max_rounds=4)
+    prover = make_prover(real=True, max_rounds=4)
 
     result = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "out")
 
     assert result.success, result.verification and result.verification.compile_log
     assert result.verification is not None and result.verification.verified
+    assert result.prover == "numina"
+    assert result.metadata["end_reason"] == "COMPLETE"
     assert result.metadata["statement_changed"] is False
     assert list(result.completed_files) == ["MILExample.lean"]

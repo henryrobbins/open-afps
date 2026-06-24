@@ -104,7 +104,8 @@ class AristotleProver(AutomatedProver):
     Generation happens over the network (submit the lake project, wait, download the
     result archive, unpack it over the workdir); the shared
     :class:`~open_atp.verify.Verifier` then runs the same local compile/sorry/axiom
-    check. Network-only, so it takes just the verify backend -- no ``agent_backend``.
+    check. Generation is network-only, so the backend is used solely for that final
+    check -- unlike the agentic provers, there is no live session to reuse.
 
     Examples
     --------

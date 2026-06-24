@@ -14,11 +14,12 @@ This module is just the registry/factory over that flow:
 
 * :class:`PROVERS` -- the available prover names as an enum.
 * :func:`available_provers` -- list them.
-* :func:`get_prover` -- construct one by name with a shared image + verify backend.
+* :func:`get_prover` -- construct one by name against a compute backend.
 
-Backends: the verifier (cheap final check) and the agent (generation) backends are
-kept separate -- the split already exists in ``AgentProver`` -- so a job can run
-generation on Modal and the check on local Docker.
+Backends: a prover takes one :class:`~open_atp.backends.base.ComputeBackend`. Agentic
+provers run generation in a live session over it and then verify in that same hot
+sandbox; Aristotle generates over the network and uses the backend only for the final
+check.
 """
 
 from __future__ import annotations
@@ -117,9 +118,8 @@ def get_prover(
     name: PROVERS | str,
     *,
     verification_backend: ComputeBackend,
-    agent_backend: ComputeBackend | None = None,
 ) -> AutomatedProver:
-    """Construct the *default* prover ``name`` against the shared verify backend.
+    """Construct the *default* prover ``name`` against a compute backend.
 
     ``name`` is a :class:`PROVERS` member (or its string value). The prover is built
     with its config class's baked-in defaults -- this factory is a shortcut for the
@@ -134,8 +134,8 @@ def get_prover(
 
     The sandbox image (and the toolchain + Mathlib pins projects are checked against)
     comes from ``verification_backend``'s config, not a parameter here. Agentic provers
-    also receive ``agent_backend`` for generation (defaults to the verify backend),
-    keeping the agent-vs-verify backend split available.
+    run their generation in a live session over this same backend and verify in that hot
+    sandbox.
 
     Parameters
     ----------
@@ -144,13 +144,9 @@ def get_prover(
         (e.g. ``PROVERS.CLAUDE`` or ``"agent"``). Raises :class:`ValueError` for an
         unknown name.
     verification_backend : ComputeBackend
-        The backend that runs the shared :class:`~open_atp.verify.Verifier` (the cheap
-        final compile/sorry/axiom check).
-    agent_backend : ComputeBackend, optional
-        The backend agentic provers run generation on. Defaults to
-        ``verification_backend``, so generation and verification share a backend unless
-        you split them (e.g. generate on Modal, verify on local Docker). Ignored by
-        non-agentic provers (e.g. :class:`~open_atp.provers.aristotle.AristotleProver`).
+        The backend this prover runs on: the shared :class:`~open_atp.verify.Verifier`'s
+        final compile/sorry/axiom check, and -- for agentic provers -- generation in a
+        live session over it.
 
     Returns
     -------
@@ -211,8 +207,6 @@ def get_prover(
     else:
         config = entry.config_cls()
 
-    # Agentic provers take (config, verify_backend, agent_backend); Aristotle does
-    # its generation over the network and takes only the verify backend.
-    if isinstance(config, AgentProverConfig):
-        return entry.prover_cls(config, verification_backend, agent_backend)  # type: ignore[call-arg]
+    # Every prover takes (config, backend): agentic provers run generation in a live
+    # session over it; Aristotle generates over the network and uses it only to verify.
     return entry.prover_cls(config, verification_backend)
