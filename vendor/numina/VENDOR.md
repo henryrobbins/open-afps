@@ -36,8 +36,20 @@ do **not** vendor its `scripts/runner.py` -- that orchestration is re-implemente
    `uv run --no-project .claude/skills/cli/<tool>.py` (uv is on the image PATH and
    its cache is pre-warmed with these deps in `images/Dockerfile`).
 
-Only the markdown docs/prompts and the four skill headers were touched; the Python
-skill logic is byte-for-byte upstream.
+Beyond the markdown docs/prompts, the four skill headers, and the post-copy
+changes recorded in the changelog below, the Python skill logic is upstream.
+
+## Local changelog (post-copy edits to vendored Python)
+
+Deliberate edits to the vendored skill logic made *after* the initial copy, so a
+re-sync `git diff` against the upstream SHA has a record of what is ours:
+
+- **2026-06-23** — `skills/cli/discussion_partner.py`: emit a per-call token-usage
+  record to `.claude/helper_usage.jsonl` so the host-side `NuminaProver` can bill
+  the Gemini/GPT discussion-partner spend into the run's `cost_usd` (previously
+  untracked). Added `_record_usage()` + two call sites; no change to the
+  discussion logic itself.
+  [`49ea116`](https://github.com/henryrobbins/open-afps/commit/49ea116c9013f0d12fbafe6baf855fd5df255b08)
 
 ## What was re-implemented instead of copied
 

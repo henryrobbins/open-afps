@@ -40,12 +40,32 @@ verifier **rejects** projects whose toolchain doesn't match the sandbox image's 
 (`ToolchainMismatch`) rather than failing deep in a build. One Mathlib image to start;
 `image` is a config field so more can be added without refactoring.
 
-## Status: two compute backends + Aristotle + AgentProver + NuminaProver done
+## Available provers
+
+Each name below is accepted by the `--provers` CLI flag and the `Platform` registry
+(`api.py`). The agentic provers all run as an `AgentProver` on a selectable *harness*
+(a coding-agent CLI staged into the sandbox); the shared `Verifier` does the final
+compile/sorry/axiom check regardless of which tool generated the proof.
+
+| Prover name | Backing tool | Generation | Source / website |
+| --- | --- | --- | --- |
+| `aristotle` | Harmonic Aristotle (hosted) | remote API via `aristotlelib` | [harmonic.fun](https://www.harmonic.fun) · [aristotlelib](https://pypi.org/project/aristotlelib/) |
+| `agent` | Claude Code (`claude_code` harness) | coding agent + lean-lsp-mcp | [anthropics/claude-code](https://github.com/anthropics/claude-code) |
+| `agent:codex` | OpenAI Codex CLI | coding agent + lean-lsp-mcp | [openai/codex](https://github.com/openai/codex) |
+| `agent:opencode` | opencode | coding agent + lean-lsp-mcp | [sst/opencode](https://github.com/sst/opencode) |
+| `agent:axprover` | ax-prover (LangGraph Lean agent) | proposer→builder→reviewer loop | [Axiomatic-AI/ax-prover-base](https://github.com/Axiomatic-AI/ax-prover-base) ([fork](https://github.com/henryrobbins/ax-prover-base)) |
+| `numina` | Numina skills/prompts on Claude Code | round-continuation loop | [vendor/numina/VENDOR.md](vendor/numina/VENDOR.md) |
+| `leanstral` | Leanstral via Mistral Vibe (`vibe` harness, `lean` agent) | hosted model, no GPU | [mistralai/mistral-vibe](https://github.com/mistralai/mistral-vibe) |
+| `leanstral:devstral` | Mistral Vibe `lean` scaffold on Devstral | non-Labs stand-in | [mistralai/mistral-vibe](https://github.com/mistralai/mistral-vibe) |
+| `leanstral:magistral` | Mistral Vibe `lean` scaffold on Magistral (reasoning) | non-Labs stand-in | [mistralai/mistral-vibe](https://github.com/mistralai/mistral-vibe) |
+
+The shared LSP server used by the agentic harnesses is
+[lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp).
+
+## Compute backends
 
 `DockerBackend` and `ModalBackend` both run the shared `Verifier` and the agentic
-provers end-to-end against the Mathlib image; the AristotleProver, AgentProver
-(claude/codex/opencode + lean-lsp-mcp), and NuminaProver (claude_code + vendored
-Numina assets + round loop) are implemented. Docker bind-mounts the workdir; Modal
+provers end-to-end against the Mathlib image. Docker bind-mounts the workdir; Modal
 pushes/pulls it around an isolated Sandbox filesystem. Docker uses `images/Dockerfile`
 (runs as the `agent` user); Modal runs as root, so its image is built
 programmatically with the same toolchain installed globally (`build-modal-image`).
@@ -54,7 +74,7 @@ programmatically with the same toolchain installed globally (`build-modal-image`
 # Build the Mathlib base image (pins Lean/Mathlib v4.28.0).
 docker build -t open-afps:latest images/
 
-# Run the phase-1 verifier test (compiles a trivial Mathematics-in-Lean file).
+# Run the verifier test (compiles a trivial Mathematics-in-Lean file).
 uv run pytest -m docker
 
 # Modal backend: publish the same image to Modal, then run its parity suite.
@@ -74,41 +94,6 @@ from open_afps.core.verifier import docker_verifier
 report = docker_verifier().verify(LeanProject("path/to/lake/project"))
 print(report.verified, report.sorry_free, report.axioms)
 ```
-
-### Build order
-
-1. ~~**Backend + verifier (the spine).**~~ ✅ Done: `DockerBackend` and `ModalBackend`
-   both ported from milp_flare. `images/Dockerfile` builds the Docker (agent-user)
-   image with a warm olean cache; `build-modal-image` builds the root/global Modal
-   image programmatically from the same skeleton. `Verifier` compiles file-by-file
-   and checks sorry/axioms.
-2. ~~**AristotleProver.**~~ ✅ Done: submits the lake project via `aristotlelib`
-   (submit → wait → download), unpacks the result over the workdir, and funnels it
-   through the shared Docker verifier. Needs `ARISTOTLE_API_KEY` for real runs; tests
-   stub the remote call and verify a real proof locally.
-3. ~~**AgentProver.**~~ ✅ Done: ports milp_flare's `harness/` (claude/opencode/codex
-   + lean-lsp-mcp, `cost.py`) onto the backend with a generic "fill the sorrys" prompt.
-   The agent edits the staged project in place; `prove` diffs the `.lean` files and the
-   shared verifier does the final check. Needs `CLAUDE_CODE_OAUTH_TOKEN` (or a provider
-   key) for real runs; the fast tests mock the launch and parse a captured stream.
-4. ~~**NuminaProver.**~~ ✅ Done: vendors Numina's `skills/`+`prompts/` (see
-   `vendor/numina/VENDOR.md`) as a selectable asset bundle, extends `AgentProver`
-   pinned to `claude_code` with the round-continuation loop (continue while the
-   coordinator reports `END_REASON:LIMIT`, stop on `COMPLETE`/`max_rounds`) and the
-   ported statement tracker (`numina_tracker.py`) guarding against weakened/deleted
-   theorems. Helper-skill API keys (Gemini/OpenAI/Leandex/Anthropic) forward into the
-   sandbox; the image pre-warms a uv cache for the skills' PEP 723 deps. Needs
-   `CLAUDE_CODE_OAUTH_TOKEN` + `GEMINI_API_KEY` for real runs (`pytest -m numina_api`).
-5. ~~**Common API surface**~~ ✅ Done (`api.py`): a `Platform` + prover registry that
-   takes a lake project (or bare `.lean` files, staged into the pinned skeleton) and a
-   list of provers, builds each from `name → (ProverClass, ConfigClass)` with the
-   shared image/backends, fans them out concurrently (`ThreadPoolExecutor`, isolated
-   `runs/<id>/<prover>/` workdirs), isolates per-prover failures, and returns a
-   `SolveResult` with `verified()`/`best()` (verified → cheapest → fastest) +
-   `total_cost_usd` and `to_dict()` JSON. Driven by the `open-afps solve <project>
-   --provers aristotle,agent,numina [--json]` CLI. The verify/generation backend split
-   is wired across both backends (`--backend`/`--agent-backend`, e.g. Modal for
-   generation + local Docker for the cheap verify).
 
 ## Layout
 

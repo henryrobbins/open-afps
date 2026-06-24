@@ -46,6 +46,11 @@ packages = ["src/open_afps"]
 # vendor/numina in a source checkout).
 [tool.hatch.build.targets.wheel.force-include]
 "vendor/numina" = "open_afps/vendor/numina"
+# Host-agnostic skills (leanprover/skills) and the Claude `lean4` plugin
+# (lean4-skills), resolved at runtime by open_afps.harness._paths the same way as
+# numina (open_afps/vendor/<name> in a wheel, repo-root vendor/<name> in a checkout).
+"vendor/leanprover-skills" = "open_afps/vendor/leanprover-skills"
+"vendor/lean4-skills" = "open_afps/vendor/lean4-skills"
 
 [tool.ruff]
 line-length = 88

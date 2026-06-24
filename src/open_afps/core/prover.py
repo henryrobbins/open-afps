@@ -75,7 +75,11 @@ class AutomatedProver(abc.ABC):
         # Verify the project now living in workdir (subclasses sync results there).
         from open_afps.core.task import LeanProject
 
-        report = self.verifier.verify(LeanProject(workdir))
+        # A prover that ran its generation and the final check in one shared sandbox
+        # (the agent/verify backend-reuse path) reports the report on ``output``; reuse
+        # it rather than spinning a second sandbox. Otherwise verify standalone --
+        # Aristotle (no sandbox) and the split-backend case land here.
+        report = output.verification or self.verifier.verify(LeanProject(workdir))
 
         return ProofResult(
             prover=self.name,

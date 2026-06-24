@@ -41,6 +41,7 @@ from open_afps.backends.base import (
     CommandHandle,
     CommandResult,
     ComputeBackend,
+    ComputeSession,
     wrap_command,
 )
 
@@ -153,6 +154,32 @@ class ModalCommandHandle(CommandHandle):
         )
 
 
+@dataclass
+class ModalSessionHandle(ModalCommandHandle):
+    """A command exec'd into a live :class:`ModalSession`.
+
+    Same stdout/stderr draining as the one-shot handle, but :meth:`wait` does NOT
+    ``_pull_wd``/``_terminate`` and :meth:`cancel` is a no-op: the session owns
+    teardown (:meth:`ModalSession.close`), so a finished exec must leave the Sandbox
+    up for the next command (and must not leave it leaked either -- that is close's
+    job, guaranteed by the session context manager).
+    """
+
+    def cancel(self) -> None:
+        pass
+
+    def wait(self) -> CommandResult:
+        self._flush()
+        exit_code = self.proc.wait()
+        stderr = _pull_stderr(self.sb)
+        return CommandResult(
+            exit_code=exit_code,
+            stdout="\n".join(self._stdout_lines),
+            stderr=stderr,
+            duration_s=time.time() - self.started_at,
+        )
+
+
 def _terminate(sb: modal.Sandbox) -> None:
     """Tear down the Sandbox; idempotent (safe if it is already gone)."""
     try:
@@ -222,16 +249,19 @@ class ModalBackend(ComputeBackend):
     def _wrap(self, command: str) -> str:
         return wrap_command(REMOTE_WD, BAKED_LAKE, command)
 
-    def start(
+    def _provision(
         self,
         workdir: Path,
-        command: str,
-        *,
-        env: Mapping[str, str] | None = None,
-        mounts: Sequence[tuple[str, str]] | None = None,
-        timeout_s: int | None = None,
-    ) -> CommandHandle:
-        _require_modal()
+        env: Mapping[str, str] | None,
+        mounts: Sequence[tuple[str, str]] | None,
+        timeout_s: int | None,
+    ) -> modal.Sandbox:
+        """Create an idle Sandbox, push the workdir + mounts, warm the Lean cache.
+
+        Shared by :meth:`start` (one command then teardown) and :meth:`session` (kept
+        alive for many commands). On any failure the Sandbox is terminated before
+        propagating so a failed provision never leaks compute.
+        """
         import modal
 
         app = modal.App.lookup(self.config.app, create_if_missing=True)
@@ -272,7 +302,23 @@ class ModalBackend(ComputeBackend):
                 f"ln -sfn {BAKED_LAKE} {REMOTE_WD}/.lake && lake build",
                 workdir=REMOTE_WD,
             ).wait()
+        except BaseException:
+            _terminate(sb)
+            raise
+        return sb
 
+    def start(
+        self,
+        workdir: Path,
+        command: str,
+        *,
+        env: Mapping[str, str] | None = None,
+        mounts: Sequence[tuple[str, str]] | None = None,
+        timeout_s: int | None = None,
+    ) -> CommandHandle:
+        _require_modal()
+        sb = self._provision(workdir, env, mounts, timeout_s)
+        try:
             started_at = time.time()
             # Redirect stdin from /dev/null (Modal leaves it an open pipe with no EOF,
             # so agent CLIs hang) and capture stderr to a file pulled back on wait().
@@ -284,10 +330,72 @@ class ModalBackend(ComputeBackend):
                 workdir=REMOTE_WD,
             )
         except BaseException:
-            # Provisioning failed after create; release the Sandbox before
-            # propagating so a failed start never leaks compute.
+            # Launch failed after provision; release the Sandbox before propagating.
             _terminate(sb)
             raise
         return ModalCommandHandle(
             proc=proc, sb=sb, workdir=workdir, started_at=started_at
         )
+
+    def session(
+        self,
+        workdir: Path,
+        *,
+        env: Mapping[str, str] | None = None,
+        mounts: Sequence[tuple[str, str]] | None = None,
+        timeout_s: int | None = None,
+    ) -> ComputeSession:
+        _require_modal()
+        sb = self._provision(workdir, env, mounts, timeout_s)
+        return ModalSession(backend=self, sb=sb, workdir=workdir)
+
+
+@dataclass
+class ModalSession(ComputeSession):
+    """A live Modal Sandbox: exec many commands over the pushed workdir, terminate once.
+
+    The filesystem is isolated, so :meth:`sync_out` (tar pull) and :meth:`sync_in`
+    (tar push) bridge host<->Sandbox when a caller needs the host workdir current
+    between commands (e.g. a host-side diff, or Numina's statement tracker).
+    """
+
+    backend: ModalBackend
+    sb: modal.Sandbox
+    workdir: Path
+
+    def exec(
+        self,
+        command: str,
+        *,
+        env: Mapping[str, str] | None = None,
+        timeout_s: int | None = None,
+    ) -> CommandHandle:
+        import modal
+
+        # Per-command env is rare (the agent's creds are pinned at session create), so
+        # this is usually an empty secret list.
+        secrets = [modal.Secret.from_dict(dict(env))] if env else []
+        started_at = time.time()
+        proc = self.sb.exec(
+            "bash",
+            "-c",
+            f"{{ {self.backend._wrap(command)} ; }} "
+            f"< /dev/null 2> {REMOTE_WD}/modal_stderr.txt",
+            workdir=REMOTE_WD,
+            secrets=secrets,
+        )
+        return ModalSessionHandle(
+            proc=proc, sb=self.sb, workdir=self.workdir, started_at=started_at
+        )
+
+    def sync_out(self) -> None:
+        _pull_wd(self.sb, self.workdir)
+
+    def sync_in(self) -> None:
+        _push_dir(self.sb, self.workdir, REMOTE_WD)
+
+    def close(self) -> None:
+        # Pull final artifacts, then terminate. Both are best-effort/idempotent, so a
+        # second close() (or close after a failed exec) is safe.
+        _pull_wd(self.sb, self.workdir)
+        _terminate(self.sb)
