@@ -34,11 +34,16 @@ class MathlibRevMismatch(ValueError):
 class LeanProject:
     """A complete lake project on disk.
 
-    Parameters
+    Attributes
     ----------
-    root:
+    root : Path
         Directory containing ``lakefile.toml`` (or ``lakefile.lean``),
-        ``lean-toolchain``, and ``lake-manifest.json``.
+        ``lean-toolchain``, and ``lake-manifest.json``. Resolved to an absolute path.
+    lean_toolchain : str
+        The pinned toolchain read from ``lean-toolchain``, e.g.
+        ``leanprover/lean4:v4.31.0``.
+    mathlib_rev : str | None
+        The pinned Mathlib revision from ``lake-manifest.json``, if present.
 
     Examples
     --------
@@ -116,16 +121,18 @@ class LeanProject:
 class ProofTask:
     """A unit of work: complete the sorrys in ``project``.
 
-    Parameters
+    Attributes
     ----------
-    project:
+    project : LeanProject
         The lake project to complete.
-    targets:
+    targets : tuple[Path, ...]
         Optional explicit list of files (relative to ``project.root``) to focus on.
         When empty, every file containing ``sorry`` is fair game.
-    instructions:
+    instructions : str | None
         Optional natural-language guidance forwarded to provers that accept a prompt
         (e.g. Aristotle, or the agent system prompt).
+    metadata : dict[str, str]
+        Optional free-form metadata carried alongside the task.
     """
 
     project: LeanProject

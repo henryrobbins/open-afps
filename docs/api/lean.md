@@ -6,8 +6,10 @@ and the staging helper. A project is a *full lake project* carrying its own
 
 ```{eval-rst}
 .. autoclass:: open_atp.lean.LeanProject
+   :exclude-members: root, lean_toolchain, mathlib_rev
 
 .. autoclass:: open_atp.lean.ProofTask
+   :exclude-members: project, targets, instructions, metadata
 
 .. autoexception:: open_atp.lean.ToolchainMismatch
    :no-members:
