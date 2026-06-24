@@ -43,7 +43,11 @@ def _fake_result(*, solved: bool) -> object:
     body = SOLVED_FILE if solved else open(FIXTURE / "MILExample.lean").read()
 
     async def _stub(
-        self: AristotleProver, project_dir: Path, prompt: str, dest_tar: Path
+        self: AristotleProver,
+        project_dir: Path,
+        prompt: str,
+        dest_tar: Path,
+        run_dir: Path,
     ) -> tuple[Path, dict[str, object]]:
         # Real Aristotle archives wrap everything under a single top-level dir;
         # mirror that so the test exercises _extract_over's unwrapping.
@@ -56,7 +60,14 @@ def _fake_result(*, solved: bool) -> object:
                 info = tarfile.TarInfo(f"{project_dir.name}_aristotle/{name}")
                 info.size = len(data)
                 tar.addfile(info, io.BytesIO(data))
-        return dest_tar, {"project_id": "test-123", "task_status": "COMPLETE"}
+        # Stand in for the real run-info sync so prove() sees a populated run_dir.
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "events.json").write_text("[]")
+        return dest_tar, {
+            "project_id": "test-123",
+            "task_status": "COMPLETE",
+            "run_dir": str(run_dir),
+        }
 
     return _stub
 
@@ -81,6 +92,8 @@ def test_prove_extracts_result_and_reports_changed_files(
     assert "rw [mul_comm" in output.completed_files["MILExample.lean"]
     assert output.metadata["project_id"] == "test-123"
     assert "Summary" in output.logs
+    # The run record was synced to the host alongside the workdir.
+    assert Path(output.metadata["run_dir"]).joinpath("events.json").is_file()
 
 
 @pytest.mark.docker

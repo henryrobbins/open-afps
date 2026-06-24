@@ -12,16 +12,21 @@ so tests can stand in a fake result without touching the network or an API key.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import shutil
 import tarfile
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from open_afps.core.prover import AutomatedProver, AutomatedProverConfig
 from open_afps.core.result import GenerationOutput
 from open_afps.core.task import ProofTask
+
+if TYPE_CHECKING:
+    from aristotlelib import AgentTask, Project
 
 _DEFAULT_PROMPT = (
     "Complete every `sorry` in this Lean project. Make the project compile and be "
@@ -58,8 +63,9 @@ class AristotleProver(AutomatedProver):
 
         prompt = task.instructions or _DEFAULT_PROMPT
         result_tar = workdir.parent / f"{workdir.name}_aristotle.tar.gz"
+        run_dir = workdir.parent / f"{workdir.name}_aristotle_run"
         downloaded, metadata = asyncio.run(
-            self._submit_and_download(workdir, prompt, result_tar)
+            self._submit_and_download(workdir, prompt, result_tar, run_dir)
         )
 
         if downloaded is not None:
@@ -90,9 +96,12 @@ class AristotleProver(AutomatedProver):
         )
 
     async def _submit_and_download(
-        self, project_dir: Path, prompt: str, dest_tar: Path
+        self, project_dir: Path, prompt: str, dest_tar: Path, run_dir: Path
     ) -> tuple[Path | None, dict[str, object]]:
         """Submit ``project_dir`` to Aristotle, wait, and download the result archive.
+
+        Also syncs the full run record (task metadata, every event, a readable
+        transcript, project metadata) to ``run_dir`` on the host.
 
         Returns ``(downloaded_tar_or_None, metadata)``. Isolated for testing.
         """
@@ -123,10 +132,15 @@ class AristotleProver(AutomatedProver):
         await project.refresh()
 
         metadata.update(
+            task_id=agent_task.agent_task_id,
             task_status=agent_task.status.name,
             percent_complete=agent_task.percent_complete,
             output_summary=agent_task.output_summary,
         )
+
+        # Sync the full run record to the host before returning.
+        await self._sync_run_info(project, agent_task, run_dir)
+        metadata["run_dir"] = str(run_dir)
 
         if not project.has_files:
             metadata["error"] = "Aristotle produced no output files."
@@ -134,6 +148,38 @@ class AristotleProver(AutomatedProver):
 
         await project.get_files(destination=dest_tar)
         return dest_tar, metadata
+
+    @staticmethod
+    async def _sync_run_info(
+        project: Project, agent_task: AgentTask, run_dir: Path
+    ) -> None:
+        """Download the task's metadata and full event log to ``run_dir``.
+
+        Writes ``project.json``, ``task.json``, ``events.json`` (every event,
+        oldest-first), and a human-readable ``transcript.txt``.
+        """
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        # Page through every event, oldest-first, so the transcript reads top-down.
+        events = []
+        pagination_key = None
+        while True:
+            page, pagination_key = await agent_task.get_events(
+                limit=100, pagination_key=pagination_key, newest_first=False
+            )
+            events.extend(page)
+            if not pagination_key:
+                break
+
+        def _dump(obj: object) -> str:
+            return json.dumps(obj, default=str, indent=2)
+
+        (run_dir / "project.json").write_text(_dump(project.model_dump()))
+        (run_dir / "task.json").write_text(_dump(agent_task.model_dump()))
+        (run_dir / "events.json").write_text(_dump([e.model_dump() for e in events]))
+        (run_dir / "transcript.txt").write_text(
+            "\n\n".join(f"[{e.created_at.isoformat()}] {e}" for e in events)
+        )
 
     @staticmethod
     def _extract_over(tar_path: Path, workdir: Path) -> None:
