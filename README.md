@@ -55,9 +55,7 @@ compile/sorry/axiom check regardless of which tool generated the proof.
 | `agent:opencode` | opencode | coding agent + lean-lsp-mcp | [sst/opencode](https://github.com/sst/opencode) |
 | `agent:axprover` | ax-prover (LangGraph Lean agent) | proposer→builder→reviewer loop | [Axiomatic-AI/ax-prover-base](https://github.com/Axiomatic-AI/ax-prover-base) ([fork](https://github.com/henryrobbins/ax-prover-base)) |
 | `numina` | Numina skills/prompts on Claude Code | round-continuation loop | [vendor/numina/VENDOR.md](vendor/numina/VENDOR.md) |
-| `leanstral` | Leanstral via Mistral Vibe (`vibe` harness, `lean` agent) | hosted model, no GPU | [mistralai/mistral-vibe](https://github.com/mistralai/mistral-vibe) |
-| `leanstral:devstral` | Mistral Vibe `lean` scaffold on Devstral | non-Labs stand-in | [mistralai/mistral-vibe](https://github.com/mistralai/mistral-vibe) |
-| `leanstral:magistral` | Mistral Vibe `lean` scaffold on Magistral (reasoning) | non-Labs stand-in | [mistralai/mistral-vibe](https://github.com/mistralai/mistral-vibe) |
+| `vibe` | Mistral Vibe `lean` scaffold (Leanstral stand-in on Magistral; `--model` configurable) | hosted model, no GPU | [mistralai/mistral-vibe](https://github.com/mistralai/mistral-vibe) |
 
 The shared LSP server used by the agentic harnesses is
 [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp).

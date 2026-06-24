@@ -96,8 +96,8 @@ class AgentProverConfig(AutomatedProverConfig):
     plugins: list[str] | None = None
     extra_env: dict[str, str] = field(default_factory=dict)
     # Vibe-only knobs (ignored by the other harnesses): which vibe agent profile to
-    # drive (``lean`` is Leanstral; ``lean-devstral`` the non-Labs stand-in) and the
-    # programmatic-run guards passed straight to ``vibe -p``.
+    # drive (``lean`` is Leanstral; ``lean-standin`` the non-Labs, model-templated
+    # stand-in) and the programmatic-run guards passed straight to ``vibe -p``.
     agent: str = "lean"
     max_turns: int | None = None
     max_price: float | None = None

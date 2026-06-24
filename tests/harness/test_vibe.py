@@ -3,7 +3,8 @@
 Fast unit layer (no Docker, no creds, no API):
 
 * ``configure_wd`` bootstraps a workdir-local VIBE_HOME (config that un-gates the
-  builtin ``lean`` agent + the vendored ``lean-devstral`` stand-in).
+  builtin ``lean`` agent + the vendored ``lean-standin`` stand-in, with the model
+  templated in).
 * ``_agent_command`` renders the chosen agent profile + the ``-p`` run guards.
 * ``parse`` pulls cost/tokens from the per-session ``meta.json`` (the vibe-specific
   seam -- the NDJSON stream carries no cost), and the final assistant text from the
@@ -11,9 +12,8 @@ Fast unit layer (no Docker, no creds, no API):
 * ``prove`` diffs the workdir after a stubbed run that writes a solved file and a
   synthetic session log, with no Docker.
 
-The live path (the non-Labs ``leanstral:devstral`` / ``leanstral:magistral`` stand-ins
-on the real Mistral Vibe CLI) lives in the single parametrized ``test_e2e_provers.py``
-suite, alongside every other prover.
+The live path (the non-Labs ``vibe`` stand-in on the real Mistral Vibe CLI) lives in
+the single parametrized ``test_e2e_provers.py`` suite, alongside every other prover.
 """
 
 from __future__ import annotations
@@ -80,8 +80,8 @@ def _make_prover() -> AgentProver:
         image=DEFAULT_IMAGE,
         supported_toolchain=DEFAULT_TOOLCHAIN,
         harness="vibe",
-        agent="lean-devstral",
-        model="devstral-medium-latest",
+        agent="lean-standin",
+        model="magistral-medium-latest",
     )
     # Distinct agent backend so prove() takes the non-reuse path (no live session) --
     # the diff unit test stubs _run_agent and must not touch a real backend.
@@ -124,9 +124,9 @@ def test_agent_command_renders_agent_and_run_guards() -> None:
 
 
 def test_agent_command_omits_unset_guards() -> None:
-    harness = VibeHarness("labs-leanstral-2603", agent="lean-devstral")
+    harness = VibeHarness("magistral-medium-latest", agent="lean-standin")
     script = harness._agent_command()
-    assert "--agent lean-devstral" in script
+    assert "--agent lean-standin" in script
     assert "--max-turns" not in script
     assert "--max-price" not in script
 
@@ -144,7 +144,7 @@ def test_auth_spec_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_configure_wd_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None:
-    harness = VibeHarness("devstral-medium-latest", agent="lean-devstral")
+    harness = VibeHarness("magistral-medium-latest", agent="lean-standin")
     harness.configure_wd(tmp_path, "fill the sorrys")
 
     assert (tmp_path / "agent.sh").is_file()
@@ -159,10 +159,17 @@ def test_configure_wd_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None
     assert "bypass_tool_permissions = true" in config
     assert "[[mcp_servers]]" in config
     assert 'command = "lean-lsp-mcp"' in config
+    # Raised MCP tool timeout: cold Mathlib load exceeds vibe's 60s default (mirrors
+    # the opencode fix). Vibe's field is in seconds.
+    assert "tool_timeout_sec = 180" in config
 
-    standin = tmp_path / ".vibe" / "agents" / "lean-devstral.toml"
+    standin = tmp_path / ".vibe" / "agents" / "lean-standin.toml"
     assert standin.is_file()
-    assert 'system_prompt_id = "lean"' in standin.read_text()
+    standin_text = standin.read_text()
+    assert 'system_prompt_id = "lean"' in standin_text
+    # Vibe has no --model flag, so the model is templated into the profile.
+    assert 'name = "magistral-medium-latest"' in standin_text
+    assert "<<MODEL>>" not in standin_text
 
     # The default skill (lean-proof) is staged under VIBE_HOME/skills (vibe's user
     # skills dir, loaded without project-folder trust), matching the other harnesses.
@@ -223,5 +230,5 @@ def test_prove_reports_changes_and_session_cost(
     # Cost flows straight from the session log (vibe never self-reports in stdout).
     assert output.cost_usd == pytest.approx(0.0119204)
     assert output.metadata["harness"] == "vibe"
-    assert output.metadata["model"] == "devstral-medium-latest"
+    assert output.metadata["model"] == "magistral-medium-latest"
     assert output.metadata["input_tokens"] == 26951

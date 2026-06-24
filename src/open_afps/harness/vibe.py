@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -18,9 +17,12 @@ class VibeHarness(Harness):
 
     Vibe's ``lean`` agent *is* Leanstral: ``vibe -p ... --agent lean`` pins the model
     to ``leanstral`` via the builtin agent profile (there is no ``--model`` flag). The
-    bare ``lean`` profile is Labs-gated, so the ``lean-devstral`` stand-in (vendored
+    bare ``lean`` profile is Labs-gated, so the ``lean-standin`` stand-in (vendored
     under ``assets/vibe/``) runs the same Lean scaffold on a non-Labs model until Labs
-    access is enabled. The selected profile is named by :attr:`agent`.
+    access is enabled. The selected profile is named by :attr:`agent`. Since vibe has
+    no ``--model`` flag, the stand-in profile templates ``<<MODEL>>`` and the harness
+    substitutes :attr:`model` into it at :meth:`configure_wd` time -- so the model is a
+    knob (default Magistral) just like the other harnesses' ``--model``.
 
     Two things differ from the other harnesses:
 
@@ -98,6 +100,13 @@ class VibeHarness(Harness):
         # feedback loop the prompt assumes. Vibe publishes its tools as
         # ``lean-lsp_<tool>``; discovery failure is non-fatal (logged, agent runs
         # without them) so this is safe even if the server is missing.
+        #
+        # ``tool_timeout_sec`` mirrors the 180s opencode fix: the first
+        # ``lean_diagnostic_messages`` call starts ``lake serve`` and loads the file's
+        # full Mathlib import closure into the LSP, which blows through vibe's 60s
+        # default tool timeout on a cold, few-CPU Modal sandbox (the
+        # ``test_lean_lsp_mcp[vibe-modal]`` probe timed out at exactly 60s). Vibe's
+        # field is in *seconds* (opencode's is ms).
         (vibe_home / "config.toml").write_text(
             'installed_agents = ["lean"]\n'
             "bypass_tool_permissions = true\n\n"
@@ -106,13 +115,16 @@ class VibeHarness(Harness):
             'transport = "stdio"\n'
             'name = "lean-lsp"\n'
             'command = "lean-lsp-mcp"\n'
+            "tool_timeout_sec = 180\n"
         )
-        # Vendored stand-in profiles live as ``<agent>.toml`` (e.g. ``lean-devstral``,
-        # ``lean-magistral``). The builtin ``lean`` agent (real Leanstral) ships with
-        # vibe, so it needs no profile copied.
+        # The vendored stand-in profile lives as ``<agent>.toml`` (``lean-standin``).
+        # Vibe has no ``--model`` flag, so the model is templated into the profile:
+        # ``_render`` substitutes ``<<MODEL>>`` with ``self.model`` (default Magistral)
+        # as it writes the copy into the workdir. The builtin ``lean`` agent (real
+        # Leanstral) ships with vibe and pins its own model, so it needs no profile.
         if self.agent != "lean":
             profile = _VIBE_ASSETS / f"{self.agent}.toml"
-            shutil.copy2(profile, agents_dir / profile.name)
+            (agents_dir / profile.name).write_text(self._render(profile.read_text()))
         # Mount the selected bundle's skills (by default the vendored ``lean-proof``
         # skill) under VIBE_HOME/skills -- vibe's *user* skills dir, which loads
         # regardless of project-folder trust. The other harnesses copy into

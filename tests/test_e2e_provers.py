@@ -66,10 +66,9 @@ def _need_modal() -> str | None:
 
 # --- the parametrization: backends x provers ----------------------------------
 #
-# ``leanstral`` (bare) is intentionally absent: its ``labs-leanstral-2603`` model is
-# Mistral-Labs-gated and not runnable today, so the non-Labs ``leanstral:devstral``
-# and ``leanstral:magistral`` stand-ins cover the vibe harness here. Keep this set in
-# sync with the registry -- ``test_registry_is_fully_covered`` enforces it.
+# ``vibe`` covers the vibe harness on its non-Labs Magistral default (the real
+# ``labs-leanstral-2603`` model is Mistral-Labs-gated and not runnable today). Keep
+# this set in sync with the registry -- ``test_registry_is_fully_covered`` enforces it.
 
 BACKENDS = [
     pytest.param("docker", lambda: None, marks=pytest.mark.docker, id="docker"),
@@ -114,16 +113,10 @@ PROVERS = [
         id="numina",
     ),
     pytest.param(
-        "leanstral:devstral",
+        "vibe",
         _need_env("MISTRAL_API_KEY"),
         marks=pytest.mark.agent_api,
-        id="leanstral-devstral",
-    ),
-    pytest.param(
-        "leanstral:magistral",
-        _need_env("MISTRAL_API_KEY"),
-        marks=pytest.mark.agent_api,
-        id="leanstral-magistral",
+        id="vibe",
     ),
 ]
 
@@ -157,7 +150,7 @@ def test_prover_solves_trivial_theorem(
 
 def test_registry_is_fully_covered() -> None:
     """Every registered prover has an e2e row (so new provers can't slip through)."""
-    covered = {p.values[0] for p in PROVERS} | {"leanstral"}  # Labs-gated stand-in
+    covered = {p.values[0] for p in PROVERS}
     assert covered >= set(available_provers()), (
         f"provers missing an e2e case: {sorted(set(available_provers()) - covered)}"
     )

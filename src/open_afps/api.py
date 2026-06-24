@@ -78,33 +78,20 @@ REGISTRY: dict[str, _Entry] = {
         {"harness": "axprover", "model": "claude-opus-4-8", "effort": "high"},
     ),
     "numina": _Entry(NuminaProver, NuminaProverConfig),
-    # Leanstral runs as an AgentProver on the ``vibe`` harness: Mistral Vibe's
-    # builtin ``lean`` agent *is* Leanstral (api-hosted, no GPU). The bare model id
-    # ``labs-leanstral-2603`` is Labs-gated, so ``leanstral:devstral`` drives the same
-    # Lean scaffold on a non-Labs model until Labs is enabled. The ``model`` field is
-    # informational here -- vibe picks the model from the agent profile.
-    "leanstral": _Entry(
-        AgentProver,
-        AgentProverConfig,
-        {"harness": "vibe", "agent": "lean", "model": "labs-leanstral-2603"},
-    ),
-    "leanstral:devstral": _Entry(
-        AgentProver,
-        AgentProverConfig,
-        {
-            "harness": "vibe",
-            "agent": "lean-devstral",
-            "model": "devstral-medium-latest",
-        },
-    ),
-    # Same Lean scaffold on Magistral, a non-Labs *reasoning* model -- a stronger
-    # stand-in than Devstral for long structured proofs until Labs is enabled.
-    "leanstral:magistral": _Entry(
+    # ``vibe`` runs as an AgentProver on the ``vibe`` harness driving Mistral Vibe's
+    # Lean agent scaffold (the builtin ``lean`` agent *is* Leanstral; api-hosted, no
+    # GPU). The real model ``labs-leanstral-2603`` is Labs-gated (403 until a Mistral
+    # org admin enables Labs), so this defaults to Magistral -- a non-Labs *reasoning*
+    # model any La Plateforme key can reach. The model is a knob, like the agent specs:
+    # ``overrides={"model": "devstral-medium-latest"}`` swaps it. Vibe has no
+    # ``--model`` flag, so the harness templates the model into the vendored
+    # ``lean-standin`` profile at launch. Rename/repoint to the Labs model once enabled.
+    "vibe": _Entry(
         AgentProver,
         AgentProverConfig,
         {
             "harness": "vibe",
-            "agent": "lean-magistral",
+            "agent": "lean-standin",
             "model": "magistral-medium-latest",
         },
     ),

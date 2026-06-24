@@ -32,7 +32,7 @@ Prerequisites:
   - codex: ``~/.codex/auth.json`` from ``codex login``
   - opencode: ``DEEPSEEK_API_KEY`` in env (tests use deepseek-chat to keep
     integration spend off the Anthropic bill)
-  - vibe: ``MISTRAL_API_KEY`` in env (tests run the non-Labs ``lean-devstral``
+  - vibe: ``MISTRAL_API_KEY`` in env (tests run the non-Labs ``lean-standin``
     stand-in so they don't need Labs access to the builtin ``lean`` agent)
   - docker backend: docker on PATH + the ``open-afps:latest`` image
   - modal backend: ``MODAL_TOKEN_*`` env or ``~/.modal.toml`` + the published image
@@ -98,8 +98,8 @@ _MODELS = {
     # (provider is inferred from the model prefix in the harness).
     "opencode": "deepseek-chat",
     # The builtin ``lean`` agent (real Leanstral) is Labs-gated; the non-Labs
-    # ``lean-devstral`` stand-in (selected in _make_harness) runs this model.
-    "vibe": "devstral-medium-latest",
+    # ``lean-standin`` stand-in (selected in _make_harness) runs this model.
+    "vibe": "magistral-medium-latest",
 }
 
 # Backend dimension: each value carries its own opt-out marker so a run can pick
@@ -158,11 +158,11 @@ def _make_backend(backend: str) -> ComputeBackend:
 def _make_harness(harness: str) -> Harness:
     if harness == "vibe":
         # The builtin ``lean`` agent is Labs-gated; drive the vendored non-Labs
-        # ``lean-devstral`` stand-in so the probe runs without Labs access.
+        # ``lean-standin`` stand-in so the probe runs without Labs access.
         return VibeHarness(
             model=_MODELS["vibe"],
             effort="low",
-            agent="lean-devstral",
+            agent="lean-standin",
             assets=PROBE_BUNDLE,
         )
     return HARNESSES[harness](model=_MODELS[harness], effort="low", assets=PROBE_BUNDLE)
