@@ -17,6 +17,25 @@ class VerificationReport:
 
     Produced by :class:`~open_afps.core.verifier.Verifier` and shared by every
     prover, including Aristotle.
+
+    Attributes
+    ----------
+    compiles : bool
+        Whether the whole project built successfully.
+    sorry_free : bool
+        Whether the build is free of ``sorry`` (no incomplete proofs remain).
+    axioms : tuple[str, ...]
+        Every axiom the compiled project depends on, as reported by Lean.
+    compile_log : str
+        The full build log. Omitted from :meth:`to_dict`.
+    per_file : dict[str, bool]
+        Per-file compile status, keyed by file path relative to the project root.
+    non_standard_axioms : tuple[str, ...]
+        The axioms outside :data:`STANDARD_AXIOMS` -- notably ``sorryAx``, which
+        means the proof is not actually complete.
+    verified : bool
+        True iff the project compiles, has no ``sorry``, and uses no axioms
+        outside :data:`STANDARD_AXIOMS`.
     """
 
     compiles: bool
@@ -71,7 +90,43 @@ class GenerationOutput:
 
 @dataclass
 class ProofResult:
-    """What a prover returns for one :class:`~open_afps.core.task.ProofTask`."""
+    """What a prover returns for one :class:`~open_afps.core.task.ProofTask`.
+
+    Attributes
+    ----------
+    prover : str
+        Name of the prover that produced this result.
+    verification : VerificationReport or None
+        The shared verification of the completed project, or ``None`` when the run
+        failed before a candidate could be verified (see :attr:`error`).
+    completed_files : dict[str, str]
+        The completed ``.lean`` sources, keyed by file path relative to the project
+        root.
+    cost_usd : float, optional
+        Estimated USD cost of the run. ``None`` when the prover does not report cost.
+    duration_s : float, optional
+        Wall-clock duration of the run, in seconds.
+    logs : str
+        The run's primary log text. Truncated to the tail by :meth:`to_dict`.
+    artifacts_dir : pathlib.Path, optional
+        The working directory the run produced -- a complete lake project with the
+        completed ``.lean`` files (the proof output). Cloned by :meth:`download_wd`.
+    logs_dir : pathlib.Path, optional
+        The run's logs directory -- a flat dir holding the captured agent stream
+        (``stdout.jsonl``), ``stderr.txt``, and any harness-specific rich record
+        (Vibe's session log, ax-prover's per-target logs, Aristotle's events). It sits
+        beside ``artifacts_dir`` (``<run>/<label>/{wd,logs}/``) and is the proof
+        output's counterpart -- copied out by :meth:`download_logs`.
+    metadata : dict[str, object]
+        Harness-specific run metadata (token counts, run summaries, ...).
+    error : str, optional
+        Set when the prover raised before producing a result (Docker down, API error,
+        toolchain mismatch). :attr:`verification` is ``None`` and :attr:`success` is
+        ``False``.
+    success : bool
+        True iff :attr:`verification` exists and is
+        :attr:`~VerificationReport.verified`.
+    """
 
     prover: str
     verification: VerificationReport | None
@@ -79,18 +134,9 @@ class ProofResult:
     cost_usd: float | None = None
     duration_s: float | None = None
     logs: str = ""
-    # The working directory the run produced -- a complete lake project with the
-    # completed ``.lean`` files (the proof output). Cloned by :meth:`download_wd`.
     artifacts_dir: Path | None = None
-    # The run's logs directory -- a flat dir holding the captured agent stream
-    # (``stdout.jsonl``), ``stderr.txt``, and any harness-specific rich record
-    # (Vibe's session log, ax-prover's per-target logs, Aristotle's events). It sits
-    # beside ``artifacts_dir`` (``<run>/<label>/{wd,logs}/``) and is the proof
-    # output's counterpart -- copied out by :meth:`download_logs`.
     logs_dir: Path | None = None
     metadata: dict[str, object] = field(default_factory=dict)
-    # Set when the prover raised before producing a result (Docker down, API error,
-    # toolchain mismatch). ``verification`` is ``None`` and ``success`` is ``False``.
     error: str | None = None
 
     @property
