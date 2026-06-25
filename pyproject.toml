@@ -1,7 +1,20 @@
 [project]
 name = "open-atp"
 version = "0.1.0"
-description = "Open Automated Formal Proof Synthesis: upload Lean files with sorrys, get verified completed proofs across multiple proving backends."
+description = "Open Automated Theorem Proving: upload Lean files with sorrys, get verified completed proofs across multiple proving backends."
+readme = "README.md"
+authors = [{ name = "Henry Robbins", email = "hwr@stanford.edu" }]
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["lean", "mathlib", "theorem-proving", "automated-theorem-proving", "llm", "formal-verification"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 requires-python = ">=3.12"
 dependencies = [
     "jinja2>=3.1",
@@ -13,6 +26,12 @@ dependencies = [
     "openai>=2.7.1",
     "anthropic>=0.75.0",
 ]
+
+[project.urls]
+Homepage = "https://open-atp.henryrobbins.com"
+Documentation = "https://open-atp.readthedocs.io"
+Repository = "https://github.com/henryrobbins/open-atp"
+Issues = "https://github.com/henryrobbins/open-atp/issues"
 
 [project.optional-dependencies]
 dev = ["mypy", "pytest", "pytest-cov", "pytest-xdist>=3.5", "ruff", "python-dotenv"]
