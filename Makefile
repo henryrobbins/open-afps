@@ -1,6 +1,6 @@
 # Common dev commands for the open-atp package.
 
-.PHONY: help install test test-docker test-modal test-aristotle test-agent cov cov-open cov-clean lint format typecheck check build-image docs docs-serve docs-clean clean
+.PHONY: help install test test-docker test-modal test-aristotle test-agent cov cov-open cov-clean lint format typecheck check build build-image docs docs-serve docs-clean clean
 
 help:
 	@echo "Targets:"
@@ -17,6 +17,7 @@ help:
 	@echo "  format          Run ruff format + ruff check --fix"
 	@echo "  typecheck       Run mypy"
 	@echo "  check           Run lint + typecheck + test"
+	@echo "  build           Build the sdist + wheel into dist/"
 	@echo "  build-image     Build the open-atp:latest Docker image"
 	@echo "  docs            Build the Sphinx docs once"
 	@echo "  docs-serve      Live-reload docs in browser"
@@ -65,6 +66,9 @@ typecheck:
 	uv run mypy
 
 check: lint typecheck test
+
+build:
+	uv build
 
 build-image:
 	docker build -t open-atp:latest images/

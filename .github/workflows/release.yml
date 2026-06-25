@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+  id-token: write  # OIDC for PyPI Trusted Publishing
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Refetch annotated tag and checkout
+        run: |
+          git fetch --force --tags origin "refs/tags/${{ steps.tag.outputs.tag }}:refs/tags/${{ steps.tag.outputs.tag }}"
+          git checkout "${{ steps.tag.outputs.tag }}"
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Publish to PyPI
+        run: uv publish dist/open_atp-*  # Trusted Publishing via OIDC, no token needed
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          SHORT=$(git rev-parse --short "$TAG^{commit}")
+          MSG=$(git tag -l --format='%(contents:body)' "$TAG")
+          {
+            echo "$MSG"
+            echo
+            echo "open-atp release at $SHORT."
+          } > dist-notes.md
+          VERSION="${TAG#v}"
+          PRERELEASE=()
+          if [[ "${VERSION%%.*}" == "0" ]]; then
+            PRERELEASE=(--prerelease)
+          fi
+          gh release create "$TAG" \
+            dist/open_atp-* \
+            --title "$TAG" \
+            --notes-file dist-notes.md \
+            "${PRERELEASE[@]}"
