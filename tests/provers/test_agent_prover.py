@@ -22,9 +22,8 @@ from open_atp.harness import (
     ClaudeCodeHarness,
     Harness,
     compute_cost_usd,
-    resolve_plugin,
-    resolve_skill,
 )
+from open_atp.harness._catalog import resolve_plugin, resolve_skill
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver

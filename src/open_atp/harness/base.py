@@ -146,7 +146,7 @@ class Harness(ABC):
         Each ``<name>/SKILL.md`` tree lands at ``wd/<skills_dest>/<dir-name>/`` (an
         upstream ``tests/`` fixture dir is dropped). A no-op for a harness that does
         not consume skills (``skills_dest is None``, e.g. ax-prover). The prover owns
-        the *list* (``AgentProver.skills``, resolved by :func:`resolve_skill`);
+        the *list* (``AgentProver.skills``, resolved by ``resolve_skill``);
         the harness owns *where* it goes.
         """
         if self.skills_dest is None or not skill_dirs:

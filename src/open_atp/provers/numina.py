@@ -38,8 +38,8 @@ from open_atp.harness import (
     Harness,
     HarnessRunResult,
     compute_cost_usd,
-    resolve_skill,
 )
+from open_atp.harness._catalog import resolve_skill
 from open_atp.harness._paths import _vendor_numina_dir
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver

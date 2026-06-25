@@ -7,9 +7,9 @@ import os
 import shutil
 from pathlib import Path
 
+from open_atp.harness._catalog import resolve_plugin
 from open_atp.harness._paths import _MCP_JSON, _SCRIPTS
 from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
-from open_atp.harness.catalog import resolve_plugin
 
 
 class ClaudeCodeHarness(Harness):

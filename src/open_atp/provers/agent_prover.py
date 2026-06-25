@@ -31,8 +31,8 @@ from open_atp.harness import (
     ClaudeCodeHarness,
     Harness,
     compute_cost_usd,
-    resolve_skill,
 )
+from open_atp.harness._catalog import resolve_skill
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.base import (
     AutomatedProver,

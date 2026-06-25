@@ -14,7 +14,6 @@ from open_atp.harness.base import (
     Harness,
     HarnessRunResult,
 )
-from open_atp.harness.catalog import resolve_plugin, resolve_skill
 from open_atp.harness.claude_code import ClaudeCodeHarness
 from open_atp.harness.codex import CodexHarness
 from open_atp.harness.cost import COST_PER_MTOK, compute_cost_usd
@@ -40,8 +39,6 @@ __all__ = [
     "AuthSpec",
     "SCRIPT_FILE",
     "PROMPT_FILE",
-    "resolve_skill",
-    "resolve_plugin",
     "ClaudeCodeHarness",
     "CodexHarness",
     "OpenCodeHarness",

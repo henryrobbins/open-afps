@@ -53,22 +53,6 @@ Each harness adapts one agent CLI and is a
    :exclude-members: stage, name
 ```
 
-## Asset resolution
-
-Skills and plugins are named (resolved from a vendored catalog) or path-given, then
-resolved to their source directories. Skills are a list on `AgentProver`'s `skills`
-(staged by the prover into each harness's skill location), plugins a list on
-`ClaudeCodeHarness`'s `plugins` (Claude-only); the prompt is owned by the prover and
-the task. Anything that isn't a simple named skill or plugin — e.g. Numina's
-root-mounted coordinator skill and subagent-prompt tree — is staged by that prover
-itself, not resolved here.
-
-```{eval-rst}
-.. autofunction:: open_atp.harness.catalog.resolve_skill
-
-.. autofunction:: open_atp.harness.catalog.resolve_plugin
-```
-
 ## Pricing
 
 ```{eval-rst}
