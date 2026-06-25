@@ -94,7 +94,7 @@ pygments_style = "friendly"
 pygments_dark_style = "github-dark"
 
 autodoc_default_options = {"members": True}
-autodoc_typehints = "none"
+autodoc_typehints = "signature"
 numpydoc_class_members_toctree = False
 numpydoc_show_class_members = False
 numpydoc_xref_param_type = True
