@@ -72,16 +72,25 @@ The `--format json` event stream goes to stdout.
 OpenCode bills directly against an API provider rather than a flat-rate subscription.
 Sign up for an API account with your chosen provider, fund it, and monitor consumption
 from that provider's usage dashboard — see
-[OpenCode providers](https://opencode.ai/docs/providers/) for the full list. Export the
-key matching your chosen provider on the host, for example:
+[OpenCode providers](https://opencode.ai/docs/providers/) for the full list. Pass the
+key matching your chosen provider to the harness explicitly:
+
+```python
+OpenCodeHarness(model="claude-opus-4-8", provider_api_key="sk-...")
+```
+
+or leave `provider_api_key` unset (the default) to read it from the host environment,
+for example:
 
 ```bash
 export DEEPSEEK_API_KEY=...
 ```
 
-The harness forwards whichever provider keys are present —
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` — into the
-sandbox; the one matching the chosen model is used.
+The provider is inferred from the model prefix unless you pass `provider`
+explicitly. Either way the harness forwards the selected provider's key into the
+sandbox under its canonical env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`GOOGLE_API_KEY`, or `DEEPSEEK_API_KEY`); resolution fails if neither the explicit
+key nor the host env var is set.
 
 ## Cost tracking
 

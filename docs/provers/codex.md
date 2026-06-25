@@ -75,9 +75,17 @@ Codex CLI once on the host:
 codex login
 ```
 
-This writes credentials to `~/.codex`. The harness exposes that directory inside the
-sandbox at run time so Codex can refresh its access token mid-session, billing against
-your ChatGPT subscription.
+This writes credentials to `~/.codex/auth.json`. Pass that file to the harness
+explicitly:
+
+```python
+CodexHarness(auth_file=Path("~/.codex/auth.json").expanduser())
+```
+
+or leave `auth_file` unset (the default) to use `~/.codex/auth.json`. Either way the
+harness mounts just that credential inside the sandbox at run time so Codex can
+refresh its access token mid-session, billing against your ChatGPT subscription;
+resolution fails if the file is absent.
 
 ## Cost tracking
 

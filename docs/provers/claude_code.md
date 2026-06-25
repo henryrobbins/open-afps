@@ -84,14 +84,23 @@ long-lived OAuth token once on the host:
 claude setup-token
 ```
 
-Save the printed token to a `.env` file in your project:
+Pass the token to the harness explicitly:
+
+```python
+ClaudeCodeHarness(oauth_token="sk-ant-oat01-...")
+```
+
+or leave `oauth_token` unset (the default) to read it from the host
+`CLAUDE_CODE_OAUTH_TOKEN` environment variable — for example from a `.env` file in
+your project:
 
 ```
 CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
 ```
 
-The harness forwards `CLAUDE_CODE_OAUTH_TOKEN` into the sandbox at run time, billing
-against your Claude plan rather than the API.
+Either way the harness forwards `CLAUDE_CODE_OAUTH_TOKEN` into the sandbox at run
+time, billing against your Claude plan rather than the API; resolution fails if
+neither is supplied.
 
 ## Cost tracking
 

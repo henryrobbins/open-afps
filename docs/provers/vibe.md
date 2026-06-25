@@ -94,9 +94,16 @@ NDJSON message stream (one message per line) goes to stdout.
 
 ## Authentication
 
-The harness forwards `MISTRAL_API_KEY` (a Mistral La Plateforme key) from the host;
-the lean agent's provider reads it from the process env. It must be set or the harness
-raises.
+Pass the Mistral La Plateforme key to the harness explicitly:
+
+```python
+VibeHarness(mistral_api_key="msk-...")
+```
+
+or leave `mistral_api_key` unset (the default) to read it from the host environment.
+Either way the harness forwards it into the sandbox as `MISTRAL_API_KEY`, where the
+lean agent's provider reads it from the process env. Resolution fails if neither the
+explicit key nor the host env var is set.
 
 ## Cost tracking
 

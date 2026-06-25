@@ -69,9 +69,17 @@ reasoning knob. ax-prover's per-call LLM retries are capped at 3 (its default of
 
 ## Authentication
 
-The harness forwards one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or
-`GOOGLE_API_KEY` from the host (ax-prover reads the provider key from the process
-env). At least one must be set or the harness raises.
+Pass the provider key to the harness explicitly:
+
+```python
+AxProverHarness(provider_api_key="sk-...")
+```
+
+or leave `provider_api_key` unset (the default) to read it from the host environment.
+The provider is inferred from the model prefix, and the harness forwards the key into
+the sandbox under its canonical env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or
+`GOOGLE_API_KEY`), where ax-prover reads it from the process env. Resolution fails if
+neither the explicit key nor the host env var is set.
 
 ## Cost tracking
 
