@@ -27,9 +27,9 @@ from open_atp.lean import ProofTask
 from open_atp.provers.base import (
     AutomatedProver,
     AutomatedProverConfig,
+    ProofResult,
     compose_prompt,
 )
-from open_atp.verify import ProofResult
 
 if TYPE_CHECKING:
     from aristotlelib import AgentTask, Project

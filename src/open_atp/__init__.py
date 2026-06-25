@@ -19,8 +19,8 @@ are then funnelled through the shared verifier.
 from open_atp.images import DEFAULT_IMAGE, Image
 from open_atp.lean import LeanProject, ProofTask, stage_files
 from open_atp.provers import PROVERS, available_provers, get_prover
-from open_atp.provers.base import AutomatedProver, AutomatedProverConfig
-from open_atp.verify import ProofResult, VerificationReport
+from open_atp.provers.base import AutomatedProver, AutomatedProverConfig, ProofResult
+from open_atp.verify import VerificationReport
 
 __all__ = [
     "AutomatedProver",

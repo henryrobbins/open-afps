@@ -37,8 +37,12 @@ from open_atp.harness import (
     resolve_skill,
 )
 from open_atp.lean import LeanProject, ProofTask
-from open_atp.provers.base import AutomatedProver, AutomatedProverConfig, compose_prompt
-from open_atp.verify import ProofResult
+from open_atp.provers.base import (
+    AutomatedProver,
+    AutomatedProverConfig,
+    ProofResult,
+    compose_prompt,
+)
 
 log = logging.getLogger(__name__)
 

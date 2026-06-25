@@ -2,7 +2,7 @@
 
 A prover takes a {class}`~open_atp.lean.ProofTask` (a lake project plus
 optional instructions and target files) and returns a
-{class}`~open_atp.verify.ProofResult` (the completed files, a
+{class}`~open_atp.provers.base.ProofResult` (the completed files, a
 {class}`~open_atp.verify.VerificationReport`, cost, and duration). Every prover
 shares the same lifecycle: **generate candidate files, then verify them in a sandbox**
 via the shared {class}`~open_atp.verify.Verifier`.
@@ -93,7 +93,7 @@ result = prover.prove(task, output_dir=Path("runs/aristotle_demo"))
 
 ## Inspecting the result
 
-A {class}`~open_atp.verify.ProofResult` records everything a run produced:
+A {class}`~open_atp.provers.base.ProofResult` records everything a run produced:
 
 ```python
 result.prover            # "agent" | "aristotle" | "numina"

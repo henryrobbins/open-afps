@@ -45,9 +45,8 @@ from open_atp.harness import (
 from open_atp.harness._paths import _vendor_numina_dir
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
-from open_atp.provers.base import compose_prompt
+from open_atp.provers.base import ProofResult, compose_prompt
 from open_atp.provers.numina_tracker import StatementTracker
-from open_atp.verify import ProofResult
 
 # Directories never worth copying into the agent workdir (mirrors AgentProver).
 _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")

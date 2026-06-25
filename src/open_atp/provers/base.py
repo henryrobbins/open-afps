@@ -3,7 +3,7 @@
 An :class:`AutomatedProver` is a *candidate generator*: it takes a
 :class:`~open_atp.lean.ProofTask` and a caller-chosen output directory, fills
 the project's ``sorry``\\s, verifies the result in a shared sandbox, and returns a
-:class:`~open_atp.verify.ProofResult`. The base class owns the shared lifecycle
+:class:`ProofResult`. The base class owns the shared lifecycle
 -- stage the output layout, generate, then verify -- so subclasses only implement
 ``_generate`` and every prover (including Aristotle) gets the same final check for
 free. Concrete provers live alongside this base in ``open_atp.provers``.
@@ -29,7 +29,7 @@ from typing import Any, Self
 
 from open_atp.backends.base import ComputeBackend
 from open_atp.lean import LeanProject, ProofTask
-from open_atp.verify import ProofResult, Verifier
+from open_atp.verify import VerificationReport, Verifier
 
 #: Heading the optional per-task ``user_prompt`` is appended under.
 _ADDITIONAL_INSTRUCTIONS = "\n\n# Additional instructions\n\n{user_prompt}"
@@ -104,6 +104,92 @@ class AutomatedProverConfig:
                 value = tuple(tuple(v) if isinstance(v, list) else v for v in value)
             kwargs[key] = value
         return cls(**kwargs)
+
+
+@dataclass
+class ProofResult:
+    """What a prover returns from :meth:`AutomatedProver.prove`.
+
+    The prover writes its artifacts into the caller-chosen :attr:`output_dir`, laid
+    out as ``output_dir/{wd,logs}/``: ``wd`` is the completed lake project (the proof
+    output) and ``logs`` is the run record (the streamed agent ``stdout.txt``,
+    ``stderr.txt``, ``result.json``, and any harness-specific rich logs). This object
+    just records where those live, plus the verification verdict and run metadata.
+
+    Attributes
+    ----------
+    prover : str
+        Name of the prover that produced this result.
+    verification : VerificationReport or None
+        The shared verification of the completed project, or ``None`` when the run
+        failed before a candidate could be verified (see :attr:`error`).
+    output_dir : pathlib.Path
+        The run's output directory. Holds the :attr:`wd` (proof project) and
+        :attr:`logs_dir` (run record) subdirectories the prover populated.
+    completed_files : dict[str, str]
+        The completed ``.lean`` sources, keyed by file path relative to the project
+        root.
+    cost_usd : float, optional
+        Estimated USD cost of the run. ``None`` when the prover does not report cost.
+    duration_s : float, optional
+        Wall-clock duration of the run, in seconds.
+    metadata : dict[str, object]
+        Harness-specific run metadata (token counts, run summaries, ...).
+    error : str, optional
+        Set when the prover raised before producing a result (Docker down, API error,
+        toolchain mismatch). :attr:`verification` is ``None`` and :attr:`success` is
+        ``False``.
+    wd : pathlib.Path
+        The completed working directory (``output_dir/wd``) -- a complete lake project
+        with the completed ``.lean`` files. The proof output.
+    logs_dir : pathlib.Path
+        The run's logs directory (``output_dir/logs``) -- the captured agent stream
+        (``stdout.txt``), ``stderr.txt``, ``result.json``, and any harness-specific
+        rich record (Vibe's session log, ax-prover's per-target logs, Aristotle's
+        events).
+    success : bool
+        True iff :attr:`verification` exists and is
+        :attr:`~open_atp.verify.VerificationReport.verified`.
+    """
+
+    prover: str
+    verification: VerificationReport | None
+    output_dir: Path
+    completed_files: dict[str, str] = field(default_factory=dict)
+    cost_usd: float | None = None
+    duration_s: float | None = None
+    metadata: dict[str, object] = field(default_factory=dict)
+    error: str | None = None
+
+    @property
+    def wd(self) -> Path:
+        """The completed proof project (``output_dir/wd``)."""
+        return self.output_dir / "wd"
+
+    @property
+    def logs_dir(self) -> Path:
+        """The run's logs directory (``output_dir/logs``)."""
+        return self.output_dir / "logs"
+
+    @property
+    def success(self) -> bool:
+        return bool(self.verification and self.verification.verified)
+
+    def to_dict(self) -> dict[str, object]:
+        """JSON-ready view: inline files, verification, cost, and artifact paths."""
+        return {
+            "prover": self.prover,
+            "success": self.success,
+            "error": self.error,
+            "verification": self.verification.to_dict() if self.verification else None,
+            "completed_files": dict(self.completed_files),
+            "cost_usd": self.cost_usd,
+            "duration_s": self.duration_s,
+            "output_dir": str(self.output_dir),
+            "wd": str(self.wd),
+            "logs_dir": str(self.logs_dir),
+            "metadata": dict(self.metadata),
+        }
 
 
 class AutomatedProver(abc.ABC):

@@ -105,8 +105,8 @@ numpydoc_xref_aliases = {
     "ToolchainMismatch": "open_atp.lean.ToolchainMismatch",
     # Verification
     "VerificationReport": "open_atp.verify.VerificationReport",
-    "ProofResult": "open_atp.verify.ProofResult",
     "Verifier": "open_atp.verify.Verifier",
+    "ProofResult": "open_atp.provers.base.ProofResult",
     "AutomatedProver": "open_atp.provers.base.AutomatedProver",
     "AutomatedProverConfig": "open_atp.provers.base.AutomatedProverConfig",
     # Backends

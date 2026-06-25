@@ -25,13 +25,13 @@ from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.harness import Harness
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
+from open_atp.provers.base import ProofResult
 from open_atp.provers.numina import NuminaProver, NuminaProverConfig
 from open_atp.provers.numina_tracker import (
     StatementTracker,
     extract_statements_from_file,
     normalize_statement,
 )
-from open_atp.verify import ProofResult
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 

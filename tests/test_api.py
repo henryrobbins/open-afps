@@ -34,9 +34,9 @@ from open_atp.lean import LeanProject, ProofTask, ToolchainMismatch, stage_files
 from open_atp.provers import PROVERS, available_provers, get_prover
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
 from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
-from open_atp.provers.base import AutomatedProver
+from open_atp.provers.base import AutomatedProver, ProofResult
 from open_atp.provers.numina import NuminaProver, NuminaProverConfig
-from open_atp.verify import ProofResult, VerificationReport, Verifier
+from open_atp.verify import VerificationReport, Verifier
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
 

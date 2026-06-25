@@ -32,7 +32,7 @@ from open_atp.harness import (
 )
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
-from open_atp.verify import ProofResult
+from open_atp.provers.base import ProofResult
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 

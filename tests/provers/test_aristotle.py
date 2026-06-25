@@ -17,7 +17,7 @@ import pytest
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
-from open_atp.verify import ProofResult
+from open_atp.provers.base import ProofResult
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 

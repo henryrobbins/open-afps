@@ -16,7 +16,7 @@ The `open_atp.provers` registry maps a prover name to a constructed
 {class}`~open_atp.provers.base.AutomatedProver`, wired to a shared sandbox
 image/toolchain and compute backend. A caller then drives the prover directly
 via {meth}`~open_atp.provers.base.AutomatedProver.prove`, which returns a
-{class}`~open_atp.verify.ProofResult` with verification and cost. This is the
+{class}`~open_atp.provers.base.ProofResult` with verification and cost. This is the
 top-level surface re-exported from `open_atp` itself.
 
 {class}`~open_atp.provers.PROVERS` enumerates the available provers (e.g.
@@ -47,6 +47,9 @@ generate, then verify in the sandbox) so subclasses only implement `_generate`.
 
 .. autoclass:: open_atp.provers.base.AutomatedProverConfig
    :exclude-members: timeout_s, env
+
+.. autoclass:: open_atp.provers.base.ProofResult
+   :exclude-members: prover, verification, output_dir, completed_files, cost_usd, duration_s, metadata, error, wd, logs_dir, success
 ```
 
 ## AgentProver
