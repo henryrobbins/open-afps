@@ -19,10 +19,8 @@ import pytest
 from open_atp.backends.docker import DockerBackend, DockerConfig
 from open_atp.harness import (
     HARNESS_CONFIGS,
-    AssetBundle,
     ClaudeCodeHarnessConfig,
     Harness,
-    bundle_for_config,
     compute_cost_usd,
     resolve_plugin,
     resolve_skill,
@@ -108,6 +106,8 @@ def test_codex_cost_falls_back_to_token_table() -> None:
 
 
 def test_claude_code_stage_writes_assets(tmp_path: Path) -> None:
+    """stage() writes the harness/bundle assets and (Claude-only) plugins -- but NOT
+    the skills list, which the prover stages via stage_skills()."""
     harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high").build()
     harness.stage(tmp_path)
     harness.write_prompt(tmp_path, "fill the sorrys")
@@ -119,15 +119,14 @@ def test_claude_code_stage_writes_assets(tmp_path: Path) -> None:
     assert "<<MODEL>>" not in script and "<<PLUGIN_FLAGS>>" not in script
     assert (tmp_path / "agent_prompt.txt").read_text() == "fill the sorrys"
     assert (tmp_path / ".mcp.json").is_file()
-    # The default bundle: the vendored lean-proof skill, plus the lean4 plugin
-    # mounted under .plugins/ and loaded via a --plugin-dir flag.
-    assert (tmp_path / ".claude" / "skills" / "lean-proof" / "SKILL.md").is_file()
-    # Upstream skill `tests/` fixtures are dropped at mount time.
-    assert not (tmp_path / ".claude" / "skills" / "lean-proof" / "tests").exists()
+    # The default lean4 plugin (from ClaudeCodeHarnessConfig.plugins) is mounted under
+    # .plugins/ and loaded via a --plugin-dir flag.
     plugin_json = tmp_path / ".plugins" / "lean4" / ".claude-plugin" / "plugin.json"
     assert plugin_json.is_file()
     assert "--plugin-dir .plugins/lean4" in script
     assert harness.static_env().get("CLAUDE_CODE_FORK_SUBAGENT") == "1"
+    # stage() does not mount the skills list -- that is the prover's job.
+    assert not (tmp_path / ".claude" / "skills").exists()
 
 
 def test_skills_resolve_by_name_and_path(tmp_path: Path) -> None:
@@ -144,27 +143,40 @@ def test_skills_resolve_by_name_and_path(tmp_path: Path) -> None:
         resolve_plugin("no-such-plugin")
 
 
-def test_config_overrides_select_skills_and_plugins() -> None:
-    # Explicit lists override the bundle's defaults (names or paths).
-    bundle = bundle_for_config(
-        AgentProverConfig(
-            skills=["lean-proof", "lean-setup"],
-            plugins=[],
-        )
-    )
-    assert [p.name for p in bundle.skills] == ["lean-proof", "lean-setup"]
-    assert bundle.plugins == ()
-    # Unset (None) keeps the default bundle's assets.
-    default = bundle_for_config(AgentProverConfig())
-    assert [p.name for p in default.skills] == ["lean-proof"]
-    assert [p.name for p in default.plugins] == ["lean4"]
+@pytest.mark.parametrize(
+    "harness_name,dest",
+    [
+        ("claude_code", ".claude/skills"),
+        ("codex", ".agents/skills"),
+        ("opencode", ".agents/skills"),
+        ("vibe", ".vibe/skills"),
+    ],
+)
+def test_stage_skills_copies_into_harness_location(
+    tmp_path: Path, harness_name: str, dest: str
+) -> None:
+    """The prover-resolved skills list lands in each harness's skill location."""
+    harness = HARNESS_CONFIGS[harness_name](
+        model="claude-opus-4-8", effort="high"
+    ).build()
+    harness.stage_skills(tmp_path, [resolve_skill("lean-proof")])
+    assert (tmp_path / dest / "lean-proof" / "SKILL.md").is_file()
+    # Upstream skill `tests/` fixtures are dropped at mount time.
+    assert not (tmp_path / dest / "lean-proof" / "tests").exists()
+
+
+def test_axprover_ignores_skills(tmp_path: Path) -> None:
+    """ax-prover ships its own prompts and consumes no skills (skills_dest is None)."""
+    harness = HARNESS_CONFIGS["axprover"](model="claude-opus-4-8").build()
+    assert harness.skills_dest is None
+    harness.stage_skills(tmp_path, [resolve_skill("lean-proof")])  # no-op, no error
+    assert not list(tmp_path.iterdir())
 
 
 def test_empty_plugins_mount_nothing_for_claude(tmp_path: Path) -> None:
-    bundle = AssetBundle(name="t", skills=(resolve_skill("lean-proof"),), plugins=())
-    harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high").build(
-        assets=bundle
-    )
+    harness = ClaudeCodeHarnessConfig(
+        model="claude-opus-4-8", effort="high", plugins=[]
+    ).build()
     harness.stage(tmp_path)
     assert not (tmp_path / ".plugins").exists()
     assert harness._plugin_flags() == ""
@@ -173,31 +185,6 @@ def test_empty_plugins_mount_nothing_for_claude(tmp_path: Path) -> None:
     script = (tmp_path / "agent.sh").read_text()
     assert script.rstrip().endswith("--effort 'high'")
     assert "CLAUDE_CODE_FORK_SUBAGENT" not in harness.static_env()
-
-
-@pytest.mark.parametrize(
-    "harness_name,dest",
-    [
-        ("codex", ".agents/skills"),
-        ("opencode", ".agents/skills"),
-        ("vibe", ".vibe/skills"),
-    ],
-)
-def test_non_claude_harnesses_mount_skills_not_plugins(
-    tmp_path: Path, harness_name: str, dest: str
-) -> None:
-    """Skills mount into every harness; plugins are Claude-only and ignored."""
-    bundle = AssetBundle(
-        name="t",
-        skills=(resolve_skill("lean-proof"),),
-        plugins=(resolve_plugin("lean4"),),
-    )
-    harness = HARNESS_CONFIGS[harness_name](
-        model="claude-opus-4-8", effort="high"
-    ).build(assets=bundle)
-    harness.stage(tmp_path)
-    assert (tmp_path / dest / "lean-proof" / "SKILL.md").is_file()
-    assert not (tmp_path / ".plugins").exists()
 
 
 # --- _generate() diff logic (no Docker) ------------------------------------
@@ -239,6 +226,8 @@ def test_generate_reports_files_the_agent_changed(
 
     result, wd = _run_generate(prover, tmp_path)
 
+    # The prover staged its default skill (lean-proof) into the claude_code location.
+    assert (wd / ".claude" / "skills" / "lean-proof" / "SKILL.md").is_file()
     # The solved file landed in the workdir and is the only reported change.
     assert (wd / "MILExample.lean").read_text() == SOLVED_FILE
     assert list(result.completed_files) == ["MILExample.lean"]

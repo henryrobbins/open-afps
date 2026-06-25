@@ -64,11 +64,11 @@ back out with it. The written `.vibe/config.toml`:
   mirror of the OpenCode 180 s fix, for the cold first `lean_diagnostic_messages`
   call that loads the full Mathlib import closure).
 
-The stand-in profile is written to `.vibe/agents/<agent>.toml`, and the bundle's
-skills — the host-agnostic [`leanprover/skills`](https://github.com/leanprover/skills)
-— are mounted under `.vibe/skills` (Vibe's user skills dir, which loads
-regardless of project-folder trust). The launch script
-(`assets/scripts/vibe_agent.sh`) runs:
+The stand-in profile is written to `.vibe/agents/<agent>.toml`, and the prover stages
+the `AgentProverConfig.skills` — the host-agnostic
+[`leanprover/skills`](https://github.com/leanprover/skills) — under `.vibe/skills`
+(Vibe's user skills dir, which loads regardless of project-folder trust). The launch
+script (`assets/scripts/vibe_agent.sh`) runs:
 
 ```bash
 export VIBE_HOME="$PWD/.vibe"

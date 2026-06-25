@@ -41,6 +41,7 @@ from open_atp.harness import (
     HarnessRunResult,
     compute_cost_usd,
     resolve_bundle,
+    resolve_skill,
 )
 from open_atp.harness._paths import _vendor_numina_dir
 from open_atp.lean import LeanProject, ProofTask
@@ -110,11 +111,16 @@ class NuminaProverConfig(AgentProverConfig):
     Attributes
     ----------
     harness : HarnessConfig
-        Fixed to a :class:`~open_atp.harness.ClaudeCodeHarnessConfig`: Numina is
-        claude-CLI driven and not configurable (pinned ``init=False``).
+        Fixed to a :class:`~open_atp.harness.ClaudeCodeHarnessConfig` with no plugins
+        (Numina ships its own scaffold): Numina is claude-CLI driven and not
+        configurable (pinned ``init=False``).
     assets : str
-        Asset bundle to mount. Default ``numina`` (coordinator prompt + vendored
-        skills + subagent prompts).
+        Asset bundle to mount. Default ``numina`` (the root-mounted coordinator skill
+        via ``skills_dir`` + the subagent prompts via ``extra_dirs``).
+    skills : list[str]
+        Extra named/path skills to mount alongside the bundle's ``skills_dir``.
+        Default empty -- Numina's coordinator skill comes from the bundle, not this
+        list.
     max_rounds : int
         Maximum number of coordinator rounds before the run stops. Default ``20``.
     max_consecutive_limits : int
@@ -136,8 +142,11 @@ class NuminaProverConfig(AgentProverConfig):
         empty.
     """
 
-    harness: HarnessConfig = field(default_factory=ClaudeCodeHarnessConfig, init=False)
+    harness: HarnessConfig = field(
+        default_factory=lambda: ClaudeCodeHarnessConfig(plugins=[]), init=False
+    )
     assets: str = "numina"
+    skills: list[str] = field(default_factory=list)
     max_rounds: int = 20
     max_consecutive_limits: int = 2
     helper_env_keys: tuple[str, ...] = (
@@ -193,12 +202,13 @@ class NuminaProver(AgentProver):
             if ".lake" not in p.parts
         }
 
-        # 3. Stage the workdir with the Numina asset bundle (vendored skills +
-        #    subagent prompts), then write the coordinator prompt (+ the task's
-        #    optional user prompt).
+        # 3. Stage the workdir with the Numina asset bundle (coordinator skill via
+        #    skills_dir + subagent prompts via extra_dirs) and any config skills, then
+        #    write the coordinator prompt (+ the task's optional user prompt).
         bundle = resolve_bundle(self.config.assets)
         harness = self.config.harness.build(assets=bundle)
         harness.stage(wd)
+        harness.stage_skills(wd, [resolve_skill(s) for s in self.config.skills])
         harness.write_prompt(wd, compose_prompt(self.prover_prompt, task.user_prompt))
         stdout_path = logs_dir / "stdout.txt"
 

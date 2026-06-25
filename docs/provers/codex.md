@@ -30,8 +30,9 @@ Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
 
 ## Harness details
 
-Codex does not auto-discover `.mcp.json`, so `stage` mounts the bundle's skills
-— the host-agnostic [`leanprover/skills`](https://github.com/leanprover/skills) — under
+Codex does not auto-discover `.mcp.json`, so the prover stages the
+`AgentProverConfig.skills` — the host-agnostic
+[`leanprover/skills`](https://github.com/leanprover/skills) — under
 `.agents/skills/` and the lean-lsp MCP server is wired through `-c` overrides on
 the command line instead of a config file. The launch script
 (`assets/scripts/codex_agent.sh`) runs:

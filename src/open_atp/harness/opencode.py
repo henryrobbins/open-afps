@@ -23,6 +23,8 @@ class OpenCodeHarness(Harness):
 
     name = "opencode"
 
+    skills_dest = ".agents/skills"
+
     config: OpenCodeHarnessConfig
 
     @property
@@ -34,7 +36,6 @@ class OpenCodeHarness(Harness):
         super().stage(wd)
         # opencode.json configures the model provider + MCP server.
         (wd / "opencode.json").write_text(json.dumps(self._opencode_config(), indent=2))
-        self._copy_skills(wd, ".agents/skills")
 
     def _opencode_config(self) -> dict[str, Any]:
         options: dict[str, Any]

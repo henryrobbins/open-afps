@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
 
 from open_atp.harness._paths import _MCP_JSON, _SCRIPTS
 from open_atp.harness.base import AuthSpec, Harness, HarnessConfig, HarnessRunResult
+from open_atp.harness.bundles import resolve_plugin
 
 
 class ClaudeCodeHarness(Harness):
@@ -18,26 +19,34 @@ class ClaudeCodeHarness(Harness):
 
     name = "claude_code"
 
+    skills_dest = ".claude/skills"
+
+    config: ClaudeCodeHarnessConfig
+
     #: Where plugin dirs are staged in the workdir (the launch script's
     #: ``--plugin-dir`` flags reference this, so the two must agree).
     PLUGINS_DIR = ".plugins"
 
     def stage(self, wd: Path) -> None:
         super().stage(wd)
-        # Project-scope MCP config (passed via --mcp-config), skills, and plugins.
+        # Project-scope MCP config (passed via --mcp-config) and plugins.
         shutil.copy2(_MCP_JSON, wd / ".mcp.json")
-        self._copy_skills(wd, ".claude/skills")
         self._copy_plugins(wd)
 
-    def _copy_plugins(self, wd: Path) -> None:
-        """Stage each bundle plugin under ``wd/.plugins/<name>``.
+    def _resolved_plugins(self) -> list[Path]:
+        """``config.plugins`` (names or paths) resolved to plugin source dirs."""
+        return [resolve_plugin(p) for p in self.config.plugins]
 
-        Claude is the only harness that consumes plugins; the launch script loads
+    def _copy_plugins(self, wd: Path) -> None:
+        """Stage each configured plugin under ``wd/.plugins/<name>``.
+
+        Claude is the only harness that consumes plugins (so they live on
+        :class:`ClaudeCodeHarnessConfig`, not the bundle); the launch script loads
         them with ``--plugin-dir`` (see :meth:`_plugin_flags`). Plugins are copied
         *into* the workdir (not referenced from the host vendor tree) so they sync
         into the sandbox with everything else.
         """
-        for plugin in self.assets.plugins:
+        for plugin in self._resolved_plugins():
             shutil.copytree(
                 plugin, wd / self.PLUGINS_DIR / plugin.name, dirs_exist_ok=True
             )
@@ -50,7 +59,7 @@ class ClaudeCodeHarness(Harness):
         """
         return "".join(
             f" \\\n    --plugin-dir {self.PLUGINS_DIR}/{p.name}"
-            for p in self.assets.plugins
+            for p in self._resolved_plugins()
         )
 
     def static_env(self) -> dict[str, str]:
@@ -58,7 +67,7 @@ class ClaudeCodeHarness(Harness):
         env = {"IS_SANDBOX": "1"}
         # Plugin-provided subagents (e.g. lean4's sorry-filler-deep) are only
         # dispatchable in a headless `-p` run with subagent forking enabled.
-        if self.assets.plugins:
+        if self.config.plugins:
             env["CLAUDE_CODE_FORK_SUBAGENT"] = "1"
         return env
 
@@ -103,8 +112,16 @@ class ClaudeCodeHarness(Harness):
 class ClaudeCodeHarnessConfig(HarnessConfig):
     """:class:`~open_atp.harness.base.HarnessConfig` for the Claude Code CLI.
 
-    Claude Code is the only harness that loads plugins; it has no harness-specific
-    knobs beyond the shared ``model``/``effort``.
+    Claude Code is the only harness that loads plugins, so they live here rather than
+    on the shared asset bundle.
+
+    Attributes
+    ----------
+    plugins : list[str]
+        Claude Code plugins to load, each a name (resolved from the vendored
+        ``lean4-skills`` catalog) or a full path to a ``.claude-plugin/plugin.json``
+        tree. Default ``["lean4"]``; an empty list loads none.
     """
 
+    plugins: list[str] = field(default_factory=lambda: ["lean4"])
     harness_cls: ClassVar[type[Harness]] = ClaudeCodeHarness

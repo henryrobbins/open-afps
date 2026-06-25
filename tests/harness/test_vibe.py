@@ -174,9 +174,9 @@ def test_stage_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None:
     assert 'name = "magistral-medium-latest"' in standin_text
     assert "<<MODEL>>" not in standin_text
 
-    # The default skill (lean-proof) is staged under VIBE_HOME/skills (vibe's user
-    # skills dir, loaded without project-folder trust), matching the other harnesses.
-    assert (tmp_path / ".vibe" / "skills" / "lean-proof" / "SKILL.md").is_file()
+    # Skills are staged by the prover (stage_skills), not stage(); the VIBE_HOME skills
+    # location is covered by test_stage_skills_copies_into_harness_location.
+    assert harness.skills_dest == ".vibe/skills"
 
     # parse() looks here for the session log written back from the sandbox.
     assert harness._session_log_dir == tmp_path / ".vibe" / "logs" / "session"

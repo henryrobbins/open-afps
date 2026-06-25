@@ -35,13 +35,14 @@ Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI: `age
 
 ## Harness details
 
-`stage` writes a project-scope `.mcp.json` registering the lean-lsp MCP server
-and mounts the bundle's skills — the host-agnostic
-[`leanprover/skills`](https://github.com/leanprover/skills) — under `.claude/skills/`.
-Claude Code is the only harness that also loads **plugins** — the default bundle's
-`lean4` plugin, vendored from
-[`cameronfreer/lean4-skills`](https://github.com/cameronfreer/lean4-skills), is staged
-under `.plugins/<name>/`. The launch script
+`stage` writes a project-scope `.mcp.json` registering the lean-lsp MCP server. The
+prover then stages the `AgentProverConfig.skills` — the host-agnostic
+[`leanprover/skills`](https://github.com/leanprover/skills), default `lean-proof` —
+under `.claude/skills/` (via `stage_skills`). Claude Code is the only harness that
+also loads **plugins**, so they live on `ClaudeCodeHarnessConfig.plugins` (default
+`lean4`, vendored from
+[`cameronfreer/lean4-skills`](https://github.com/cameronfreer/lean4-skills)) rather
+than the shared bundle; each is staged under `.plugins/<name>/`. The launch script
 (`assets/scripts/claude_code_agent.sh`) runs:
 
 ```bash

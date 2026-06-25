@@ -18,15 +18,11 @@ class CodexHarness(Harness):
 
     name = "codex"
 
+    skills_dest = ".agents/skills"
+
     #: Holds the staged minimal ``.codex`` so it outlives :meth:`auth_spec` until the
     #: backend pushes/bind-mounts it; cleaned up when the harness is collected.
     _codex_home: tempfile.TemporaryDirectory[str] | None = None
-
-    def stage(self, wd: Path) -> None:
-        super().stage(wd)
-        # Codex registers the MCP server via -c overrides in the launch script;
-        # only the skills need copying. https://developers.openai.com/codex/skills
-        self._copy_skills(wd, ".agents/skills")
 
     def auth_spec(self) -> AuthSpec:
         # Mount ONLY the auth credential, never the whole ~/.codex: the host's

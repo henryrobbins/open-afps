@@ -33,8 +33,9 @@ from open_atp.harness import (
     ClaudeCodeHarnessConfig,
     Harness,
     HarnessConfig,
-    bundle_for_config,
     compute_cost_usd,
+    resolve_bundle,
+    resolve_skill,
 )
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.base import AutomatedProver, AutomatedProverConfig, compose_prompt
@@ -117,24 +118,26 @@ class AgentProverConfig(AutomatedProverConfig):
         :class:`~open_atp.harness.AxProverHarnessConfig`. Carries ``model``/``effort``
         plus any harness-specific knobs.
     assets : str
-        Vendored skill/prompt/MCP asset bundle to mount into the workdir. Default
-        ``default``.
-    skills : list[str], optional
-        Per-run override of the bundle's skills, each a name (resolved from a
-        vendored catalog) or a full path. ``None`` keeps the bundle's own skills;
-        an empty list mounts none. Applies to every harness.
-    plugins : list[str], optional
-        Per-run override of the bundle's plugins, same resolution as ``skills``.
-        Claude-only; ignored by the other harnesses.
+        Named :class:`~open_atp.harness.AssetBundle` of non-list workdir assets
+        (``extra_dirs`` / ``skills_dir``) to mount. Default ``default`` (empty).
+    skills : list[str]
+        Skills to mount into the agent workdir, each a name (resolved from the
+        vendored ``leanprover/skills`` catalog) or a full path to a ``SKILL.md``
+        tree. Default ``["lean-proof"]``; an empty list mounts none. Staged into
+        every skill-supporting harness's location; ignored by ax-prover.
     extra_env : dict[str, str]
         Additional environment variables forwarded into the agent sandbox. Default
         empty.
+
+    Note
+    ----
+    Plugins are Claude-only and live on
+    :class:`~open_atp.harness.ClaudeCodeHarnessConfig.plugins`, not here.
     """
 
     harness: HarnessConfig = field(default_factory=ClaudeCodeHarnessConfig)
     assets: str = "default"
-    skills: list[str] | None = None
-    plugins: list[str] | None = None
+    skills: list[str] = field(default_factory=lambda: ["lean-proof"])
     extra_env: dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -207,12 +210,12 @@ class AgentProver(AutomatedProver):
             if ".lake" not in p.parts
         }
 
-        # 3. Stage the workdir from the chosen harness + asset bundle, then write the
-        #    prompt: this prover's own prompt, with the task's optional user prompt
-        #    appended.
-        bundle = bundle_for_config(self.config)
-        harness = self.config.harness.build(assets=bundle)
+        # 3. Stage the workdir: harness/bundle assets, then the config's skills (this
+        #    prover owns the list; the harness owns where they land), then the prompt
+        #    (this prover's own prompt + the task's optional user prompt).
+        harness = self.config.harness.build(assets=resolve_bundle(self.config.assets))
         harness.stage(wd)
+        harness.stage_skills(wd, [resolve_skill(s) for s in self.config.skills])
         harness.write_prompt(wd, compose_prompt(self.prover_prompt, task.user_prompt))
         stdout_path = logs_dir / "stdout.txt"
 

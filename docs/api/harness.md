@@ -83,10 +83,12 @@ harnesses are registered in {data}`~open_atp.harness.HARNESSES` and their config
 
 ## Asset bundles
 
-An {class}`~open_atp.harness.bundles.AssetBundle` is the selectable set of skills,
-plugins, and extra directories mounted into the agent workdir (selected via
-`AgentProverConfig.assets`). The prompt is not a bundle concern -- it is owned by the
-prover and the task.
+An {class}`~open_atp.harness.bundles.AssetBundle` is the selectable preset of the
+*non-list* workdir assets — `extra_dirs` and the legacy `skills_dir` whole-directory
+mount (both Numina-only today) — selected via `AgentProverConfig.assets`. Skills are a
+list on `AgentProverConfig.skills` (staged by the prover), plugins a list on
+`ClaudeCodeHarnessConfig.plugins` (Claude-only), and the prompt is owned by the prover
+and the task — none are bundle concerns.
 
 ```{eval-rst}
 .. autoclass:: open_atp.harness.bundles.AssetBundle

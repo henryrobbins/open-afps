@@ -36,9 +36,10 @@ name through the same `model` knob.
 ## Harness details
 
 `stage` writes an `opencode.json` carrying the inferred provider, the model and
-its reasoning-effort config, and the lean-lsp MCP server, plus mounts the bundle's
-skills — the host-agnostic [`leanprover/skills`](https://github.com/leanprover/skills)
-— under `.agents/skills/`. The MCP `timeout` is raised to **180 000 ms (180 s)**
+its reasoning-effort config, and the lean-lsp MCP server; the prover then stages the
+`AgentProverConfig.skills` — the host-agnostic
+[`leanprover/skills`](https://github.com/leanprover/skills) — under `.agents/skills/`.
+The MCP `timeout` is raised to **180 000 ms (180 s)**
 — the first `lean_diagnostic_messages` call starts `lake serve` and loads the file's
 full Mathlib import closure, which blows past the 60 s default on a cold, few-CPU
 sandbox. Reasoning effort maps per provider: Anthropic gets `thinking: {type:

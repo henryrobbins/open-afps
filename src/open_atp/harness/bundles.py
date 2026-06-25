@@ -1,30 +1,31 @@
-"""Selectable agent assets mounted into the agent workdir.
+"""Vendored agent assets and the selectable :class:`AssetBundle` preset.
 
-Two kinds of asset can be mounted, both resolvable **by name** (from a vendored
-catalog) or **by full path**:
+Two kinds of asset are resolvable **by name** (from a vendored catalog) or **by full
+path**, via :func:`resolve_skill` / :func:`resolve_plugin`:
 
-* **skills** -- host-agnostic Agent Skills (``<name>/SKILL.md``) copied into every
+* **skills** -- host-agnostic Agent Skills (``<name>/SKILL.md``) listed on
+  ``AgentProverConfig.skills`` and copied by the :class:`~...AgentProver` into each
   harness's skill location (``.claude/skills``, ``.agents/skills``,
   ``VIBE_HOME/skills``). The default is ``lean-proof`` from the vendored
   ``leanprover/skills`` catalog.
 * **plugins** -- Claude Code plugins (a dir with ``.claude-plugin/plugin.json``)
-  loaded **only** by the Claude harness via ``--plugin-dir``. The default is the
-  vendored ``lean4`` plugin. The other harnesses can't consume plugins and ignore
-  them.
+  listed on ``ClaudeCodeHarnessConfig.plugins`` and loaded **only** by the Claude
+  harness via ``--plugin-dir`` (no other harness supports plugins). The default is
+  the vendored ``lean4`` plugin.
 
-A named :class:`AssetBundle` packages a coherent preset (skills + plugins + extra
-dirs); :func:`bundle_for_config` resolves the active bundle for a config and applies
-any per-run ``skills`` / ``plugins`` overrides. The prompt is *not* a bundle concern:
-it is owned by the prover and the task (see
-:func:`~open_atp.provers.base.compose_prompt`).
+A named :class:`AssetBundle` packages the *remaining* preset pieces that aren't a
+simple list -- ``extra_dirs`` and the legacy ``skills_dir`` whole-directory mount
+(both Numina-only today); :func:`resolve_bundle` resolves it from ``config.assets``.
+Skills, plugins, and the prompt are **not** bundle concerns: skills/plugins are owned
+by the config (resolved here, copied by the prover/Claude harness) and the prompt by
+the prover and task (see :func:`~open_atp.provers.base.compose_prompt`).
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from open_atp.harness._paths import (
     _vendor_lean4_skills_dir,
@@ -71,48 +72,39 @@ def resolve_plugin(spec: str) -> Path:
 
 @dataclass(frozen=True)
 class AssetBundle:
-    """A selectable set of agent assets mounted into the workdir.
+    """A selectable preset of the non-list assets mounted into the workdir.
+
+    Skills and plugins are *not* here -- they are lists on the configs
+    (``AgentProverConfig.skills`` / ``ClaudeCodeHarnessConfig.plugins``). A bundle
+    carries only the pieces that aren't a flat list of named assets.
 
     Attributes
     ----------
     name:
         Bundle identifier matching ``AgentProverConfig.assets``.
-    skills:
-        Individual skill source dirs (each a ``<name>/SKILL.md`` tree). Each is
-        copied to ``<dest>/<dir-name>`` in every harness's skill location.
-    plugins:
-        Claude Code plugin source dirs (each a ``.claude-plugin/plugin.json``
-        tree). Mounted and ``--plugin-dir``-loaded by the Claude harness only;
-        ignored by the others.
     extra_dirs:
         Additional ``(src_dir, dest_relative_to_workdir)`` trees to copy in (e.g.
         Numina's coordinator/subagent prompts under ``.claude/prompts``).
     skills_dir:
-        Legacy whole-directory mount: its *contents* are copied to the skill
-        location root (so a top-level ``SKILL.md`` lands at ``<dest>/SKILL.md``).
+        Legacy whole-directory mount: its *contents* are copied to the harness's
+        skill location root (so a top-level ``SKILL.md`` lands at ``<dest>/SKILL.md``).
         Used by the Numina bundle, which mounts one root-level skill plus helper
-        subdirs (``cli/`` etc.). Prefer ``skills`` for ordinary skills.
+        subdirs (``cli/`` etc.). Ordinary skills go on ``AgentProverConfig.skills``.
     """
 
     name: str
-    skills: tuple[Path, ...] = ()
-    plugins: tuple[Path, ...] = ()
     extra_dirs: tuple[tuple[Path, str], ...] = ()
     skills_dir: Path | None = None
 
 
 def _default_bundle() -> AssetBundle:
-    """The built-in default: the official ``lean-proof`` skill + ``lean4`` plugin.
+    """The built-in default: an empty preset.
 
-    Every harness gets ``lean-proof`` (a host-agnostic skill); the Claude harness
-    additionally loads the ``lean4`` plugin (commands/subagents/hooks it alone can
-    consume).
+    The default skill (``lean-proof``) and plugin (``lean4``) are config defaults
+    (``AgentProverConfig.skills`` / ``ClaudeCodeHarnessConfig.plugins``), not bundle
+    contents, so the default bundle carries no ``extra_dirs`` / ``skills_dir``.
     """
-    return AssetBundle(
-        name="default",
-        skills=(resolve_skill("lean-proof"),),
-        plugins=(resolve_plugin("lean4"),),
-    )
+    return AssetBundle(name="default")
 
 
 def _numina_bundle() -> AssetBundle:
@@ -146,21 +138,3 @@ def resolve_bundle(name: str) -> AssetBundle:
         raise ValueError(
             f"unknown asset bundle {name!r}; known: {sorted(BUNDLES)}"
         ) from None
-
-
-def bundle_for_config(config: Any) -> AssetBundle:
-    """The active bundle for a config, with per-run skill/plugin overrides applied.
-
-    Starts from the named bundle (``config.assets``) and, when ``config.skills`` /
-    ``config.plugins`` are given (a list of names or paths), replaces the bundle's
-    skills/plugins with the resolved set. An empty list explicitly mounts none; an
-    unset (``None``) field keeps the bundle's own assets.
-    """
-    bundle = resolve_bundle(getattr(config, "assets", "default"))
-    skills = getattr(config, "skills", None)
-    plugins = getattr(config, "plugins", None)
-    if skills is not None:
-        bundle = replace(bundle, skills=tuple(resolve_skill(s) for s in skills))
-    if plugins is not None:
-        bundle = replace(bundle, plugins=tuple(resolve_plugin(p) for p in plugins))
-    return bundle

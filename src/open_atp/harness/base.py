@@ -77,6 +77,11 @@ class Harness(ABC):
 
     name: ClassVar[str]
 
+    #: Workdir-relative directory this harness mounts skills into (e.g.
+    #: ``.claude/skills``), or ``None`` if the harness doesn't consume skills
+    #: (ax-prover ships its own). Read by :meth:`stage_skills` and the prover.
+    skills_dest: ClassVar[str | None] = None
+
     def __init__(
         self, config: HarnessConfig, assets: AssetBundle | None = None
     ) -> None:
@@ -112,15 +117,17 @@ class Harness(ABC):
         return AuthSpec()
 
     def stage(self, wd: Path) -> None:
-        """Populate ``wd`` with the launch script, MCP config, skills, and extra dirs.
+        """Populate ``wd`` with the launch script, bundle extra dirs, and skills_dir.
 
-        Everything the harness and its asset bundle own -- *not* the prompt, which the
-        prover and task own and write via :meth:`write_prompt`.
+        Everything the harness and its asset bundle own -- *not* the skills list (the
+        prover stages it via :meth:`stage_skills`) and *not* the prompt (the prover and
+        task own it, written via :meth:`write_prompt`).
         """
         if not wd.exists():
             raise RuntimeError("The agent working directory must be created first.")
         (wd / SCRIPT_FILE).write_text(self._agent_command())
         self._copy_extra_dirs(wd)
+        self._copy_skills_dir(wd)
 
     def write_prompt(self, wd: Path, prompt: str) -> None:
         """Write the composed prompt where this harness's launch script reads it.
@@ -154,31 +161,39 @@ class Harness(ABC):
         safe.
         """
 
-    def _copy_skills(self, wd: Path, dest: str) -> None:
-        """Copy the selected bundle's skills into ``wd/<dest>``.
+    def stage_skills(self, wd: Path, skill_dirs: list[Path]) -> None:
+        """Copy resolved skill source dirs into this harness's skill location.
 
-        Two mount modes (a bundle may use either or both):
-
-        * each dir in ``skills`` -> ``wd/<dest>/<dir-name>/`` (ordinary named
-          skills; an upstream ``tests/`` fixture dir is dropped); and
-        * the legacy ``skills_dir`` -> its *contents* to ``wd/<dest>/`` (a single
-          root-mounted skill bundle, e.g. Numina).
-
-        A no-op when the bundle mounts no skills.
+        Each ``<name>/SKILL.md`` tree lands at ``wd/<skills_dest>/<dir-name>/`` (an
+        upstream ``tests/`` fixture dir is dropped). A no-op for a harness that does
+        not consume skills (``skills_dest is None``, e.g. ax-prover). The prover owns
+        the *list* (``AgentProverConfig.skills``, resolved by :func:`resolve_skill`);
+        the harness owns *where* it goes.
         """
-        if self.assets.skills_dir is None and not self.assets.skills:
+        if self.skills_dest is None or not skill_dirs:
             return
-        target = wd / dest
+        target = wd / self.skills_dest
         target.mkdir(parents=True, exist_ok=True)
-        if self.assets.skills_dir is not None:
-            shutil.copytree(self.assets.skills_dir, target, dirs_exist_ok=True)
-        for skill in self.assets.skills:
+        for skill in skill_dirs:
             shutil.copytree(
                 skill,
                 target / skill.name,
                 ignore=shutil.ignore_patterns("tests"),
                 dirs_exist_ok=True,
             )
+
+    def _copy_skills_dir(self, wd: Path) -> None:
+        """Copy the bundle's legacy ``skills_dir`` *contents* into the skill location.
+
+        A single root-mounted skill bundle (e.g. Numina's, whose top-level ``SKILL.md``
+        lands at ``<skills_dest>/SKILL.md``). A no-op when the bundle sets no
+        ``skills_dir`` or the harness has no ``skills_dest``.
+        """
+        if self.skills_dest is None or self.assets.skills_dir is None:
+            return
+        target = wd / self.skills_dest
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(self.assets.skills_dir, target, dirs_exist_ok=True)
 
     def _render(self, template: str) -> str:
         """Substitute ``<<MODEL>>``/``<<EFFORT>>`` into a launch-script template."""

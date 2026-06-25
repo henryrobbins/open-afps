@@ -49,7 +49,13 @@ from pathlib import Path
 import pytest
 
 from open_atp.backends.base import ComputeBackend
-from open_atp.harness import HARNESS_CONFIGS, AssetBundle, Harness, VibeHarnessConfig
+from open_atp.harness import (
+    HARNESS_CONFIGS,
+    AssetBundle,
+    ClaudeCodeHarnessConfig,
+    Harness,
+    VibeHarnessConfig,
+)
 from open_atp.images import DEFAULT_IMAGE
 
 pytestmark = pytest.mark.agent_api
@@ -58,10 +64,12 @@ FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
 RUNS_DIR = Path(__file__).resolve().parents[1] / ".runs"
 
 #: A no-op skill mounted into every probe so the skill-invocable check tests skill
-#: discovery itself, not whatever the default bundle happens to ship. Mounted with
-#: no plugins -- plugin loading isn't what these probes exercise.
+#: discovery itself, not whatever the default config happens to ship. Staged via
+#: ``stage_skills`` with no plugins -- plugin loading isn't what these probes exercise.
 PROBE_SKILL = Path(__file__).parents[1] / "fixtures" / "skills" / "probe-skill"
-PROBE_BUNDLE = AssetBundle(name="probe", skills=(PROBE_SKILL,))
+#: An empty bundle: the probe skill is staged explicitly (see ``stage_skills`` below),
+#: and plugins live on the harness config (left at the build default / unused here).
+PROBE_BUNDLE = AssetBundle(name="probe")
 
 #: A complete project the size of one tool call: edit in place, build, inspect.
 #:
@@ -164,6 +172,11 @@ def _make_harness(harness: str) -> Harness:
             effort="low",
             agent="lean-standin",
         ).build(PROBE_BUNDLE)
+    if harness == "claude_code":
+        # No plugins -- plugin loading isn't what these probes exercise.
+        return ClaudeCodeHarnessConfig(
+            model=_MODELS[harness], effort="low", plugins=[]
+        ).build(PROBE_BUNDLE)
     return HARNESS_CONFIGS[harness](model=_MODELS[harness], effort="low").build(
         PROBE_BUNDLE
     )
@@ -215,6 +228,7 @@ def _run(harness_name: str, backend_name: str, run_dir: Path, action: str) -> Pa
     backend = _make_backend(backend_name)
     wd = run_dir / "wd"
     harness.stage(wd)
+    harness.stage_skills(wd, [PROBE_SKILL])
     harness.write_prompt(wd, ONE_CALL_PROMPT.format(action=action))
     env, mounts = _auth(harness, backend)
 

@@ -44,6 +44,12 @@ class VibeHarness(Harness):
     #: Workdir-relative VIBE_HOME (matches the export in ``vibe_agent.sh``).
     VIBE_HOME_DIR = ".vibe"
 
+    #: Skills mount under VIBE_HOME's *user* skills dir, which loads regardless of
+    #: project-folder trust. The other harnesses use project dirs (``.claude/skills`` /
+    #: ``.agents/skills``), which ``vibe -p`` gates behind ``--trust``, so the
+    #: VIBE_HOME-relative spot is the parity-preserving one.
+    skills_dest = f"{VIBE_HOME_DIR}/skills"
+
     def __init__(
         self, config: VibeHarnessConfig, assets: AssetBundle | None = None
     ) -> None:
@@ -108,13 +114,6 @@ class VibeHarness(Harness):
         if self.config.agent != "lean":
             profile = _VIBE_ASSETS / f"{self.config.agent}.toml"
             (agents_dir / profile.name).write_text(self._render(profile.read_text()))
-        # Mount the selected bundle's skills (by default the vendored ``lean-proof``
-        # skill) under VIBE_HOME/skills -- vibe's *user* skills dir, which loads
-        # regardless of project-folder trust. The other harnesses copy into
-        # ``.claude/skills`` / ``.agents/skills`` (project dirs); those are gated
-        # behind ``--trust`` in ``vibe -p``, so the VIBE_HOME-relative location is
-        # the parity-preserving spot.
-        self._copy_skills(wd, f"{self.VIBE_HOME_DIR}/skills")
         self._session_log_dir = vibe_home / "logs" / "session"
 
     def _agent_command(self) -> str:
