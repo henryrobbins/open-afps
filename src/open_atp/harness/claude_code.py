@@ -32,6 +32,22 @@ class ClaudeCodeHarness(Harness):
         The ``CLAUDE_CODE_OAUTH_TOKEN`` (from ``claude setup-token``) to forward into
         the sandbox. ``None`` (default) reads it from the host
         ``CLAUDE_CODE_OAUTH_TOKEN`` env var; resolution fails if neither is set.
+
+    Examples
+    --------
+    >>> from open_atp.harness import ClaudeCodeHarness
+    >>> harness = ClaudeCodeHarness()
+    >>> harness.name
+    'claude_code'
+    >>> harness.plugins
+    ['lean4']
+
+    With the credential supplied explicitly, :meth:`agent_auth` resolves the full
+    forwarded env without touching the host environment:
+
+    >>> harness = ClaudeCodeHarness(plugins=[], oauth_token="sk-ant-oat-fake")
+    >>> harness.agent_auth().env
+    {'IS_SANDBOX': '1', 'CLAUDE_CODE_OAUTH_TOKEN': 'sk-ant-oat-fake'}
     """
 
     name = "claude_code"
@@ -55,8 +71,8 @@ class ClaudeCodeHarness(Harness):
         self.plugins = plugins if plugins is not None else ["lean4"]
         self._oauth_token = oauth_token
 
-    def stage(self, wd: Path) -> None:
-        super().stage(wd)
+    def stage_wd(self, wd: Path) -> None:
+        super().stage_wd(wd)
         # Project-scope MCP config (passed via --mcp-config) and plugins.
         shutil.copy2(_MCP_JSON, wd / ".mcp.json")
         self._copy_plugins(wd)

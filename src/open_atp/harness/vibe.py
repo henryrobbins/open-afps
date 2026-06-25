@@ -21,7 +21,7 @@ class VibeHarness(Harness):
     under ``assets/vibe/``) runs the same Lean scaffold on a non-Labs model until Labs
     access is enabled. The selected profile is named by :attr:`agent`. Since vibe has
     no ``--model`` flag, the stand-in profile templates ``<<MODEL>>`` and the harness
-    substitutes :attr:`model` into it at :meth:`stage` time -- so the model is a
+    substitutes :attr:`model` into it at :meth:`stage_wd` time -- so the model is a
     knob (default Magistral) just like the other harnesses' ``--model``.
 
     Two things differ from the other harnesses:
@@ -32,7 +32,8 @@ class VibeHarness(Harness):
       workdir and sync back out with it.
     * **Cost comes from the session log, not stdout.** ``--output streaming`` carries
       only conversation messages -- no token/cost totals. Those live in vibe's
-      per-session ``meta.json``; :meth:`parse` reads it from the synced-back log dir.
+      per-session ``meta.json``; :meth:`parse_result` reads it from the synced-back
+      log dir.
 
     Parameters
     ----------
@@ -52,6 +53,22 @@ class VibeHarness(Harness):
     mistral_api_key : str, optional
         Mistral La Plateforme key forwarded as ``MISTRAL_API_KEY``. ``None`` (default)
         reads it from the host env var; resolution fails if neither is set.
+
+    Examples
+    --------
+    >>> from open_atp.harness import VibeHarness
+    >>> harness = VibeHarness()
+    >>> harness.name
+    'vibe'
+    >>> harness.agent
+    'lean-standin'
+
+    With the key supplied explicitly, :meth:`agent_auth` forwards it as
+    ``MISTRAL_API_KEY`` without reading the host environment:
+
+    >>> harness = VibeHarness(mistral_api_key="msk-fake")
+    >>> harness.agent_auth().env
+    {'MISTRAL_API_KEY': 'msk-fake'}
     """
 
     name = "vibe"
@@ -81,7 +98,7 @@ class VibeHarness(Harness):
         self.max_turns = max_turns
         self.max_price = max_price
         self._mistral_api_key = mistral_api_key
-        #: Set in :meth:`stage`; where :meth:`parse` looks for session logs.
+        #: Set in :meth:`stage_wd`; where :meth:`parse_result` looks for session logs.
         self._session_log_dir: Path | None = None
 
     def _required_env(self) -> dict[str, str]:
@@ -94,8 +111,8 @@ class VibeHarness(Harness):
             )
         return {"MISTRAL_API_KEY": key}
 
-    def stage(self, wd: Path) -> None:
-        super().stage(wd)
+    def stage_wd(self, wd: Path) -> None:
+        super().stage_wd(wd)
         # Workdir-local VIBE_HOME: a minimal config that un-gates the builtin `lean`
         # agent, plus the vendored stand-in agent profile. Session logs (with cost)
         # default to VIBE_HOME/logs/session, so they land here and sync back out.
@@ -153,7 +170,7 @@ class VibeHarness(Harness):
             extra += f" \\\n    --max-price {self.max_price}"
         return template.replace("<<AGENT>>", self.agent).replace("<<EXTRA>>", extra)
 
-    def parse(self, lines: list[str]) -> HarnessRunResult:
+    def parse_result(self, lines: list[str]) -> HarnessRunResult:
         # Final assistant text + stop signal come from the NDJSON stream; token/cost
         # totals come from the session log, which the stream does not carry.
         result = self._parse_lines(lines)

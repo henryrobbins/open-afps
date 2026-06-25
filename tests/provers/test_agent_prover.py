@@ -59,7 +59,7 @@ def make_prover(fake_session_backend: object) -> object:
 
 def test_claude_code_parse_lines_tokens_and_cost() -> None:
     harness = ClaudeCodeHarness(model="claude-opus-4-8", effort="high")
-    result = harness.parse(STREAM.read_text().splitlines())
+    result = harness.parse_result(STREAM.read_text().splitlines())
 
     assert result.input_tokens == 18432
     assert result.output_tokens == 2096
@@ -71,7 +71,7 @@ def test_claude_code_parse_lines_tokens_and_cost() -> None:
 def test_parse_ignores_blank_and_malformed_lines() -> None:
     harness = ClaudeCodeHarness(model="claude-opus-4-8")
     lines = ["", "   ", "not json", '{"type":"system"}']
-    result = harness.parse(lines)
+    result = harness.parse_result(lines)
     assert result.input_tokens == 0
     assert result.output_tokens == 0
     assert result.cost_usd is None
@@ -91,7 +91,7 @@ def test_codex_cost_falls_back_to_token_table() -> None:
         '{"type":"turn.completed","usage":{"input_tokens":2000000,'
         '"output_tokens":1000000}}',
     ]
-    result = harness.parse(lines)
+    result = harness.parse_result(lines)
     assert result.cost_usd is None  # codex never self-reports
     # gpt-5.4 is (2.5, 15.0): 2M*2.5 + 1M*15 = 5 + 15 = 20.
     estimated = compute_cost_usd("gpt-5.4", result.input_tokens, result.output_tokens)
@@ -102,10 +102,10 @@ def test_codex_cost_falls_back_to_token_table() -> None:
 
 
 def test_claude_code_stage_writes_assets(tmp_path: Path) -> None:
-    """stage() writes the harness/bundle assets and (Claude-only) plugins -- but NOT
+    """stage_wd() writes the harness/bundle assets and (Claude-only) plugins -- but NOT
     the skills list, which the prover stages via stage_skills()."""
     harness = ClaudeCodeHarness(model="claude-opus-4-8", effort="high")
-    harness.stage(tmp_path)
+    harness.stage_wd(tmp_path)
     harness.write_prompt(tmp_path, "fill the sorrys")
 
     assert (tmp_path / "agent.sh").is_file()
@@ -121,7 +121,7 @@ def test_claude_code_stage_writes_assets(tmp_path: Path) -> None:
     assert plugin_json.is_file()
     assert "--plugin-dir .plugins/lean4" in script
     assert harness._static_env().get("CLAUDE_CODE_FORK_SUBAGENT") == "1"
-    # stage() does not mount the skills list -- that is the prover's job.
+    # stage_wd() does not mount the skills list -- that is the prover's job.
     assert not (tmp_path / ".claude" / "skills").exists()
 
 
@@ -169,7 +169,7 @@ def test_axprover_ignores_skills(tmp_path: Path) -> None:
 
 def test_empty_plugins_mount_nothing_for_claude(tmp_path: Path) -> None:
     harness = ClaudeCodeHarness(model="claude-opus-4-8", effort="high", plugins=[])
-    harness.stage(tmp_path)
+    harness.stage_wd(tmp_path)
     assert not (tmp_path / ".plugins").exists()
     assert harness._plugin_flags() == ""
     # No plugin flag is appended: the launch command ends at the model/effort line

@@ -22,7 +22,7 @@ set -euo pipefail
 #   * `|| true` keeps one unprovable file from aborting the rest; the final
 #     Verifier pass is the source of truth either way.
 #   * -o writes ax_output.<target>.json: per-target {success, error, summary,
-#     input_tokens, output_tokens, ...}. AxProverHarness.parse sums the token fields
+#     input_tokens, output_tokens, ...}. AxProverHarness.parse_result sums the token fields
 #     across these files for cost (the pinned fork commit adds the usage fields).
 #   * ax-prover logs are human-readable (not the JSONL the parsers consume), so we
 #     tee each run's stdout+stderr to ax_prover.<target>.log. The file lands in the

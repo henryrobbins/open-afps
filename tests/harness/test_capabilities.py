@@ -10,7 +10,7 @@ actually works inside the sandbox -- not merely that the harness *configured* it
 The four capabilities the :class:`AgentProver` design depends on:
 
 * **shell + Lean toolchain** -- the agent can ``lake build`` a fresh module;
-* **skills** -- the ``probe-skill`` fixture ``stage`` mounts is invocable
+* **skills** -- the ``probe-skill`` fixture ``stage_wd`` mounts is invocable
   from the harness-specific location (``.claude/skills`` vs ``.agents/skills``);
 * **lean-lsp MCP** -- the ``mcp__lean-lsp__*`` tools the default prompt leans on
   are wired up; and
@@ -217,7 +217,7 @@ def _run(harness_name: str, backend_name: str, run_dir: Path, action: str) -> Pa
     harness = _make_harness(harness_name)
     backend = _make_backend(backend_name)
     wd = run_dir / "wd"
-    harness.stage(wd)
+    harness.stage_wd(wd)
     harness.stage_skills(wd, [PROBE_SKILL])
     harness.write_prompt(wd, ONE_CALL_PROMPT.format(action=action))
     env, mounts = _auth(harness, backend)
@@ -603,7 +603,7 @@ def test_bash_lake_build_fresh_module(harness: str, backend: str) -> None:
 @pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("harness", HARNESS_NAMES)
 def test_skill_invocable(harness: str, backend: str) -> None:
-    """Agent invokes the ``probe-skill`` fixture ``stage`` mounted for it."""
+    """Agent invokes the ``probe-skill`` fixture ``stage_wd`` mounted for it."""
     run_dir = _make_run_dir(backend, f"skill_invocable_{harness}")
     _stage(run_dir)
     action, classifier, tool, matcher = _skill_check(harness, "probe-skill")

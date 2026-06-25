@@ -32,6 +32,24 @@ class OpenCodeHarness(Harness):
         that env var from the host; resolution fails if neither is set. The key is
         assumed to match :attr:`provider` (OpenAI and DeepSeek keys are
         indistinguishable, so no format check is done).
+
+    Examples
+    --------
+    The provider is inferred from the model prefix when not given explicitly:
+
+    >>> from open_atp.harness import OpenCodeHarness
+    >>> harness = OpenCodeHarness(model="gpt-5.5")
+    >>> harness.name
+    'opencode'
+    >>> harness.provider
+    'openai'
+
+    With the provider key supplied explicitly, :meth:`agent_auth` forwards it under
+    the provider's canonical env var without reading the host environment:
+
+    >>> harness = OpenCodeHarness(model="claude-opus-4-8", provider_api_key="sk-fake")
+    >>> harness.agent_auth().env
+    {'ANTHROPIC_API_KEY': 'sk-fake'}
     """
 
     name = "opencode"
@@ -55,8 +73,8 @@ class OpenCodeHarness(Harness):
         """API provider, taken from config or inferred from the model prefix."""
         return self._provider or _infer_provider(self.model)
 
-    def stage(self, wd: Path) -> None:
-        super().stage(wd)
+    def stage_wd(self, wd: Path) -> None:
+        super().stage_wd(wd)
         # opencode.json configures the model provider + MCP server.
         (wd / "opencode.json").write_text(json.dumps(self._opencode_config(), indent=2))
 

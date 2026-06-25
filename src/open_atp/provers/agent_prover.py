@@ -202,7 +202,7 @@ class AgentProver(AutomatedProver):
         #    (this prover owns the list; the harness owns where they land), then prompt
         #    (this prover's own prompt + the task's optional user prompt).
         harness = self.harness
-        harness.stage(wd)
+        harness.stage_wd(wd)
         harness.stage_skills(wd, [resolve_skill(s) for s in self.skills])
         harness.write_prompt(wd, compose_prompt(self.prover_prompt, task.user_prompt))
         stdout_path = logs_dir / "stdout.txt"
@@ -253,7 +253,7 @@ class AgentProver(AutomatedProver):
         lines: list[str],
     ) -> None:
         """Token totals -> cost, then diff the workdir against the staged originals."""
-        parsed = harness.parse(lines)
+        parsed = harness.parse_result(lines)
         cost = parsed.cost_usd
         if cost is None:
             cost = compute_cost_usd(

@@ -29,8 +29,9 @@ from open_atp.lean import LeanProject, ProofTask
 #:     ``import Mathlib`` as a theorem ``Mathlib`` and flags it "unproven" whenever a
 #:     nearby docstring contains the word ``sorry``, wasting a prove loop on a phantom
 #:     target; the rewrite asks the Lean server for real declarations + ``Sorry`` terms.
-#:   * per-target token usage in the ``-o`` JSON, which ``AxProverHarness.parse`` reads
-#:     to report cost (the PyPI release emits no usage).
+#:   * per-target token usage in the ``-o`` JSON, which
+#:     ``AxProverHarness.parse_result`` reads to report cost (the PyPI release emits
+#:     no usage).
 #: Fork is public; HTTPS clone needs no credentials in the image build.
 AX_PROVER_REPO = "https://github.com/henryrobbins/ax-prover-base"
 AX_PROVER_REF = "361e5b3451267785bfd70f173e7ab0be667d4987"

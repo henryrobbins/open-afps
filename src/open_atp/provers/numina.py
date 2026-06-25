@@ -236,7 +236,7 @@ class NuminaProver(AgentProver):
         #    (coordinator skill + subagent prompts), any config skills, then the
         #    coordinator prompt (+ the task's optional user prompt).
         harness = self.harness
-        harness.stage(wd)
+        harness.stage_wd(wd)
         self._stage_numina_assets(wd)
         harness.stage_skills(wd, [resolve_skill(s) for s in self.skills])
         harness.write_prompt(wd, compose_prompt(self.prover_prompt, task.user_prompt))
@@ -378,7 +378,7 @@ class NuminaProver(AgentProver):
             # Pull the round's edits to the host so the statement tracker (and the
             # next round's snapshot) see them (no-op on bind-mounted Docker).
             session.sync_out()
-            parsed = harness.parse(round_lines)
+            parsed = harness.parse_result(round_lines)
 
             input_tokens += parsed.input_tokens
             output_tokens += parsed.output_tokens

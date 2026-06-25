@@ -2,13 +2,13 @@
 
 Fast unit layer (no Docker, no creds, no API):
 
-* ``stage`` writes ``axprover.yaml`` overriding only the deltas (model +
+* ``stage_wd`` writes ``axprover.yaml`` overriding only the deltas (model +
   provider_config, optional max_iterations) over ax-prover's bundled default.yaml.
 * ``_render_config`` maps the open-atp model id to ax-prover's ``provider:model``
   string and ``effort`` to each provider's reasoning knob.
 * ``_agent_command`` is the self-discovering launch script (no <<MODEL>> subst).
-* ``parse`` sums tokens from the per-target ``ax_output.*.json`` ``-o`` files (the
-  stdout stream carries none) and leaves cost None for the prover to derive.
+* ``parse_result`` sums tokens from the per-target ``ax_output.*.json`` ``-o`` files
+  (the stdout stream carries none) and leaves cost None for the prover to derive.
 * ``prove`` diffs the workdir after a stubbed run that writes a solved file and a
   synthetic ``-o`` output file, with no Docker.
 
@@ -43,8 +43,8 @@ theorem mul_comm_assoc (a b c : ℝ) : a * b * c = b * (a * c) := by
   rw [mul_comm a b, mul_assoc b a c]
 """
 
-# ax-prover streams human-readable logs (not a JSON event stream); parse() keeps the
-# last non-empty line as result text and reads tokens from the usage files instead.
+# ax-prover streams human-readable logs (not a JSON event stream); parse_result()
+# keeps the last non-empty line as result text and reads tokens from the usage files.
 STREAM_LINES = [
     "Proving: MILExample:mul_comm_assoc",
     "",
@@ -132,7 +132,7 @@ def test_agent_command_is_self_discovering_script() -> None:
 
 def test_render_config_anthropic_model_and_effort(tmp_path: Path) -> None:
     harness = AxProverHarness(model="claude-opus-4-8", effort="high", max_iterations=15)
-    harness.stage(tmp_path)
+    harness.stage_wd(tmp_path)
 
     assert (tmp_path / "agent.sh").is_file()
     cfg = json.loads((tmp_path / "axprover.yaml").read_text())  # JSON is valid YAML
@@ -148,7 +148,7 @@ def test_render_config_anthropic_model_and_effort(tmp_path: Path) -> None:
     # API rejects under thinking.type: adaptive ("Extra inputs are not permitted").
     assert "budget_tokens" not in llm["provider_config"]["thinking"]
     assert cfg["prover"]["max_iterations"] == 15
-    # parse() looks here for the usage side-channel files.
+    # parse_result() looks here for the usage side-channel files.
     assert harness._wd == tmp_path
 
 
@@ -167,7 +167,7 @@ def test_render_config_provider_prefix_and_knob_per_provider() -> None:
 
 
 def test_render_config_omits_max_iterations_when_unset(tmp_path: Path) -> None:
-    AxProverHarness(model="claude-opus-4-8").stage(tmp_path)
+    AxProverHarness(model="claude-opus-4-8").stage_wd(tmp_path)
     cfg = json.loads((tmp_path / "axprover.yaml").read_text())
     assert "max_iterations" not in cfg["prover"]
 
@@ -177,11 +177,11 @@ def test_render_config_omits_max_iterations_when_unset(tmp_path: Path) -> None:
 
 def test_parse_sums_tokens_across_usage_files(tmp_path: Path) -> None:
     harness = AxProverHarness(model="claude-opus-4-8")
-    harness.stage(tmp_path)
+    harness.stage_wd(tmp_path)
     _write_usage(tmp_path, "A_lean", 1000, 200)
     _write_usage(tmp_path, "B_lean", 500, 50)
 
-    result = harness.parse(STREAM_LINES)
+    result = harness.parse_result(STREAM_LINES)
     assert result.input_tokens == 1500
     assert result.output_tokens == 250
     # ax-prover never self-reports USD; the prover derives it from the token table.
@@ -191,8 +191,8 @@ def test_parse_sums_tokens_across_usage_files(tmp_path: Path) -> None:
 
 def test_parse_without_usage_files_reports_zero_tokens(tmp_path: Path) -> None:
     harness = AxProverHarness(model="claude-opus-4-8")
-    harness.stage(tmp_path)  # no usage files written
-    result = harness.parse(STREAM_LINES)
+    harness.stage_wd(tmp_path)  # no usage files written
+    result = harness.parse_result(STREAM_LINES)
     assert result.input_tokens == 0
     assert result.output_tokens == 0
     assert result.cost_usd is None
@@ -218,7 +218,7 @@ def test_generate_reports_changes_and_token_cost(
         session: object | None = None,
     ) -> tuple[list[str], str]:
         (workdir / "MILExample.lean").write_text(SOLVED_FILE)
-        # The real run writes this; emulate it so parse() finds the tokens.
+        # The real run writes this; emulate it so parse_result() finds the tokens.
         assert isinstance(harness, AxProverHarness)
         _write_usage(workdir, "MILExample_lean", 1_000_000, 100_000)
         return STREAM_LINES, ""

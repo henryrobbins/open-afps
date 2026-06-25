@@ -2,13 +2,13 @@
 
 Fast unit layer (no Docker, no creds, no API):
 
-* ``stage`` bootstraps a workdir-local VIBE_HOME (config that un-gates the
+* ``stage_wd`` bootstraps a workdir-local VIBE_HOME (config that un-gates the
   builtin ``lean`` agent + the vendored ``lean-standin`` stand-in, with the model
   templated in).
 * ``_agent_command`` renders the chosen agent profile + the ``-p`` run guards.
-* ``parse`` pulls cost/tokens from the per-session ``meta.json`` (the vibe-specific
-  seam -- the NDJSON stream carries no cost), and the final assistant text from the
-  stream.
+* ``parse_result`` pulls cost/tokens from the per-session ``meta.json`` (the
+  vibe-specific seam -- the NDJSON stream carries no cost), and the final assistant
+  text from the stream.
 * ``prove`` diffs the workdir after a stubbed run that writes a solved file and a
   synthetic session log, with no Docker.
 
@@ -144,7 +144,7 @@ def test_agent_auth_explicit_key_overrides_env(monkeypatch: pytest.MonkeyPatch) 
 
 def test_stage_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None:
     harness = VibeHarness(model="magistral-medium-latest", agent="lean-standin")
-    harness.stage(tmp_path)
+    harness.stage_wd(tmp_path)
     harness.write_prompt(tmp_path, "fill the sorrys")
 
     assert (tmp_path / "agent.sh").is_file()
@@ -171,11 +171,11 @@ def test_stage_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None:
     assert 'name = "magistral-medium-latest"' in standin_text
     assert "<<MODEL>>" not in standin_text
 
-    # Skills are staged by the prover (stage_skills), not stage(); the VIBE_HOME skills
-    # location is covered by test_stage_skills_copies_into_harness_location.
+    # Skills are staged by the prover (stage_skills), not stage_wd(); the VIBE_HOME
+    # skills location is covered by test_stage_skills_copies_into_harness_location.
     assert harness.skills_dest == ".vibe/skills"
 
-    # parse() looks here for the session log written back from the sandbox.
+    # parse_result() looks here for the session log written back from the sandbox.
     assert harness._session_log_dir == tmp_path / ".vibe" / "logs" / "session"
 
 
@@ -184,10 +184,10 @@ def test_stage_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None:
 
 def test_parse_reads_cost_and_tokens_from_session_log(tmp_path: Path) -> None:
     harness = VibeHarness(model="labs-leanstral-2603")
-    harness.stage(tmp_path)
+    harness.stage_wd(tmp_path)
     _write_session_log(harness._session_log_dir, _session_stats())
 
-    result = harness.parse(STREAM_LINES)
+    result = harness.parse_result(STREAM_LINES)
     assert result.cost_usd == pytest.approx(0.0119204)
     assert result.input_tokens == 26951
     assert result.output_tokens == 570
@@ -196,8 +196,8 @@ def test_parse_reads_cost_and_tokens_from_session_log(tmp_path: Path) -> None:
 
 def test_parse_without_session_log_leaves_cost_none(tmp_path: Path) -> None:
     harness = VibeHarness(model="labs-leanstral-2603")
-    harness.stage(tmp_path)  # no log written
-    result = harness.parse(STREAM_LINES)
+    harness.stage_wd(tmp_path)  # no log written
+    result = harness.parse_result(STREAM_LINES)
     assert result.cost_usd is None
     assert result.input_tokens == 0
 
@@ -222,7 +222,7 @@ def test_generate_reports_changes_and_session_cost(
         session: object | None = None,
     ) -> tuple[list[str], str]:
         (workdir / "MILExample.lean").write_text(SOLVED_FILE)
-        # The real vibe run writes this; emulate it so parse() finds the cost.
+        # The real vibe run writes this; emulate it so parse_result() finds the cost.
         assert isinstance(harness, VibeHarness)
         _write_session_log(harness._session_log_dir, _session_stats())
         return STREAM_LINES, ""

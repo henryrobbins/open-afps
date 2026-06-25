@@ -26,6 +26,15 @@ class CodexHarness(Harness):
     auth_file : Path, optional
         The Codex ``auth.json`` to mount. ``None`` (default) uses ``~/.codex/auth.json``
         (from ``codex login``); resolution fails if the file is absent.
+
+    Examples
+    --------
+    >>> from open_atp.harness import CodexHarness
+    >>> harness = CodexHarness()
+    >>> harness.name
+    'codex'
+    >>> harness.model
+    'gpt-5.5'
     """
 
     name = "codex"

@@ -35,7 +35,7 @@ class AxProverHarness(Harness):
 
     Two things differ from the CLI harnesses (it mirrors :class:`VibeHarness` here):
 
-    * **Config lives in a workdir YAML, not flags.** :meth:`stage` writes
+    * **Config lives in a workdir YAML, not flags.** :meth:`stage_wd` writes
       ``axprover.yaml`` selecting the model/effort/iterations; it layers on top of
       ax-prover's bundled ``default.yaml`` (auto-prepended by the CLI), so it only
       needs to override the deltas.
@@ -43,10 +43,11 @@ class AxProverHarness(Harness):
       comes from its ``-o`` JSON (the per-target ``ax_output.<target>.json`` files the
       launch script writes), which carries ``input_tokens``/``output_tokens`` alongside
       ``{success, error, summary}`` as of the pinned fork commit (see ``AX_PROVER_REF``
-      in ``__main__.py``). :meth:`parse` sums those across every target and leaves
-      ``cost_usd`` ``None`` so the prover converts tokens->USD via the fallback table,
-      exactly like :class:`CodexHarness`. (On an ax-prover build without those fields
-      the tokens are simply absent and the run reports zero cost.)
+      in ``__main__.py``). :meth:`parse_result` sums those across every target and
+      leaves ``cost_usd`` ``None`` so the prover converts tokens->USD via the
+      fallback table, exactly like :class:`CodexHarness`. (On an ax-prover build
+      without those fields the tokens are simply absent and the run reports zero
+      cost.)
 
     Parameters
     ----------
@@ -62,6 +63,22 @@ class AxProverHarness(Harness):
         The selected provider's API key, forwarded under its canonical env var
         (``ANTHROPIC_API_KEY`` / ``OPENAI_API_KEY`` / ...). ``None`` (default) reads
         that env var from the host; resolution fails if neither is set.
+
+    Examples
+    --------
+    >>> from open_atp.harness import AxProverHarness
+    >>> harness = AxProverHarness()
+    >>> harness.name
+    'axprover'
+    >>> harness.model
+    'claude-opus-4-8'
+
+    With the provider key supplied explicitly, :meth:`agent_auth` forwards it under
+    the provider's canonical env var without reading the host environment:
+
+    >>> harness = AxProverHarness(provider_api_key="sk-fake")
+    >>> harness.agent_auth().env
+    {'ANTHROPIC_API_KEY': 'sk-fake'}
     """
 
     name = "axprover"
@@ -86,7 +103,7 @@ class AxProverHarness(Harness):
         # max_iterations documented as a class Parameter/Attribute above.
         self.max_iterations = max_iterations
         self._provider_api_key = provider_api_key
-        #: Set in :meth:`stage`; where :meth:`parse` looks for usage files.
+        #: Set in :meth:`stage_wd`; where :meth:`parse_result` looks for usage files.
         self._wd: Path | None = None
 
     def _required_env(self) -> dict[str, str]:
@@ -97,10 +114,10 @@ class AxProverHarness(Harness):
             _infer_provider(self.model), self._provider_api_key
         )
 
-    def stage(self, wd: Path) -> None:
+    def stage_wd(self, wd: Path) -> None:
         # ax-prover has its own prompts and ignores the written prompt, but the base
         # launch contract still cats it, so the prover writes it via write_prompt.
-        super().stage(wd)
+        super().stage_wd(wd)
         (wd / "axprover.yaml").write_text(self._render_config())
         self._wd = wd
 
@@ -182,7 +199,7 @@ class AxProverHarness(Harness):
         # No <<MODEL>>/<<EFFORT>> substitution: those live in axprover.yaml.
         return (_SCRIPTS / "axprover_agent.sh").read_text()
 
-    def parse(self, lines: list[str]) -> HarnessRunResult:
+    def parse_result(self, lines: list[str]) -> HarnessRunResult:
         # Tokens come from the per-target ``-o`` files (ax_output.<target>.json), each
         # a ``{location: {success, ..., input_tokens, output_tokens, ...}}`` map written
         # by the launch script. Sum across every target in every file; the stream itself
@@ -206,8 +223,8 @@ class AxProverHarness(Harness):
     def collect_logs(self, wd: Path, logs_dir: Path) -> None:
         # ax-prover's rich record is the per-target ``ax_output.<target>.json`` (usage
         # + outcome) and the teed ``ax_prover.<target>.log`` (human-readable run log),
-        # both written into the workdir. Move them out to ``logs/`` -- ``parse`` has
-        # already summed the token fields, so relocating is safe.
+        # both written into the workdir. Move them out to ``logs/`` --
+        # ``parse_result`` has already summed the token fields, so relocating is safe.
         moved = sorted(wd.glob("ax_output.*.json")) + sorted(wd.glob("ax_prover.*.log"))
         if moved:
             logs_dir.mkdir(parents=True, exist_ok=True)

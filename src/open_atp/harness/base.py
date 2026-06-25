@@ -3,12 +3,12 @@
 A :class:`Harness` knows, for one agent CLI (Claude Code / Codex / OpenCode):
 
 * how to populate the working directory from its assets (launch script, MCP
-  config, skills) -- :meth:`Harness.stage` -- and where to write the prompt the
+  config, skills) -- :meth:`Harness.stage_wd` -- and where to write the prompt the
   prover hands it -- :meth:`Harness.write_prompt`;
 * the bash command that launches the agent -- :attr:`Harness.command`;
 * which credentials to resolve and forward -- :meth:`Harness.agent_auth`; and
 * how to read token/cost totals out of the agent's streamed JSON
-  -- :meth:`Harness.parse`.
+  -- :meth:`Harness.parse_result`.
 
 The *compute* concern (where that command runs, with Lean+Mathlib and a warm
 cache) lives in the injected :class:`~open_atp.backends.base.ComputeBackend`.
@@ -160,6 +160,15 @@ class Harness(ABC):
         AgentAuth
             Resolved env (name -> value) and ``(host_dir, dest_basename)`` mounts
             the prover forwards into the sandbox.
+
+        Examples
+        --------
+        An explicit ``oauth_token`` is resolved into the forwarded env:
+
+        >>> from open_atp.harness import ClaudeCodeHarness
+        >>> harness = ClaudeCodeHarness(oauth_token="sk-ant-oat-fake")
+        >>> harness.agent_auth().env["CLAUDE_CODE_OAUTH_TOKEN"]
+        'sk-ant-oat-fake'
         """
         env: dict[str, str] = {}
         env.update(self._static_env())
@@ -234,13 +243,13 @@ class Harness(ABC):
             )
         return {env_name: key}
 
-    def stage(self, wd: Path) -> None:
+    def stage_wd(self, wd: Path) -> None:
         """Populate ``wd`` with the harness's launch script.
 
         Everything the harness itself owns -- *not* the skills list (the prover stages
         it via :meth:`stage_skills`) and *not* the prompt (the prover and task own it,
         written via :meth:`write_prompt`). Subclasses that need more (Vibe's
-        VIBE_HOME, ax-prover's per-target setup) override and call ``super().stage``.
+        VIBE_HOME, ax-prover's per-target setup) override and call ``super().stage_wd``.
 
         Parameters
         ----------
@@ -272,7 +281,7 @@ class Harness(ABC):
         """
         (wd / PROMPT_FILE).write_text(prompt)
 
-    def parse(self, lines: list[str]) -> HarnessRunResult:
+    def parse_result(self, lines: list[str]) -> HarnessRunResult:
         """Parse the agent's streamed JSON lines into a :class:`HarnessRunResult`.
 
         Parameters
@@ -295,8 +304,8 @@ class Harness(ABC):
         *also* drop a richer record inside the workdir (Vibe's session log, ax-prover's
         per-target logs) override this to relocate those files -- so ``download_wd``
         stays the proof project and ``download_logs`` carries the full record. Called
-        after :meth:`parse` (which may read those files for cost), so moving them is
-        safe.
+        after :meth:`parse_result` (which may read those files for cost), so moving
+        them is safe.
 
         Parameters
         ----------
