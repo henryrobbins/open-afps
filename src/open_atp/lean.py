@@ -143,6 +143,12 @@ class ProofTask:
     metadata: dict[str, str] = field(default_factory=dict)
 
     def resolved_targets(self) -> list[Path]:
+        """Absolute paths of the files to work on.
+
+        The explicit :attr:`targets` (resolved against ``project.root``) when given,
+        else every file containing ``sorry``
+        (:meth:`~open_atp.lean.LeanProject.files_with_sorry`).
+        """
         if self.targets:
             return [self.project.root / t for t in self.targets]
         return self.project.files_with_sorry()

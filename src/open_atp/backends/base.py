@@ -26,7 +26,19 @@ from open_atp.images import DEFAULT_IMAGE, Image
 
 @dataclass
 class CommandResult:
-    """Outcome of a finished command run inside a backend."""
+    """Outcome of a finished command run inside a backend.
+
+    Attributes
+    ----------
+    exit_code : int
+        The command's process exit code (``0`` on success).
+    stdout : str
+        The full captured standard output.
+    stderr : str
+        The full captured standard error.
+    duration_s : float
+        Wall-clock time the command took, in seconds.
+    """
 
     exit_code: int
     stdout: str

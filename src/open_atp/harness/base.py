@@ -68,25 +68,62 @@ class AgentAuth:
 
 @dataclass
 class HarnessRunResult:
-    """Token totals and cost parsed from an agent's streamed output."""
+    """Token totals and cost parsed from an agent's streamed output.
+
+    Attributes
+    ----------
+    input_tokens : int
+        Total input (prompt) tokens the run consumed.
+    output_tokens : int
+        Total output (completion) tokens the run produced.
+    stop_reason : str, optional
+        Why the agent stopped, when the stream reports it; ``None`` otherwise.
+    cost_usd : float, optional
+        USD cost if the harness self-reports it (Claude Code, OpenCode); ``None``
+        when it must be estimated from token counts (Codex, ax-prover).
+    subtype : str, optional
+        Final ``type:"result"`` subtype (Claude Code: ``success`` /
+        ``error_max_turns`` / ``error_during_execution``). Used by NuminaProver's
+        round loop to decide continue-vs-stop when no END_REASON marker is present.
+    result_text : str, optional
+        The agent's final result text (Claude Code's ``result`` field), where the
+        Numina coordinator prints its ``END_REASON:<reason>`` marker.
+    """
 
     input_tokens: int = 0
     output_tokens: int = 0
     stop_reason: str | None = None
-    #: USD cost if the harness self-reports it (Claude Code, OpenCode); ``None``
-    #: when it must be estimated from token counts (Codex).
     cost_usd: float | None = None
-    #: Final ``type:"result"`` subtype (Claude Code: ``success`` /
-    #: ``error_max_turns`` / ``error_during_execution``). Used by NuminaProver's
-    #: round loop to decide continue-vs-stop when no END_REASON marker is present.
     subtype: str | None = None
-    #: The agent's final result text (Claude Code's ``result`` field), where the
-    #: Numina coordinator prints its ``END_REASON:<reason>`` marker.
     result_text: str | None = None
 
 
 class Harness(ABC):
-    """Base class for an agent CLI harness."""
+    """Base class for an agent CLI harness.
+
+    Parameters
+    ----------
+    model : str
+        Model id the agent runs. Default ``"claude-opus-4-8"`` (Codex defaults to
+        ``"gpt-5.5"``, Vibe to ``"magistral-medium-latest"``).
+    effort : str
+        Reasoning-effort level passed to harnesses that support it. Default ``"high"``.
+    env : dict[str, str], optional
+        Literal env vars (name -> value) forwarded verbatim into the sandbox; win over
+        resolved credentials on a key clash. Default none.
+    optional_env : tuple[str, ...], optional
+        Best-effort credential names: forwarded from the host when present, never a
+        hard failure when absent (e.g. helper-skill keys). Default none.
+
+    Attributes
+    ----------
+    model : str
+        Model id this harness runs.
+    effort : str
+        Reasoning-effort level passed to harnesses that support it.
+    command : str
+        Bash command the backend runs to launch the agent (read-only property).
+    """
 
     name: ClassVar[str]
 
@@ -103,15 +140,14 @@ class Harness(ABC):
         env: dict[str, str] | None = None,
         optional_env: tuple[str, ...] = (),
     ) -> None:
-        #: Model id this harness runs.
+        # model/effort documented as class Parameters/Attributes above.
         self.model = model
-        #: Reasoning-effort level passed to harnesses that support it.
         self.effort = effort
-        #: Literal env vars (name -> value) forwarded verbatim; win over resolved
-        #: credentials on a key clash.
+        # Literal env vars (name -> value) forwarded verbatim; win over resolved
+        # credentials on a key clash.
         self._env = dict(env or {})
-        #: Best-effort credential names: forwarded from the host if present, never
-        #: a hard failure when absent (e.g. helper-skill keys).
+        # Best-effort credential names: forwarded from the host if present, never
+        # a hard failure when absent (e.g. helper-skill keys).
         self._optional_env = tuple(optional_env)
 
     @property

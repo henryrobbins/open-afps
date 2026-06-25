@@ -33,6 +33,39 @@ class VibeHarness(Harness):
     * **Cost comes from the session log, not stdout.** ``--output streaming`` carries
       only conversation messages -- no token/cost totals. Those live in vibe's
       per-session ``meta.json``; :meth:`parse` reads it from the synced-back log dir.
+
+    Parameters
+    ----------
+    model : str
+        Model templated into the stand-in profile (vibe has no ``--model`` flag).
+        Ignored by the builtin ``lean`` agent, which pins its own (Leanstral). Default
+        ``"magistral-medium-latest"``.
+    effort : str
+        Reasoning-effort level. Default ``"high"``.
+    agent : str, optional
+        Which vibe agent profile to drive: ``"lean"`` (real Leanstral) or a
+        model-templated stand-in. Default ``"lean-standin"``.
+    max_turns : int, optional
+        ``vibe -p`` turn guard; ``None`` (default) leaves it unset.
+    max_price : float, optional
+        ``vibe -p`` price guard; ``None`` (default) leaves it unset.
+    mistral_api_key : str, optional
+        Mistral La Plateforme key forwarded as ``MISTRAL_API_KEY``. ``None`` (default)
+        reads it from the host env var; resolution fails if neither is set.
+    env : dict[str, str], optional
+        Literal env vars forwarded verbatim into the sandbox; win over resolved
+        credentials on a key clash. Default none.
+    optional_env : tuple[str, ...], optional
+        Best-effort credential names forwarded from the host when present. Default none.
+
+    Attributes
+    ----------
+    agent : str
+        The vibe agent profile this harness drives.
+    max_turns : int or None
+        ``vibe -p`` turn guard, or ``None`` when unset.
+    max_price : float or None
+        ``vibe -p`` price guard, or ``None`` when unset.
     """
 
     name = "vibe"
@@ -59,10 +92,8 @@ class VibeHarness(Harness):
         optional_env: tuple[str, ...] = (),
     ) -> None:
         super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
-        #: Which vibe agent profile to drive: ``lean`` (Leanstral) or a model-templated
-        #: stand-in.
+        # agent/max_turns/max_price documented as class Parameters/Attributes above.
         self.agent = agent
-        #: ``vibe -p`` programmatic-run guards; ``None`` leaves them unset.
         self.max_turns = max_turns
         self.max_price = max_price
         self._mistral_api_key = mistral_api_key

@@ -47,6 +47,32 @@ class AxProverHarness(Harness):
       ``cost_usd`` ``None`` so the prover converts tokens->USD via the fallback table,
       exactly like :class:`CodexHarness`. (On an ax-prover build without those fields
       the tokens are simply absent and the run reports zero cost.)
+
+    Parameters
+    ----------
+    model : str
+        Model id the agent runs, mapped to ax-prover's ``provider:model`` string.
+        Default ``"claude-opus-4-8"``.
+    effort : str
+        Reasoning-effort level, mapped to each provider's knob. Default ``"high"``.
+    max_iterations : int, optional
+        Cap on ax-prover's proposer->builder->reviewer loop. ``None`` (default) keeps
+        ax-prover's own default (50).
+    provider_api_key : str, optional
+        The selected provider's API key, forwarded under its canonical env var
+        (``ANTHROPIC_API_KEY`` / ``OPENAI_API_KEY`` / ...). ``None`` (default) reads
+        that env var from the host; resolution fails if neither is set.
+    env : dict[str, str], optional
+        Literal env vars forwarded verbatim into the sandbox; win over resolved
+        credentials on a key clash. Default none.
+    optional_env : tuple[str, ...], optional
+        Best-effort credential names forwarded from the host when present. Default none.
+
+    Attributes
+    ----------
+    max_iterations : int or None
+        Cap on ax-prover's proposer->builder->reviewer loop, or ``None`` for its
+        default (50).
     """
 
     name = "axprover"
@@ -70,8 +96,7 @@ class AxProverHarness(Harness):
         optional_env: tuple[str, ...] = (),
     ) -> None:
         super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
-        #: Cap on ax-prover's proposer->builder->reviewer loop; ``None`` keeps
-        #: ax-prover's own default (50).
+        # max_iterations documented as a class Parameter/Attribute above.
         self.max_iterations = max_iterations
         self._provider_api_key = provider_api_key
         #: Set in :meth:`stage`; where :meth:`parse` looks for usage files.

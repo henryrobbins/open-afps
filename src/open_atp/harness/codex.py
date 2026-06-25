@@ -19,9 +19,18 @@ class CodexHarness(Harness):
 
     Parameters
     ----------
+    model : str
+        Model id the agent runs; must be an OpenAI model. Default ``"gpt-5.5"``.
+    effort : str
+        Reasoning-effort level. Default ``"high"``.
     auth_file : Path, optional
         The Codex ``auth.json`` to mount. ``None`` (default) uses ``~/.codex/auth.json``
         (from ``codex login``); resolution fails if the file is absent.
+    env : dict[str, str], optional
+        Literal env vars forwarded verbatim into the sandbox; win over resolved
+        credentials on a key clash. Default none.
+    optional_env : tuple[str, ...], optional
+        Best-effort credential names forwarded from the host when present. Default none.
     """
 
     name = "codex"

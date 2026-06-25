@@ -244,6 +244,18 @@ class ModalBackend(ComputeBackend):
 
     Parameters
     ----------
+    image : Image
+        The sandbox image carrying Lean + Mathlib -- its tag plus the toolchain and
+        Mathlib revision the verifier checks projects against. Default
+        :data:`~open_atp.images.DEFAULT_IMAGE`. A mapping is coerced to an
+        :class:`~open_atp.images.Image` (so a parsed config's nested ``image:`` block
+        works).
+    timeout_s : int
+        Wall-clock cap applied to a command when its call site does not pass an
+        explicit ``timeout_s``. Default ``1800``.
+    env : Mapping[str, str], optional
+        Environment variables baked into every command run in the sandbox. Default
+        empty.
     cpu : float
         CPU cores requested for the Modal Sandbox. Default ``2.0``.
     memory_mib : int

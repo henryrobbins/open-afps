@@ -46,7 +46,7 @@ src/open_atp/
   __main__.py       `open-atp solve | build-image | build-modal-image` CLI
   images/           image name + toolchain pins (DEFAULT_IMAGE, DEFAULT_TOOLCHAIN)
   lean.py           LeanProject, ProofTask, stage_files (the Lean input contract)
-  verify.py         VerificationReport, ProofResult, Verifier (the shared final check)
+  verify.py         VerificationReport, Verifier (the shared final check)
   backends/         base.py  docker.py  modal.py            (ComputeBackend impls)
   provers/          agent_prover.py  numina.py  numina_tracker.py  aristotle.py
   harness/          coding-agent CLIs staged into the sandbox:

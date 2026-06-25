@@ -19,6 +19,10 @@ class OpenCodeHarness(Harness):
 
     Parameters
     ----------
+    model : str
+        Model id the agent runs. Default ``"claude-opus-4-8"``.
+    effort : str
+        Reasoning-effort level. Default ``"high"``.
     provider : str, optional
         API provider name. ``None`` infers it from the model prefix (``claude-*`` ->
         ``anthropic``, ``gpt-*`` -> ``openai``, ...).
@@ -28,6 +32,16 @@ class OpenCodeHarness(Harness):
         that env var from the host; resolution fails if neither is set. The key is
         assumed to match :attr:`provider` (OpenAI and DeepSeek keys are
         indistinguishable, so no format check is done).
+    env : dict[str, str], optional
+        Literal env vars forwarded verbatim into the sandbox; win over resolved
+        credentials on a key clash. Default none.
+    optional_env : tuple[str, ...], optional
+        Best-effort credential names forwarded from the host when present. Default none.
+
+    Attributes
+    ----------
+    provider : str
+        API provider, taken from config or inferred from the model prefix.
     """
 
     name = "opencode"

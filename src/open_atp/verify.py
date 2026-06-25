@@ -101,7 +101,25 @@ def modal_verifier(image: Image = DEFAULT_IMAGE) -> Verifier:
 
 
 class Verifier:
-    """Compiles projects in a :class:`ComputeBackend` and reports their status."""
+    """Compiles projects in a :class:`ComputeBackend` and reports their status.
+
+    Shared by every prover for the final compile/sorry/axiom check. Use
+    :func:`docker_verifier` or :func:`modal_verifier` for the common cases.
+
+    Parameters
+    ----------
+    backend : ComputeBackend
+        The sandbox the candidate project is compiled in. Its image carries the
+        Lean toolchain + Mathlib pins every project is checked against.
+
+    Attributes
+    ----------
+    backend : ComputeBackend
+        The sandbox the candidate project is compiled in.
+    image : ~open_atp.images.Image
+        The image ``backend`` runs -- the compatibility contract projects must
+        match (toolchain + locked Mathlib revision).
+    """
 
     def __init__(self, backend: ComputeBackend) -> None:
         self.backend = backend

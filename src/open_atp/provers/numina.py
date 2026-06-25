@@ -210,6 +210,7 @@ class NuminaProver(AgentProver):
 
     @property
     def prover_prompt(self) -> str:
+        """Numina's coordinator scaffold + round protocol, before any user prompt."""
         return _coordinator_prompt()
 
     def _generate(
