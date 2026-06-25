@@ -1,6 +1,6 @@
 [project]
 name = "open-atp"
-version = "0.0.1"
+version = "0.1.0"
 description = "Open Automated Formal Proof Synthesis: upload Lean files with sorrys, get verified completed proofs across multiple proving backends."
 requires-python = ">=3.12"
 dependencies = [
