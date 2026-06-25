@@ -81,24 +81,20 @@ harnesses are registered in {data}`~open_atp.harness.HARNESSES` and their config
 .. autodata:: open_atp.harness.HARNESS_CONFIGS
 ```
 
-## Asset bundles
+## Asset resolution
 
-An {class}`~open_atp.harness.bundles.AssetBundle` is the selectable preset of the
-*non-list* workdir assets — `extra_dirs` and the legacy `skills_dir` whole-directory
-mount (both Numina-only today) — selected via `AgentProverConfig.assets`. Skills are a
-list on `AgentProverConfig.skills` (staged by the prover), plugins a list on
-`ClaudeCodeHarnessConfig.plugins` (Claude-only), and the prompt is owned by the prover
-and the task — none are bundle concerns.
+Skills and plugins are named (resolved from a vendored catalog) or path-given, then
+resolved to their source directories. Skills are a list on `AgentProverConfig.skills`
+(staged by the prover into each harness's skill location), plugins a list on
+`ClaudeCodeHarnessConfig.plugins` (Claude-only); the prompt is owned by the prover and
+the task. Anything that isn't a simple named skill or plugin — e.g. Numina's
+root-mounted coordinator skill and subagent-prompt tree — is staged by that prover
+itself, not resolved here.
 
 ```{eval-rst}
-.. autoclass:: open_atp.harness.bundles.AssetBundle
-   :no-members:
+.. autofunction:: open_atp.harness.catalog.resolve_skill
 
-.. autofunction:: open_atp.harness.bundles.resolve_bundle
-
-.. autodata:: open_atp.harness.bundles.BUNDLES
-
-.. autodata:: open_atp.harness.bundles.DEFAULT_BUNDLE
+.. autofunction:: open_atp.harness.catalog.resolve_plugin
 ```
 
 ## Pricing

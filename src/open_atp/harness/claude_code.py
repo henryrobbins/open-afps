@@ -11,7 +11,7 @@ from typing import ClassVar
 
 from open_atp.harness._paths import _MCP_JSON, _SCRIPTS
 from open_atp.harness.base import AuthSpec, Harness, HarnessConfig, HarnessRunResult
-from open_atp.harness.bundles import resolve_plugin
+from open_atp.harness.catalog import resolve_plugin
 
 
 class ClaudeCodeHarness(Harness):
@@ -41,8 +41,8 @@ class ClaudeCodeHarness(Harness):
         """Stage each configured plugin under ``wd/.plugins/<name>``.
 
         Claude is the only harness that consumes plugins (so they live on
-        :class:`ClaudeCodeHarnessConfig`, not the bundle); the launch script loads
-        them with ``--plugin-dir`` (see :meth:`_plugin_flags`). Plugins are copied
+        :class:`ClaudeCodeHarnessConfig`, not the shared skills list); the launch script
+        loads them with ``--plugin-dir`` (see :meth:`_plugin_flags`). Plugins are copied
         *into* the workdir (not referenced from the host vendor tree) so they sync
         into the sandbox with everything else.
         """
@@ -113,7 +113,7 @@ class ClaudeCodeHarnessConfig(HarnessConfig):
     """:class:`~open_atp.harness.base.HarnessConfig` for the Claude Code CLI.
 
     Claude Code is the only harness that loads plugins, so they live here rather than
-    on the shared asset bundle.
+    on the prover's shared skills list.
 
     Attributes
     ----------

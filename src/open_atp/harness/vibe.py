@@ -11,7 +11,6 @@ from typing import Any, ClassVar
 
 from open_atp.harness._paths import _SCRIPTS, _VIBE_ASSETS
 from open_atp.harness.base import AuthSpec, Harness, HarnessConfig, HarnessRunResult
-from open_atp.harness.bundles import AssetBundle
 
 
 class VibeHarness(Harness):
@@ -50,10 +49,8 @@ class VibeHarness(Harness):
     #: VIBE_HOME-relative spot is the parity-preserving one.
     skills_dest = f"{VIBE_HOME_DIR}/skills"
 
-    def __init__(
-        self, config: VibeHarnessConfig, assets: AssetBundle | None = None
-    ) -> None:
-        super().__init__(config, assets)
+    def __init__(self, config: VibeHarnessConfig) -> None:
+        super().__init__(config)
         #: Set in :meth:`stage`; where :meth:`parse` looks for session logs.
         self._session_log_dir: Path | None = None
 

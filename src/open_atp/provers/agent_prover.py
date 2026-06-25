@@ -34,7 +34,6 @@ from open_atp.harness import (
     Harness,
     HarnessConfig,
     compute_cost_usd,
-    resolve_bundle,
     resolve_skill,
 )
 from open_atp.lean import LeanProject, ProofTask
@@ -117,9 +116,6 @@ class AgentProverConfig(AutomatedProverConfig):
         :class:`~open_atp.harness.VibeHarnessConfig` |
         :class:`~open_atp.harness.AxProverHarnessConfig`. Carries ``model``/``effort``
         plus any harness-specific knobs.
-    assets : str
-        Named :class:`~open_atp.harness.AssetBundle` of non-list workdir assets
-        (``extra_dirs`` / ``skills_dir``) to mount. Default ``default`` (empty).
     skills : list[str]
         Skills to mount into the agent workdir, each a name (resolved from the
         vendored ``leanprover/skills`` catalog) or a full path to a ``SKILL.md``
@@ -136,7 +132,6 @@ class AgentProverConfig(AutomatedProverConfig):
     """
 
     harness: HarnessConfig = field(default_factory=ClaudeCodeHarnessConfig)
-    assets: str = "default"
     skills: list[str] = field(default_factory=lambda: ["lean-proof"])
     extra_env: dict[str, str] = field(default_factory=dict)
 
@@ -210,10 +205,10 @@ class AgentProver(AutomatedProver):
             if ".lake" not in p.parts
         }
 
-        # 3. Stage the workdir: harness/bundle assets, then the config's skills (this
-        #    prover owns the list; the harness owns where they land), then the prompt
+        # 3. Stage the workdir: the harness launch script, then the config's skills
+        #    (this prover owns the list; the harness owns where they land), then prompt
         #    (this prover's own prompt + the task's optional user prompt).
-        harness = self.config.harness.build(assets=resolve_bundle(self.config.assets))
+        harness = self.config.harness.build()
         harness.stage(wd)
         harness.stage_skills(wd, [resolve_skill(s) for s in self.config.skills])
         harness.write_prompt(wd, compose_prompt(self.prover_prompt, task.user_prompt))

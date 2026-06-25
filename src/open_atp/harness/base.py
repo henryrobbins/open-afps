@@ -13,10 +13,10 @@ A :class:`Harness` knows, for one agent CLI (Claude Code / Codex / OpenCode):
 The *compute* concern (where that command runs, with Lean+Mathlib and a warm
 cache) lives in the injected :class:`~open_atp.backends.base.ComputeBackend`.
 
-Ported from milp_flare's ``harness/`` package; skills/plugins to mount are
-carried by the injected :class:`~open_atp.harness.bundles.AssetBundle` (the
-default mounts the vendored ``lean-proof`` skill, plus the ``lean4`` plugin for
-the Claude harness).
+Ported from milp_flare's ``harness/`` package. The skills to mount are owned by
+the prover (``AgentProverConfig.skills``, resolved to source dirs and handed to
+:meth:`Harness.stage_skills`); plugins are Claude-only and live on
+``ClaudeCodeHarnessConfig.plugins``.
 """
 
 from __future__ import annotations
@@ -27,8 +27,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, ClassVar, Self
-
-from open_atp.harness.bundles import DEFAULT_BUNDLE, AssetBundle
 
 #: Files the harness writes into the workdir; named so they never collide with a
 #: project's own sources.
@@ -82,11 +80,8 @@ class Harness(ABC):
     #: (ax-prover ships its own). Read by :meth:`stage_skills` and the prover.
     skills_dest: ClassVar[str | None] = None
 
-    def __init__(
-        self, config: HarnessConfig, assets: AssetBundle | None = None
-    ) -> None:
+    def __init__(self, config: HarnessConfig) -> None:
         self.config = config
-        self.assets = assets or DEFAULT_BUNDLE
 
     @property
     def model(self) -> str:
@@ -117,17 +112,16 @@ class Harness(ABC):
         return AuthSpec()
 
     def stage(self, wd: Path) -> None:
-        """Populate ``wd`` with the launch script, bundle extra dirs, and skills_dir.
+        """Populate ``wd`` with the harness's launch script.
 
-        Everything the harness and its asset bundle own -- *not* the skills list (the
-        prover stages it via :meth:`stage_skills`) and *not* the prompt (the prover and
-        task own it, written via :meth:`write_prompt`).
+        Everything the harness itself owns -- *not* the skills list (the prover stages
+        it via :meth:`stage_skills`) and *not* the prompt (the prover and task own it,
+        written via :meth:`write_prompt`). Subclasses that need more (Vibe's
+        VIBE_HOME, ax-prover's per-target setup) override and call ``super().stage``.
         """
         if not wd.exists():
             raise RuntimeError("The agent working directory must be created first.")
         (wd / SCRIPT_FILE).write_text(self._agent_command())
-        self._copy_extra_dirs(wd)
-        self._copy_skills_dir(wd)
 
     def write_prompt(self, wd: Path, prompt: str) -> None:
         """Write the composed prompt where this harness's launch script reads it.
@@ -137,13 +131,6 @@ class Harness(ABC):
         ``cat $PROMPT`` launch contract, so it provides the write mechanism.
         """
         (wd / PROMPT_FILE).write_text(prompt)
-
-    def _copy_extra_dirs(self, wd: Path) -> None:
-        """Copy the bundle's extra asset trees (e.g. Numina's prompts) into ``wd``."""
-        for src, dest in self.assets.extra_dirs:
-            target = wd / dest
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(src, target, dirs_exist_ok=True)
 
     def parse(self, lines: list[str]) -> HarnessRunResult:
         """Parse the agent's streamed JSON lines into a :class:`HarnessRunResult`."""
@@ -181,19 +168,6 @@ class Harness(ABC):
                 ignore=shutil.ignore_patterns("tests"),
                 dirs_exist_ok=True,
             )
-
-    def _copy_skills_dir(self, wd: Path) -> None:
-        """Copy the bundle's legacy ``skills_dir`` *contents* into the skill location.
-
-        A single root-mounted skill bundle (e.g. Numina's, whose top-level ``SKILL.md``
-        lands at ``<skills_dest>/SKILL.md``). A no-op when the bundle sets no
-        ``skills_dir`` or the harness has no ``skills_dest``.
-        """
-        if self.skills_dest is None or self.assets.skills_dir is None:
-            return
-        target = wd / self.skills_dest
-        target.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(self.assets.skills_dir, target, dirs_exist_ok=True)
 
     def _render(self, template: str) -> str:
         """Substitute ``<<MODEL>>``/``<<EFFORT>>`` into a launch-script template."""
@@ -237,9 +211,9 @@ class HarnessConfig:
     #: The harness class :meth:`build` instantiates; set by each subclass.
     harness_cls: ClassVar[type[Harness]]
 
-    def build(self, assets: AssetBundle | None = None) -> Harness:
-        """Construct the harness this config describes, from a resolved asset bundle."""
-        return self.harness_cls(self, assets)
+    def build(self) -> Harness:
+        """Construct the harness this config describes."""
+        return self.harness_cls(self)
 
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> Self:

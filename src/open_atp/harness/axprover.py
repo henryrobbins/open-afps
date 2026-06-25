@@ -17,7 +17,6 @@ from open_atp.harness.base import (
     HarnessRunResult,
     _infer_provider,
 )
-from open_atp.harness.bundles import AssetBundle
 
 #: Cap on ax-prover's per-call LLM retries (its ``DEFAULT_LLM_RETRY_CONFIG`` ships
 #: ``stop_after_attempt=10000`` -- ~8h20m). That ``with_retry`` fires on *any* exception
@@ -66,10 +65,8 @@ class AxProverHarness(Harness):
         "deepseek": "deepseek",
     }
 
-    def __init__(
-        self, config: AxProverHarnessConfig, assets: AssetBundle | None = None
-    ) -> None:
-        super().__init__(config, assets)
+    def __init__(self, config: AxProverHarnessConfig) -> None:
+        super().__init__(config)
         #: Set in :meth:`stage`; where :meth:`parse` looks for usage files.
         self._wd: Path | None = None
 

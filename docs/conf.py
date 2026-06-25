@@ -134,7 +134,6 @@ numpydoc_xref_aliases = {
     "OpenCodeHarness": "open_atp.harness.opencode.OpenCodeHarness",
     "VibeHarness": "open_atp.harness.vibe.VibeHarness",
     "AxProverHarness": "open_atp.harness.axprover.AxProverHarness",
-    "AssetBundle": "open_atp.harness.bundles.AssetBundle",
     "COST_PER_MTOK": "open_atp.harness.cost.COST_PER_MTOK",
     "compute_cost_usd": "open_atp.harness.cost.compute_cost_usd",
     # Modal SDK types referenced in ModalBackend docstrings. Resolved to the Modal

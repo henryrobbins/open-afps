@@ -40,7 +40,6 @@ from open_atp.harness import (
     HarnessConfig,
     HarnessRunResult,
     compute_cost_usd,
-    resolve_bundle,
     resolve_skill,
 )
 from open_atp.harness._paths import _vendor_numina_dir
@@ -113,14 +112,13 @@ class NuminaProverConfig(AgentProverConfig):
     harness : HarnessConfig
         Fixed to a :class:`~open_atp.harness.ClaudeCodeHarnessConfig` with no plugins
         (Numina ships its own scaffold): Numina is claude-CLI driven and not
-        configurable (pinned ``init=False``).
-    assets : str
-        Asset bundle to mount. Default ``numina`` (the root-mounted coordinator skill
-        via ``skills_dir`` + the subagent prompts via ``extra_dirs``).
+        configurable (pinned ``init=False``). Because the harness is pinned to Claude,
+        :meth:`NuminaProver._stage_numina_assets` mounts the vendored scaffold straight
+        into the known ``.claude/`` locations.
     skills : list[str]
-        Extra named/path skills to mount alongside the bundle's ``skills_dir``.
-        Default empty -- Numina's coordinator skill comes from the bundle, not this
-        list.
+        Extra named/path skills to mount alongside Numina's vendored scaffold. Default
+        empty -- Numina's coordinator skill is staged from ``vendor/numina/skills``, not
+        this list.
     max_rounds : int
         Maximum number of coordinator rounds before the run stops. Default ``20``.
     max_consecutive_limits : int
@@ -145,7 +143,6 @@ class NuminaProverConfig(AgentProverConfig):
     harness: HarnessConfig = field(
         default_factory=lambda: ClaudeCodeHarnessConfig(plugins=[]), init=False
     )
-    assets: str = "numina"
     skills: list[str] = field(default_factory=list)
     max_rounds: int = 20
     max_consecutive_limits: int = 2
@@ -163,9 +160,10 @@ class NuminaProverConfig(AgentProverConfig):
 class NuminaProver(AgentProver):
     """Run the Numina coordinator/subagent scaffold as an :class:`AgentProver`.
 
-    A specialization of :class:`AgentProver` wired to the Numina asset bundle
-    (coordinator prompt + vendored skills + subagent prompts); generation and the
-    shared :class:`~open_atp.verify.Verifier` work exactly as in the base agent prover.
+    A specialization of :class:`AgentProver` wired to Numina's vendored scaffold
+    (coordinator prompt + skills + subagent prompts, staged by
+    :meth:`_stage_numina_assets`); generation and the shared
+    :class:`~open_atp.verify.Verifier` work exactly as in the base agent prover.
 
     Examples
     --------
@@ -202,12 +200,12 @@ class NuminaProver(AgentProver):
             if ".lake" not in p.parts
         }
 
-        # 3. Stage the workdir with the Numina asset bundle (coordinator skill via
-        #    skills_dir + subagent prompts via extra_dirs) and any config skills, then
-        #    write the coordinator prompt (+ the task's optional user prompt).
-        bundle = resolve_bundle(self.config.assets)
-        harness = self.config.harness.build(assets=bundle)
+        # 3. Stage the workdir: the harness launch script, Numina's vendored scaffold
+        #    (coordinator skill + subagent prompts), any config skills, then the
+        #    coordinator prompt (+ the task's optional user prompt).
+        harness = self.config.harness.build()
         harness.stage(wd)
+        self._stage_numina_assets(wd)
         harness.stage_skills(wd, [resolve_skill(s) for s in self.config.skills])
         harness.write_prompt(wd, compose_prompt(self.prover_prompt, task.user_prompt))
         stdout_path = logs_dir / "stdout.txt"
@@ -231,6 +229,21 @@ class NuminaProver(AgentProver):
             self._download_wd(wd, session=session)
             self._finalize(result, wd, logs_dir, harness, loop, original)
             result.verification = self.verifier.verify(LeanProject(wd), session=session)
+
+    def _stage_numina_assets(self, wd: Path) -> None:
+        """Copy Numina's vendored scaffold into the workdir's ``.claude/`` locations.
+
+        Numina is one root-mounted coordinator skill (top-level ``SKILL.md`` + ``cli/``
+        helpers) plus a subagent-prompt tree. Because the harness is pinned to Claude,
+        the destinations are known: the skill's *contents* land at ``.claude/skills``
+        (so the top-level ``SKILL.md`` is at ``.claude/skills/SKILL.md``), and the whole
+        prompt tree at ``.claude/prompts`` (where the coordinator prompt tells the agent
+        to read its subagent prompts from ``.claude/prompts/subagent_prompts/``).
+        """
+        root = _vendor_numina_dir()
+        claude = wd / ".claude"
+        shutil.copytree(root / "skills", claude / "skills", dirs_exist_ok=True)
+        shutil.copytree(root / "prompts", claude / "prompts", dirs_exist_ok=True)
 
     def _finalize(
         self,
@@ -266,7 +279,6 @@ class NuminaProver(AgentProver):
             "harness": harness.name,
             "model": self.config.harness.model,
             "effort": self.config.harness.effort,
-            "assets": self.config.assets,
             "input_tokens": loop["input_tokens"],
             "output_tokens": loop["output_tokens"],
             # cost_usd above bundles agent + helper; keep the split visible.
