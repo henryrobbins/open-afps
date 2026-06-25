@@ -62,7 +62,11 @@ html_css_files = ["custom.css"]
 # variables; the brand colors are surfaced here too so they stay in sync even
 # before the stylesheet loads. See ``design_handoff_furo_lean_theme/``.
 html_theme_options = {
-    "sidebar_hide_name": False,
+    # The logos are full wordmarks, so hide the redundant text title and let Furo
+    # swap between them based on the active light/dark color scheme.
+    "sidebar_hide_name": True,
+    "light_logo": "logo_light.svg",
+    "dark_logo": "logo_dark.svg",
     "light_css_variables": {
         "color-brand-primary": "#3D6AC9",
         "color-brand-content": "#3D6AC9",
