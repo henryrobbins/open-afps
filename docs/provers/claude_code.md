@@ -30,8 +30,8 @@ prover = AgentProver(
 carries its `model`/`effort`. Swap in any other harness to change CLI. Claude
 Code is the default, so a bare `AgentProver(backend=...)` already uses it.
 
-Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI: `agent`
-(Claude Code is the default harness, so no `:harness` suffix is needed).
+Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
+`agent:claude`.
 
 ## Harness details
 

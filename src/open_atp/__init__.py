@@ -16,10 +16,15 @@ Everything else is a candidate generator
 are then funnelled through the shared verifier.
 """
 
-from open_atp.config import build_backend, build_harness, build_prover
+from open_atp.config import (
+    build_backend,
+    build_harness,
+    build_prover,
+    standard_prover,
+    standard_provers,
+)
 from open_atp.images import DEFAULT_IMAGE, Image
 from open_atp.lean import LeanProject, ProofTask, stage_files
-from open_atp.provers import PROVER_TYPES, available_provers, get_prover
 from open_atp.provers.base import AutomatedProver, ProofResult
 from open_atp.verify import VerificationReport
 
@@ -31,9 +36,8 @@ __all__ = [
     "VerificationReport",
     "LeanProject",
     "ProofTask",
-    "PROVER_TYPES",
-    "available_provers",
-    "get_prover",
+    "standard_prover",
+    "standard_provers",
     "build_prover",
     "build_backend",
     "build_harness",

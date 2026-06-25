@@ -2,7 +2,7 @@
 
     open-atp prove <prover> <lean-dir> <output-dir>
 
-The core stays a plain Python API (:func:`open_atp.provers.get_prover` ->
+The core stays a plain Python API (:func:`open_atp.standard_prover` ->
 :meth:`~open_atp.provers.base.AutomatedProver.prove`); this is just the terminal
 front door, deliberately minimal: pick a registered prover, point at a lake project,
 and choose where the ``{wd,logs}`` output lands. Generation + verification run on the
@@ -18,9 +18,9 @@ import sys
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend
+from open_atp.config import standard_prover, standard_provers
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
-from open_atp.provers import available_provers, get_prover
 
 #: ax-prover baked into the Modal image (mirrors the images/Dockerfile ARG). Pinned
 #: to a commit on our fork (henryrobbins/ax-prover-base) rather than the 0.1.1 PyPI
@@ -42,7 +42,7 @@ def _prove(args: argparse.Namespace) -> int:
     task = ProofTask(project)
 
     backend = DockerBackend(image=DEFAULT_IMAGE)
-    prover = get_prover(args.prover, backend=backend)
+    prover = standard_prover(args.prover, backend=backend)
     result = prover.prove(task, Path(args.output_dir))
 
     if args.json:
@@ -183,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     prove.add_argument(
         "prover",
-        choices=available_provers(),
+        choices=standard_provers(),
         help="Which prover to run.",
     )
     prove.add_argument("lean_dir", help="The lake project directory to complete.")

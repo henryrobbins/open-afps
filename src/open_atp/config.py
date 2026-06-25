@@ -19,9 +19,14 @@ dependency here) into a constructed prover::
 
 Each level is dispatched on a ``type`` key through its registry
 (:data:`~open_atp.backends.BACKENDS`, :data:`~open_atp.harness.HARNESSES`,
-:data:`~open_atp.provers.PROVER_TYPES`); the remaining keys become constructor
+:data:`~open_atp.provers.PROVERS`); the remaining keys become constructor
 kwargs. Unknown keys raise -- a typo'd option fails loudly rather than being silently
 ignored.
+
+For the common case of "give me a sensible default prover by name", the
+:data:`STANDARD_PROVERS` catalog names each ready-to-run default
+(``"agent:claude"``, ``"numina"``, ...) as a canonical prover spec, and
+:func:`standard_prover` builds one against a backend.
 """
 
 from __future__ import annotations
@@ -33,7 +38,7 @@ from typing import cast
 from open_atp.backends import BACKENDS
 from open_atp.backends.base import ComputeBackend
 from open_atp.harness import HARNESSES, Harness
-from open_atp.provers import PROVER_TYPES
+from open_atp.provers import PROVERS
 from open_atp.provers.base import AutomatedProver
 
 
@@ -84,6 +89,23 @@ def build_harness(spec: Mapping[str, object] | str) -> Harness:
     return cls(**kwargs)  # type: ignore[arg-type]  # validated dict -> kwargs
 
 
+def _build_prover(
+    spec: Mapping[str, object], backend: ComputeBackend
+) -> AutomatedProver:
+    """Construct a prover from a ``prover`` spec against an already-built ``backend``.
+
+    Dispatches ``spec["type"]`` through :data:`~open_atp.provers.PROVERS`, builds a
+    nested ``harness`` spec along the way, and wires the backend in. The prover half of
+    :func:`build_prover`, shared with :func:`standard_prover`.
+    """
+    cls, kwargs = _split(PROVERS, spec, "prover")
+    if "harness" in kwargs:
+        kwargs["harness"] = build_harness(
+            cast("Mapping[str, object] | str", kwargs["harness"])
+        )
+    return cls(backend=backend, **kwargs)  # type: ignore[arg-type]  # validated kwargs
+
+
 def build_prover(config: Mapping[str, object]) -> AutomatedProver:
     """Construct a fully-wired prover from a ``{compute, prover}`` config dict.
 
@@ -92,11 +114,50 @@ def build_prover(config: Mapping[str, object]) -> AutomatedProver:
     ``harness`` spec along the way, and wires the backend in.
     """
     backend = build_backend(cast("Mapping[str, object]", config["compute"]))
-    cls, kwargs = _split(
-        PROVER_TYPES, cast("Mapping[str, object]", config["prover"]), "prover"
-    )
-    if "harness" in kwargs:
-        kwargs["harness"] = build_harness(
-            cast("Mapping[str, object] | str", kwargs["harness"])
-        )
-    return cls(backend=backend, **kwargs)  # type: ignore[arg-type]  # validated kwargs
+    return _build_prover(cast("Mapping[str, object]", config["prover"]), backend)
+
+
+#: The standard catalog: a friendly name -> the canonical ``prover`` spec for that
+#: ready-to-run default. The ``agent:<cli>`` entries are all the shared
+#: :class:`~open_atp.provers.agent_prover.AgentProver` on a different harness;
+#: ``numina`` and ``aristotle`` are the standalone provers. Build one with
+#: :func:`standard_prover`.
+STANDARD_PROVERS: dict[str, dict[str, object]] = {
+    "agent:claude": {"type": "agent", "harness": {"type": "claude_code"}},
+    "agent:codex": {"type": "agent", "harness": {"type": "codex"}},
+    "agent:opencode": {"type": "agent", "harness": {"type": "opencode"}},
+    "agent:vibe": {"type": "agent", "harness": {"type": "vibe"}},
+    "agent:axprover": {"type": "agent", "harness": {"type": "axprover"}},
+    "numina": {"type": "numina"},
+    "aristotle": {"type": "aristotle"},
+}
+
+
+def standard_prover(name: str, *, backend: ComputeBackend) -> AutomatedProver:
+    """Construct a standard default prover ``name`` against ``backend``.
+
+    ``name`` is a :data:`STANDARD_PROVERS` key -- an ``agent:<cli>`` default
+    (``"agent:claude"``, ``"agent:codex"``, ``"agent:opencode"``, ``"agent:vibe"``,
+    ``"agent:axprover"``) or a standalone prover (``"numina"``, ``"aristotle"``). The
+    prover is built with its class's baked-in defaults; to customize any knob (model,
+    effort, skills, ...), use :func:`build_prover` with a full config dict instead.
+
+    The sandbox image (and the toolchain + Mathlib pins projects are checked against)
+    comes from ``backend``, not a parameter here.
+
+    Examples
+    --------
+
+    >>> from open_atp.backends.docker import DockerBackend
+    >>> prover = standard_prover("agent:claude", backend=DockerBackend())
+    >>> prover.harness.model
+    'claude-opus-4-8'
+    """
+    if name not in STANDARD_PROVERS:
+        raise ValueError(f"unknown prover {name!r}; choose from {standard_provers()}")
+    return _build_prover(STANDARD_PROVERS[name], backend)
+
+
+def standard_provers() -> list[str]:
+    """The names :func:`standard_prover` accepts: the :data:`STANDARD_PROVERS` keys."""
+    return list(STANDARD_PROVERS)

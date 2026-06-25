@@ -99,8 +99,12 @@ numpydoc_show_class_members = False
 numpydoc_xref_param_type = True
 numpydoc_xref_ignore = {"of", "or", "optional", "default"}
 numpydoc_xref_aliases = {
-    # Registry
-    "get_prover": "open_atp.provers.get_prover",
+    # Build / catalog
+    "standard_prover": "open_atp.config.standard_prover",
+    "standard_provers": "open_atp.config.standard_provers",
+    "build_prover": "open_atp.config.build_prover",
+    "build_harness": "open_atp.config.build_harness",
+    "build_backend": "open_atp.config.build_backend",
     "stage_files": "open_atp.lean.stage_files",
     # Lean input contract
     "LeanProject": "open_atp.lean.LeanProject",
@@ -121,7 +125,8 @@ numpydoc_xref_aliases = {
     "AgentProver": "open_atp.provers.agent_prover.AgentProver",
     "AristotleProver": "open_atp.provers.aristotle.AristotleProver",
     "NuminaProver": "open_atp.provers.numina.NuminaProver",
-    "PROVER_TYPES": "open_atp.provers.PROVER_TYPES",
+    "PROVERS": "open_atp.provers.PROVERS",
+    "STANDARD_PROVERS": "open_atp.config.STANDARD_PROVERS",
     # Harnesses
     "Harness": "open_atp.harness.base.Harness",
     "HarnessRunResult": "open_atp.harness.base.HarnessRunResult",

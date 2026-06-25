@@ -29,8 +29,7 @@ See the per-harness prover pages under {doc}`../provers/index` for credential se
 
 Each harness adapts one agent CLI and is a
 {class}`~open_atp.harness.Harness` subclass (set as
-{class}`~open_atp.provers.agent_prover.AgentProver`'s `harness`). The runtime
-harnesses are registered in {data}`~open_atp.harness.HARNESSES`, keyed by `name`.
+{class}`~open_atp.provers.agent_prover.AgentProver`'s `harness`).
 
 ```{eval-rst}
 .. autoclass:: open_atp.harness.claude_code.ClaudeCodeHarness
@@ -52,7 +51,14 @@ harnesses are registered in {data}`~open_atp.harness.HARNESSES`, keyed by `name`
 .. autoclass:: open_atp.harness.axprover.AxProverHarness
    :show-inheritance:
    :exclude-members: stage, name
+```
 
+## Registry
+
+The runtime harnesses are registered in {data}`~open_atp.harness.HARNESSES`, keyed
+by `name`.
+
+```{eval-rst}
 .. autodata:: open_atp.harness.HARNESSES
 ```
 

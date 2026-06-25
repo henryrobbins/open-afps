@@ -34,8 +34,8 @@ prover = AgentProver(
 carries the AxProver-specific `max_iterations` knob (which lives only on this harness,
 not the shared base).
 
-Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
-`axprover` (defaults: `claude-opus-4-8`, `effort="high"`). The
+Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
+`agent:axprover` (defaults: `claude-opus-4-8`, `effort="high"`). The
 `max_iterations` field caps ax-prover's proposer → builder → reviewer loop.
 
 ## Harness details

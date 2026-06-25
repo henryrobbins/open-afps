@@ -7,18 +7,18 @@ then verify in the sandbox — so every prover gets the same final check for fre
 
 | Prover | Spec | Generation | Credential |
 | --- | --- | --- | --- |
-| [Claude Code](claude_code.md) | `agent` | AgentProver on the Claude Code CLI | `CLAUDE_CODE_OAUTH_TOKEN` |
-| [Codex](codex.md) | `codex` | AgentProver on the Codex CLI (OpenAI) | `~/.codex` (OAuth) |
-| [OpenCode](opencode.md) | `opencode` | AgentProver on the OpenCode CLI (any provider) | `<PROVIDER>_API_KEY` |
-| [AxProver](axprover.md) | `axprover` | AgentProver driving ax-prover-base | `ANTHROPIC` / `OPENAI` / `GOOGLE_API_KEY` |
-| [Vibe / Leanstral](vibe.md) | `vibe` | AgentProver on Mistral Vibe's `lean` agent | `MISTRAL_API_KEY` |
+| [Claude Code](claude_code.md) | `agent:claude` | AgentProver on the Claude Code CLI | `CLAUDE_CODE_OAUTH_TOKEN` |
+| [Codex](codex.md) | `agent:codex` | AgentProver on the Codex CLI (OpenAI) | `~/.codex` (OAuth) |
+| [OpenCode](opencode.md) | `agent:opencode` | AgentProver on the OpenCode CLI (any provider) | `<PROVIDER>_API_KEY` |
+| [AxProver](axprover.md) | `agent:axprover` | AgentProver driving ax-prover-base | `ANTHROPIC` / `OPENAI` / `GOOGLE_API_KEY` |
+| [Vibe / Leanstral](vibe.md) | `agent:vibe` | AgentProver on Mistral Vibe's `lean` agent | `MISTRAL_API_KEY` |
 | [NuminaProver](numina.md) | `numina` | AgentProver (Claude) + Numina assets + round loop | harness + helper API keys |
 | [AristotleProver](aristotle.md) | `aristotle` | Harmonic's hosted Aristotle API | `ARISTOTLE_API_KEY` |
 
 The Claude Code, Codex, OpenCode, AxProver, and Vibe provers are all the same
 {class}`~open_atp.provers.agent_prover.AgentProver` composed with a different
 {class}`~open_atp.harness.base.Harness`; `Spec` is the
-{func}`~open_atp.provers.get_prover` registry name. Every prover subclasses
+{func}`~open_atp.config.standard_prover` catalog name. Every prover subclasses
 {class}`~open_atp.provers.base.AutomatedProver` and funnels its output through the
 shared {class}`~open_atp.verify.Verifier`.
 
