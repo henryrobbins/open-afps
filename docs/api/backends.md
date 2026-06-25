@@ -46,13 +46,3 @@ filesystem -- without paying a second spin-up.
 .. autoclass:: open_atp.backends.modal.ModalSession
    :show-inheritance:
 ```
-
-## Registry
-
-The backends are registered in {data}`~open_atp.backends.BACKENDS`, keyed by `name`.
-The factory in {mod}`open_atp.config` dispatches a `compute` spec's `type` through
-this map.
-
-```{eval-rst}
-.. autodata:: open_atp.backends.BACKENDS
-```

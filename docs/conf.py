@@ -125,7 +125,6 @@ numpydoc_xref_aliases = {
     "AgentProver": "open_atp.provers.agent_prover.AgentProver",
     "AristotleProver": "open_atp.provers.aristotle.AristotleProver",
     "NuminaProver": "open_atp.provers.numina.NuminaProver",
-    "PROVERS": "open_atp.provers.PROVERS",
     "STANDARD_PROVERS": "open_atp.config.STANDARD_PROVERS",
     # Harnesses
     "Harness": "open_atp.harness.base.Harness",

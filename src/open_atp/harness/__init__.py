@@ -21,9 +21,9 @@ from open_atp.harness.cost import COST_PER_MTOK, compute_cost_usd
 from open_atp.harness.opencode import OpenCodeHarness
 from open_atp.harness.vibe import VibeHarness
 
-#: Harness registry by name (``Harness.name`` -> harness class). The factory in
-#: :mod:`open_atp.config` dispatches a harness spec's ``type`` through this.
-HARNESSES: dict[str, type[Harness]] = {
+#: Harness registry by name (``Harness.name`` -> harness class). Package-internal: the
+#: factory in :mod:`open_atp.config` dispatches a harness spec's ``type`` through this.
+_HARNESSES: dict[str, type[Harness]] = {
     h.name: h
     for h in (
         ClaudeCodeHarness,
@@ -47,7 +47,6 @@ __all__ = [
     "OpenCodeHarness",
     "VibeHarness",
     "AxProverHarness",
-    "HARNESSES",
     "compute_cost_usd",
     "COST_PER_MTOK",
 ]

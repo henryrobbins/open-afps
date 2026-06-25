@@ -17,9 +17,9 @@ dependency here) into a constructed prover::
         },
     })
 
-Each level is dispatched on a ``type`` key through its registry
-(:data:`~open_atp.backends.BACKENDS`, :data:`~open_atp.harness.HARNESSES`,
-:data:`~open_atp.provers.PROVERS`); the remaining keys become constructor
+Each level is dispatched on a ``type`` key through its package-internal registry
+(``open_atp.backends._BACKENDS``, ``open_atp.harness._HARNESSES``,
+``open_atp.provers._PROVERS``); the remaining keys become constructor
 kwargs. Unknown keys raise -- a typo'd option fails loudly rather than being silently
 ignored.
 
@@ -35,10 +35,10 @@ import inspect
 from collections.abc import Mapping
 from typing import cast
 
-from open_atp.backends import BACKENDS
+from open_atp.backends import _BACKENDS
 from open_atp.backends.base import ComputeBackend
-from open_atp.harness import HARNESSES, Harness
-from open_atp.provers import PROVERS
+from open_atp.harness import _HARNESSES, Harness
+from open_atp.provers import _PROVERS
 from open_atp.provers.base import AutomatedProver
 
 
@@ -74,7 +74,7 @@ def build_backend(spec: Mapping[str, object]) -> ComputeBackend:
     backend's kwargs (e.g. ``{"type": "modal", "cpu": 2}``). A nested ``image`` mapping
     is coerced to an :class:`~open_atp.images.Image` by the backend itself.
     """
-    cls, kwargs = _split(BACKENDS, spec, "compute")
+    cls, kwargs = _split(_BACKENDS, spec, "compute")
     return cls(**kwargs)  # type: ignore[arg-type]  # validated dict -> kwargs
 
 
@@ -85,7 +85,7 @@ def build_harness(spec: Mapping[str, object] | str) -> Harness:
     plus the harness's kwargs (``{"type": "vibe", "max_turns": 8}``).
     """
     spec = {"type": spec} if isinstance(spec, str) else spec
-    cls, kwargs = _split(HARNESSES, spec, "harness")
+    cls, kwargs = _split(_HARNESSES, spec, "harness")
     return cls(**kwargs)  # type: ignore[arg-type]  # validated dict -> kwargs
 
 
@@ -94,11 +94,11 @@ def _build_prover(
 ) -> AutomatedProver:
     """Construct a prover from a ``prover`` spec against an already-built ``backend``.
 
-    Dispatches ``spec["type"]`` through :data:`~open_atp.provers.PROVERS`, builds a
+    Dispatches ``spec["type"]`` through the package-internal ``_PROVERS`` map, builds a
     nested ``harness`` spec along the way, and wires the backend in. The prover half of
     :func:`build_prover`, shared with :func:`standard_prover`.
     """
-    cls, kwargs = _split(PROVERS, spec, "prover")
+    cls, kwargs = _split(_PROVERS, spec, "prover")
     if "harness" in kwargs:
         kwargs["harness"] = build_harness(
             cast("Mapping[str, object] | str", kwargs["harness"])

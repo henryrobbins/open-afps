@@ -25,7 +25,7 @@ import pytest
 
 from open_atp.backends.docker import DockerBackend
 from open_atp.harness import (
-    HARNESSES,
+    _HARNESSES,
     AxProverHarness,
     Harness,
 )
@@ -84,7 +84,7 @@ def prover(fake_session_backend: object) -> AgentProver:
 
 
 def test_registered_and_construction_carries_max_iterations() -> None:
-    assert HARNESSES["axprover"] is AxProverHarness
+    assert _HARNESSES["axprover"] is AxProverHarness
 
     harness = AxProverHarness(
         model="claude-opus-4-8",

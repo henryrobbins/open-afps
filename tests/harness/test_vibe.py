@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from open_atp.harness import (
-    HARNESSES,
+    _HARNESSES,
     Harness,
     VibeHarness,
 )
@@ -89,7 +89,7 @@ def prover(fake_session_backend: object) -> AgentProver:
 
 
 def test_registered_and_construction_carries_vibe_knobs() -> None:
-    assert HARNESSES["vibe"] is VibeHarness
+    assert _HARNESSES["vibe"] is VibeHarness
 
     harness = VibeHarness(
         agent="lean",

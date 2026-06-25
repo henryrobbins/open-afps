@@ -50,7 +50,7 @@ import pytest
 
 from open_atp.backends.base import ComputeBackend
 from open_atp.harness import (
-    HARNESSES,
+    _HARNESSES,
     ClaudeCodeHarness,
     Harness,
     VibeHarness,
@@ -171,7 +171,7 @@ def _make_harness(harness: str) -> Harness:
     if harness == "claude_code":
         # No plugins -- plugin loading isn't what these probes exercise.
         return ClaudeCodeHarness(model=_MODELS[harness], effort="low", plugins=[])
-    return HARNESSES[harness](model=_MODELS[harness], effort="low")
+    return _HARNESSES[harness](model=_MODELS[harness], effort="low")
 
 
 def _make_run_dir(backend: str, case_id: str) -> Path:

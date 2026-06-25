@@ -53,15 +53,6 @@ Each harness adapts one agent CLI and is a
    :exclude-members: stage, name
 ```
 
-## Registry
-
-The runtime harnesses are registered in {data}`~open_atp.harness.HARNESSES`, keyed
-by `name`.
-
-```{eval-rst}
-.. autodata:: open_atp.harness.HARNESSES
-```
-
 ## Asset resolution
 
 Skills and plugins are named (resolved from a vendored catalog) or path-given, then

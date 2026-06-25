@@ -18,7 +18,7 @@ import pytest
 
 from open_atp.backends.docker import DockerBackend
 from open_atp.harness import (
-    HARNESSES,
+    _HARNESSES,
     ClaudeCodeHarness,
     Harness,
     compute_cost_usd,
@@ -86,7 +86,7 @@ def test_compute_cost_usd_known_and_unknown_model() -> None:
 
 def test_codex_cost_falls_back_to_token_table() -> None:
     """Codex reports no USD, so prove() must estimate from token totals."""
-    harness = HARNESSES["codex"](model="gpt-5.4", effort="high")
+    harness = _HARNESSES["codex"](model="gpt-5.4", effort="high")
     lines = [
         '{"type":"turn.completed","usage":{"input_tokens":2000000,'
         '"output_tokens":1000000}}',
@@ -152,7 +152,7 @@ def test_stage_skills_copies_into_harness_location(
     tmp_path: Path, harness_name: str, dest: str
 ) -> None:
     """The prover-resolved skills list lands in each harness's skill location."""
-    harness = HARNESSES[harness_name](model="claude-opus-4-8", effort="high")
+    harness = _HARNESSES[harness_name](model="claude-opus-4-8", effort="high")
     harness.stage_skills(tmp_path, [resolve_skill("lean-proof")])
     assert (tmp_path / dest / "lean-proof" / "SKILL.md").is_file()
     # Upstream skill `tests/` fixtures are dropped at mount time.
@@ -161,7 +161,7 @@ def test_stage_skills_copies_into_harness_location(
 
 def test_axprover_ignores_skills(tmp_path: Path) -> None:
     """ax-prover ships its own prompts and consumes no skills (skills_dest is None)."""
-    harness = HARNESSES["axprover"](model="claude-opus-4-8")
+    harness = _HARNESSES["axprover"](model="claude-opus-4-8")
     assert harness.skills_dest is None
     harness.stage_skills(tmp_path, [resolve_skill("lean-proof")])  # no-op, no error
     assert not list(tmp_path.iterdir())
