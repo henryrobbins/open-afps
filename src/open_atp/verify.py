@@ -67,6 +67,7 @@ class VerificationReport:
 
     @property
     def non_standard_axioms(self) -> tuple[str, ...]:
+        """The depended-on axioms outside :data:`STANDARD_AXIOMS`."""
         return tuple(a for a in self.axioms if a not in STANDARD_AXIOMS)
 
     @property
@@ -75,7 +76,14 @@ class VerificationReport:
         return self.compiles and self.sorry_free and not self.non_standard_axioms
 
     def to_dict(self) -> dict[str, object]:
-        """JSON-ready summary (the full ``compile_log`` is intentionally omitted)."""
+        """JSON-ready summary (the full ``compile_log`` is intentionally omitted).
+
+        Returns
+        -------
+        dict[str, object]
+            The verdict (``verified``/``compiles``/``sorry_free``), the axiom lists,
+            and ``per_file``; ``compile_log`` is excluded.
+        """
         return {
             "verified": self.verified,
             "compiles": self.compiles,
@@ -87,7 +95,19 @@ class VerificationReport:
 
 
 def docker_verifier(image: Image = DEFAULT_IMAGE) -> Verifier:
-    """A :class:`Verifier` backed by a local Docker sandbox running ``image``."""
+    """A :class:`Verifier` backed by a local Docker sandbox running ``image``.
+
+    Parameters
+    ----------
+    image : ~open_atp.images.Image, optional
+        The image whose Lean toolchain + Mathlib pins projects are checked against.
+        Default :data:`~open_atp.images.DEFAULT_IMAGE`.
+
+    Returns
+    -------
+    Verifier
+        A verifier over a :class:`~open_atp.backends.docker.DockerBackend`.
+    """
     return Verifier(DockerBackend(image=image))
 
 
@@ -96,6 +116,17 @@ def modal_verifier(image: Image = DEFAULT_IMAGE) -> Verifier:
 
     Needs Modal credentials and the image published via ``open-atp
     build-modal-image``. The image's ``:tag`` is dropped for the Modal name lookup.
+
+    Parameters
+    ----------
+    image : ~open_atp.images.Image, optional
+        The published image whose Lean toolchain + Mathlib pins projects are checked
+        against. Default :data:`~open_atp.images.DEFAULT_IMAGE`.
+
+    Returns
+    -------
+    Verifier
+        A verifier over a :class:`~open_atp.backends.modal.ModalBackend`.
     """
     return Verifier(ModalBackend(image=image))
 
@@ -137,6 +168,19 @@ class Verifier:
         :attr:`~open_atp.images.Image.mathlib_rev`. Raises
         :class:`~open_atp.lean.ToolchainMismatch` or
         :class:`~open_atp.lean.MathlibRevMismatch` on the first mismatch.
+
+        Parameters
+        ----------
+        project : ~open_atp.lean.LeanProject
+            The candidate project whose toolchain (and locked Mathlib revision, when
+            recorded) must match the backend image's pins.
+
+        Raises
+        ------
+        ~open_atp.lean.ToolchainMismatch
+            If the project's toolchain differs from the image's.
+        ~open_atp.lean.MathlibRevMismatch
+            If the project records a Mathlib revision that differs from the image's.
 
         Examples
         --------
@@ -188,6 +232,28 @@ class Verifier:
         ``backend.run`` -- the path Aristotle and the split-backend case take. When a
         caller passes a live ``session`` (the agent/verify backend-reuse path), the
         compile runs in that already-hot sandbox instead, avoiding a second spin-up.
+
+        Parameters
+        ----------
+        project : ~open_atp.lean.LeanProject
+            The candidate project to compile. Checked for compatibility first.
+        session : ~open_atp.backends.base.ComputeSession, optional
+            A live, already-hot sandbox to compile in. When ``None`` (the default),
+            ``backend.run`` spins up a fresh sandbox for this compile.
+
+        Returns
+        -------
+        VerificationReport
+            The compile/``sorry``/axiom verdict. A project with no ``.lean`` files
+            short-circuits to a trivial passing report without touching the sandbox.
+
+        Raises
+        ------
+        ~open_atp.lean.ToolchainMismatch
+            If the project's pins differ from the backend image's (via
+            :meth:`check_compatible`).
+        ~open_atp.lean.MathlibRevMismatch
+            If the project's locked Mathlib revision differs from the image's.
 
         Examples
         --------
