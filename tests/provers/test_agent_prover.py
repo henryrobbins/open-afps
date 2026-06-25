@@ -24,6 +24,7 @@ from open_atp.harness import (
     compute_cost_usd,
 )
 from open_atp.harness._catalog import resolve_plugin, resolve_skill
+from open_atp.harness._numina import NuminaHarness
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver
@@ -196,15 +197,26 @@ def test_claude_agent_auth_resolves_oauth_token(
     assert explicit.env["CLAUDE_CODE_OAUTH_TOKEN"] == "tok-explicit"
 
 
-def test_optional_env_forwarded_only_when_present(
+def test_numina_helper_env_forwarded_only_when_present(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
     monkeypatch.delenv("HELPER_KEY", raising=False)
-    harness = ClaudeCodeHarness(plugins=[], optional_env=("HELPER_KEY",))
+    harness = NuminaHarness(helper_env_keys=("HELPER_KEY",))
     assert "HELPER_KEY" not in harness.agent_auth().env  # absent -> skipped, no raise
     monkeypatch.setenv("HELPER_KEY", "hk")
     assert harness.agent_auth().env["HELPER_KEY"] == "hk"
+
+
+def test_numina_literal_env_wins_over_helper_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
+    monkeypatch.setenv("HELPER_KEY", "from-host")
+    harness = NuminaHarness(
+        helper_env_keys=("HELPER_KEY",), env={"HELPER_KEY": "literal"}
+    )
+    assert harness.agent_auth().env["HELPER_KEY"] == "literal"
 
 
 # --- _generate() diff logic (no Docker) ------------------------------------

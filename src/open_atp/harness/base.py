@@ -108,12 +108,6 @@ class Harness(ABC):
         ``"gpt-5.5"``, Vibe to ``"magistral-medium-latest"``).
     effort : str
         Reasoning-effort level passed to harnesses that support it. Default ``"high"``.
-    env : dict[str, str], optional
-        Literal env vars (name -> value) forwarded verbatim into the sandbox; win over
-        resolved credentials on a key clash. Default none.
-    optional_env : tuple[str, ...], optional
-        Best-effort credential names: forwarded from the host when present, never a
-        hard failure when absent (e.g. helper-skill keys). Default none.
 
     Attributes
     ----------
@@ -133,18 +127,10 @@ class Harness(ABC):
         *,
         model: str = "claude-opus-4-8",
         effort: str = "high",
-        env: dict[str, str] | None = None,
-        optional_env: tuple[str, ...] = (),
     ) -> None:
         # model/effort documented as class Parameters/Attributes above.
         self.model = model
         self.effort = effort
-        # Literal env vars (name -> value) forwarded verbatim; win over resolved
-        # credentials on a key clash.
-        self._env = dict(env or {})
-        # Best-effort credential names: forwarded from the host if present, never
-        # a hard failure when absent (e.g. helper-skill keys).
-        self._optional_env = tuple(optional_env)
 
     @property
     def command(self) -> str:
@@ -159,20 +145,14 @@ class Harness(ABC):
     def agent_auth(self) -> AgentAuth:
         """Resolve this harness's credentials into a ready-to-forward auth bundle.
 
-        Merges, in order: non-secret constants (:meth:`_static_env`), resolved
+        Merges, in order: non-secret constants (:meth:`_static_env`) and resolved
         required credentials (:meth:`_required_env`, which raises if a needed key is
-        absent), best-effort :attr:`_optional_env` names present on the host, and the
-        caller's literal :attr:`_env` overrides (which win). Mount dirs come from
-        :meth:`_home_dirs`.
+        absent). Mount dirs come from :meth:`_home_dirs`. Subclasses needing
+        best-effort host passthrough override this (see ``NuminaHarness``).
         """
         env: dict[str, str] = {}
         env.update(self._static_env())
         env.update(self._required_env())
-        for key in self._optional_env:
-            value = os.environ.get(key)
-            if value is not None:
-                env.setdefault(key, value)
-        env.update(self._env)
         return AgentAuth(env=env, mounts=self._home_dirs())
 
     def _static_env(self) -> dict[str, str]:

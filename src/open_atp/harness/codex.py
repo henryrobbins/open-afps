@@ -26,11 +26,6 @@ class CodexHarness(Harness):
     auth_file : Path, optional
         The Codex ``auth.json`` to mount. ``None`` (default) uses ``~/.codex/auth.json``
         (from ``codex login``); resolution fails if the file is absent.
-    env : dict[str, str], optional
-        Literal env vars forwarded verbatim into the sandbox; win over resolved
-        credentials on a key clash. Default none.
-    optional_env : tuple[str, ...], optional
-        Best-effort credential names forwarded from the host when present. Default none.
     """
 
     name = "codex"
@@ -47,10 +42,8 @@ class CodexHarness(Harness):
         model: str = "gpt-5.5",
         effort: str = "high",
         auth_file: Path | None = None,
-        env: dict[str, str] | None = None,
-        optional_env: tuple[str, ...] = (),
     ) -> None:
-        super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
+        super().__init__(model=model, effort=effort)
         self._auth_file = auth_file
 
     def _home_dirs(self) -> list[tuple[Path, str]]:

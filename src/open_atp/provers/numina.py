@@ -33,27 +33,17 @@ from typing import Any, Literal
 
 from open_atp.backends.base import ComputeBackend, ComputeSession
 from open_atp.harness import (
-    ClaudeCodeHarness,
     Harness,
     HarnessRunResult,
     compute_cost_usd,
 )
 from open_atp.harness._catalog import resolve_skill
+from open_atp.harness._numina import _DEFAULT_HELPER_ENV_KEYS, NuminaHarness
 from open_atp.harness._paths import _vendor_numina_dir
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.agent_prover import AgentProver
 from open_atp.provers.base import ProofResult, compose_prompt
 from open_atp.provers.numina_tracker import StatementTracker
-
-#: Helper-skill credentials forwarded into the sandbox when present in the host env;
-#: skills degrade/skip when their key is absent. ``ANTHROPIC_API_KEY`` backs the
-#: informal-prover skill's Claude calls.
-_DEFAULT_HELPER_ENV_KEYS = (
-    "GEMINI_API_KEY",
-    "OPENAI_API_KEY",
-    "LEAN_LEANDEX_API_KEY",
-    "ANTHROPIC_API_KEY",
-)
 
 # Directories never worth copying into the agent workdir (mirrors AgentProver).
 _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
@@ -114,10 +104,10 @@ class NuminaProver(AgentProver):
     :meth:`_stage_numina_assets`); generation and the shared
     :class:`~open_atp.verify.Verifier` work exactly as in the base agent prover.
 
-    The harness is fixed to a :class:`~open_atp.harness.ClaudeCodeHarness` with no
-    plugins (Numina ships its own scaffold) and is *not* configurable -- Numina is
-    claude-CLI driven, and :meth:`_stage_numina_assets` mounts the vendored scaffold
-    straight into the known ``.claude/`` locations.
+    The harness is fixed to an internal ``NuminaHarness`` (Claude Code with no plugins,
+    since Numina ships its own scaffold) and is *not* configurable --
+    Numina is claude-CLI driven, and :meth:`_stage_numina_assets` mounts the vendored
+    scaffold straight into the known ``.claude/`` locations.
 
     Parameters
     ----------
@@ -184,16 +174,13 @@ class NuminaProver(AgentProver):
         timeout_s: int = 1800,
         env: dict[str, str] | None = None,
     ) -> None:
-        # The harness is pinned: Numina is claude_code-driven (no plugins; it ships its
-        # own scaffold) and not configurable. Default skills are empty -- the
-        # coordinator skill is staged from the vendored scaffold, not the shared list.
-        # Numina owns its env: helper-skill keys become the harness's optional_env
-        # (forwarded if present, never a hard failure) and any literal extras its env.
+        # The harness is pinned: Numina is claude_code-driven and not configurable.
+        # NuminaHarness ships no plugins (Numina ships its own scaffold) and forwards
+        # the helper-skill keys best-effort plus any literal env extras. Default skills
+        # are empty -- the coordinator skill is staged from the vendored scaffold.
         super().__init__(
             backend=backend,
-            harness=ClaudeCodeHarness(
-                plugins=[], optional_env=tuple(helper_env_keys), env=env
-            ),
+            harness=NuminaHarness(helper_env_keys=helper_env_keys, env=env),
             skills=skills if skills is not None else [],
             timeout_s=timeout_s,
         )

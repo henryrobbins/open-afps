@@ -32,11 +32,6 @@ class OpenCodeHarness(Harness):
         that env var from the host; resolution fails if neither is set. The key is
         assumed to match :attr:`provider` (OpenAI and DeepSeek keys are
         indistinguishable, so no format check is done).
-    env : dict[str, str], optional
-        Literal env vars forwarded verbatim into the sandbox; win over resolved
-        credentials on a key clash. Default none.
-    optional_env : tuple[str, ...], optional
-        Best-effort credential names forwarded from the host when present. Default none.
     """
 
     name = "opencode"
@@ -50,10 +45,8 @@ class OpenCodeHarness(Harness):
         effort: str = "high",
         provider: str | None = None,
         provider_api_key: str | None = None,
-        env: dict[str, str] | None = None,
-        optional_env: tuple[str, ...] = (),
     ) -> None:
-        super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
+        super().__init__(model=model, effort=effort)
         self._provider = provider
         self._provider_api_key = provider_api_key
 

@@ -32,11 +32,6 @@ class ClaudeCodeHarness(Harness):
         The ``CLAUDE_CODE_OAUTH_TOKEN`` (from ``claude setup-token``) to forward into
         the sandbox. ``None`` (default) reads it from the host
         ``CLAUDE_CODE_OAUTH_TOKEN`` env var; resolution fails if neither is set.
-    env : dict[str, str], optional
-        Literal env vars forwarded verbatim into the sandbox; win over resolved
-        credentials on a key clash. Default none.
-    optional_env : tuple[str, ...], optional
-        Best-effort credential names forwarded from the host when present. Default none.
     """
 
     name = "claude_code"
@@ -54,10 +49,8 @@ class ClaudeCodeHarness(Harness):
         effort: str = "high",
         plugins: list[str] | None = None,
         oauth_token: str | None = None,
-        env: dict[str, str] | None = None,
-        optional_env: tuple[str, ...] = (),
     ) -> None:
-        super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
+        super().__init__(model=model, effort=effort)
         # plugins documented as a class Parameter/Attribute above.
         self.plugins = plugins if plugins is not None else ["lean4"]
         self._oauth_token = oauth_token

@@ -52,11 +52,6 @@ class VibeHarness(Harness):
     mistral_api_key : str, optional
         Mistral La Plateforme key forwarded as ``MISTRAL_API_KEY``. ``None`` (default)
         reads it from the host env var; resolution fails if neither is set.
-    env : dict[str, str], optional
-        Literal env vars forwarded verbatim into the sandbox; win over resolved
-        credentials on a key clash. Default none.
-    optional_env : tuple[str, ...], optional
-        Best-effort credential names forwarded from the host when present. Default none.
     """
 
     name = "vibe"
@@ -79,10 +74,8 @@ class VibeHarness(Harness):
         max_turns: int | None = None,
         max_price: float | None = None,
         mistral_api_key: str | None = None,
-        env: dict[str, str] | None = None,
-        optional_env: tuple[str, ...] = (),
     ) -> None:
-        super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
+        super().__init__(model=model, effort=effort)
         # agent/max_turns/max_price documented as class Parameters/Attributes above.
         self.agent = agent
         self.max_turns = max_turns
