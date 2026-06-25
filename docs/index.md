@@ -38,5 +38,6 @@ installation
 user_guide/index
 provers/index
 compute_backend/index
+examples
 api/index
 ```

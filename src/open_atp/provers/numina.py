@@ -157,6 +157,25 @@ class NuminaProver(AgentProver):
     >>> prover = NuminaProver(backend=backend)
     >>> prover.max_rounds
     20
+
+    Or build the same prover from the standard catalog by name, taking its
+    baked-in defaults (see :func:`~open_atp.config.standard_prover`):
+
+    >>> from open_atp import standard_prover
+    >>> prover = standard_prover("numina", backend=DockerBackend())
+    >>> prover.name
+    'numina'
+
+    Complete a task's ``sorry``\\s with
+    :meth:`~open_atp.provers.base.AutomatedProver.prove`, here on a bundled example
+    (this runs the Numina scaffold in Docker and bills it):
+
+    >>> import tempfile
+    >>> from open_atp.examples import EXAMPLE, example_task
+    >>> task = example_task(EXAMPLE.INTER_UNION_DISTRIB)
+    >>> result = prover.prove(task, tempfile.mkdtemp())  # doctest: +SKIP
+    >>> result.success  # doctest: +SKIP
+    True
     """
 
     name = "numina"

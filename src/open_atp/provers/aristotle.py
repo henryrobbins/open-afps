@@ -108,8 +108,8 @@ class AristotleProver(AutomatedProver):
     Examples
     --------
 
-    Construct the prover directly (network-only, so the backend is just the verify
-    backend):
+    Construct the prover directly (network-only generation, so the backend is just
+    the verify backend):
 
     >>> from open_atp.backends.docker import DockerBackend
     >>> from open_atp.provers.aristotle import AristotleProver
@@ -117,6 +117,26 @@ class AristotleProver(AutomatedProver):
     >>> prover = AristotleProver(backend=backend)
     >>> prover.name
     'aristotle'
+
+    Or build the same prover from the standard catalog by name, taking its
+    baked-in defaults (see :func:`~open_atp.config.standard_prover`):
+
+    >>> from open_atp import standard_prover
+    >>> prover = standard_prover("aristotle", backend=DockerBackend())
+    >>> prover.name
+    'aristotle'
+
+    Complete a task's ``sorry``\\s with
+    :meth:`~open_atp.provers.base.AutomatedProver.prove`, here on a bundled example
+    (this hits the hosted Aristotle API, needing ``ARISTOTLE_API_KEY``, and runs
+    Docker for the verify):
+
+    >>> import tempfile
+    >>> from open_atp.examples import EXAMPLE, example_task
+    >>> task = example_task(EXAMPLE.ABS_MUL_LT)
+    >>> result = prover.prove(task, tempfile.mkdtemp())  # doctest: +SKIP
+    >>> result.success  # doctest: +SKIP
+    True
     """
 
     name = "aristotle"

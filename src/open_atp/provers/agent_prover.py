@@ -134,7 +134,7 @@ class AgentProver(AutomatedProver):
     Examples
     --------
 
-    Construct the prover directly:
+    Construct the prover directly, wiring up a harness and a backend:
 
     >>> from open_atp.backends.docker import DockerBackend
     >>> from open_atp.harness import CodexHarness
@@ -143,6 +143,25 @@ class AgentProver(AutomatedProver):
     >>> prover = AgentProver(harness=CodexHarness(effort="high"), backend=backend)
     >>> prover.harness.model
     'gpt-5.5'
+
+    Or build the same prover from the standard catalog by name, taking its
+    baked-in defaults (see :func:`~open_atp.config.standard_prover`):
+
+    >>> from open_atp import standard_prover
+    >>> prover = standard_prover("agent:codex", backend=DockerBackend())
+    >>> prover.name, prover.harness.name
+    ('agent', 'codex')
+
+    Complete a task's ``sorry``\\s with
+    :meth:`~open_atp.provers.base.AutomatedProver.prove`, here on a bundled example
+    (this runs the agent in Docker and bills it):
+
+    >>> import tempfile
+    >>> from open_atp.examples import EXAMPLE, example_task
+    >>> task = example_task(EXAMPLE.MUL_REORDER)
+    >>> result = prover.prove(task, tempfile.mkdtemp())  # doctest: +SKIP
+    >>> result.success  # doctest: +SKIP
+    True
     """
 
     name = "agent"
