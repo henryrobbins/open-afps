@@ -106,6 +106,9 @@ class AgentProver(AutomatedProver):
 
     Parameters
     ----------
+    backend : ComputeBackend
+        The sandbox the agent runs in. Generation reuses it via a live session and
+        verification runs in that same hot sandbox.
     harness : Harness, optional
         The harness to drive and its knobs:
         :class:`~open_atp.harness.ClaudeCodeHarness` (default),

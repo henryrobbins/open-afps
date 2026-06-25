@@ -6,7 +6,6 @@ funnels its output through the {class}`~open_atp.verify.Verifier`.
 
 ```{eval-rst}
 .. autoclass:: open_atp.verify.VerificationReport
-   :exclude-members: compiles, sorry_free, axioms, compile_log, per_file, non_standard_axioms, verified
 
 .. autodata:: open_atp.verify.STANDARD_AXIOMS
 

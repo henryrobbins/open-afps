@@ -15,7 +15,6 @@ filesystem -- without paying a second spin-up.
 
 ```{eval-rst}
 .. autoclass:: open_atp.backends.base.ComputeBackend
-   :exclude-members: name
 
 .. autoclass:: open_atp.backends.base.CommandHandle
 
@@ -30,7 +29,7 @@ filesystem -- without paying a second spin-up.
 ```{eval-rst}
 .. autoclass:: open_atp.backends.docker.DockerBackend
    :show-inheritance:
-   :exclude-members: name, start
+   :exclude-members: start
 
 .. autoclass:: open_atp.backends.docker.DockerSession
    :show-inheritance:
@@ -41,7 +40,7 @@ filesystem -- without paying a second spin-up.
 ```{eval-rst}
 .. autoclass:: open_atp.backends.modal.ModalBackend
    :show-inheritance:
-   :exclude-members: name, start
+   :exclude-members: start
 
 .. autoclass:: open_atp.backends.modal.ModalSession
    :show-inheritance:

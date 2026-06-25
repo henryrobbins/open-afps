@@ -1,3 +1,4 @@
+import inspect
 from importlib.metadata import version as _pkg_version
 
 from docutils import nodes
@@ -92,7 +93,7 @@ html_theme_options = {
 pygments_style = "friendly"
 pygments_dark_style = "github-dark"
 
-autodoc_default_options = {"members": True, "undoc-members": True}
+autodoc_default_options = {"members": True}
 autodoc_typehints = "none"
 numpydoc_class_members_toctree = False
 numpydoc_show_class_members = False
@@ -173,5 +174,29 @@ def _resolve_modal_xref(
     return ref
 
 
+def _skip_non_methods(
+    app: Sphinx,
+    what: str,
+    name: str,
+    obj: object,
+    skip: bool,
+    options: object,
+) -> bool | None:
+    """Only enumerate *methods* as class members.
+
+    Constructor parameters and attributes (instance state and ``@property``)
+    are documented in the class docstring's ``Parameters``/``Attributes``
+    sections, which numpydoc renders. Letting autodoc also emit them as members
+    duplicates every entry, so skip anything on a class that is not a routine.
+    Methods stay; data attributes, properties, and class vars are dropped.
+    """
+    if skip:
+        return skip
+    if what == "class" and not inspect.isroutine(obj):
+        return True
+    return None
+
+
 def setup(app: Sphinx) -> None:
     app.connect("missing-reference", _resolve_modal_xref)
+    app.connect("autodoc-skip-member", _skip_non_methods)

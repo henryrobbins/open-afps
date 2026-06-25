@@ -215,6 +215,35 @@ skill/test degrade or skip:
   the configured `model`); `TAVILY_API_KEY` optional (ax-prover web search)
 - `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — Modal backend
 
+## Docs: API reference convention
+
+The API pages (`docs/api/*.md`) are Sphinx `autoclass` directives; **numpydoc** renders
+the class docstring's `Parameters`/`Attributes` sections, and a single
+`autodoc-skip-member` hook in `docs/conf.py` (`_skip_non_methods`) drops every class
+member that isn't a method. So the split is:
+
+- **Constructor params and attributes** (instance state + `@property`) live **only in
+  the docstring**, in `Parameters`/`Attributes` sections. The hook hides them as
+  members, so they render once, from the prose. Never re-list them with `:members:`.
+- **Methods** are the only members `autoclass` enumerates. Document each method **once,
+  on the class that defines it.**
+- **Inheritance**: numpydoc does *not* walk the MRO, so each leaf class must
+  **re-document every constructor param it accepts, including inherited ones** (e.g.
+  `backend`/`timeout_s` from `AutomatedProver`) — otherwise they don't render. Pages do
+  **not** use `:inherited-members:`: an inherited method (e.g. `prove`) appears only on
+  its base class, not on each child.
+
+Practical rules:
+
+- **Do not** add `:exclude-members:` for attributes, params, or `name` — the hook
+  already handles them. The only legitimate `:exclude-members:` is to hide an
+  **overridden method** from a child page so it stays documented on the base only
+  (current uses: `start` on the backend impls, `stage` on the harness impls).
+- A new attribute/`@property` only shows up if you add it to the docstring `Attributes`
+  section.
+- `make docs` builds with `-W` (warnings are errors) — a broken xref or duplicate
+  fails the build.
+
 ## Conventions
 
 - Commit directly to `main` unless told otherwise; warn before committing work that

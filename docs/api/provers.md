@@ -18,10 +18,8 @@ generate, then verify in the sandbox) so subclasses only implement `_generate`.
 
 ```{eval-rst}
 .. autoclass:: open_atp.provers.base.AutomatedProver
-   :exclude-members: name
 
 .. autoclass:: open_atp.provers.base.ProofResult
-   :exclude-members: prover, verification, output_dir, completed_files, cost_usd, duration_s, metadata, error, wd, logs_dir, success
 ```
 
 ## Provers
@@ -33,7 +31,6 @@ The concrete candidate generators.
 ```{eval-rst}
 .. autoclass:: open_atp.provers.agent_prover.AgentProver
    :show-inheritance:
-   :exclude-members: name, harness, skills, timeout_s, prover_prompt
 ```
 
 `AgentProver`'s `harness` is a {class}`~open_atp.harness.Harness` — pick the
@@ -46,7 +43,6 @@ are documented under {doc}`harness`.
 ```{eval-rst}
 .. autoclass:: open_atp.provers.numina.NuminaProver
    :show-inheritance:
-   :exclude-members: name, skills, env, timeout_s, max_rounds, max_consecutive_limits, helper_env_keys, guard_statements, on_statement_change, prover_prompt
 ```
 
 ### AristotleProver
@@ -54,7 +50,6 @@ are documented under {doc}`harness`.
 ```{eval-rst}
 .. autoclass:: open_atp.provers.aristotle.AristotleProver
    :show-inheritance:
-   :exclude-members: name, allow_agent_questions, max_connection_retries, max_resume_attempts, resume_backoff_seconds, timeout_s, prover_prompt
 ```
 
 ## Standard catalog

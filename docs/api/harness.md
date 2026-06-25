@@ -16,7 +16,6 @@ See the per-harness prover pages under {doc}`../provers/index` for credential se
 
 ```{eval-rst}
 .. autoclass:: open_atp.harness.base.Harness
-   :exclude-members: name
 
 .. autoclass:: open_atp.harness.base.HarnessRunResult
    :no-members:
@@ -34,23 +33,23 @@ Each harness adapts one agent CLI and is a
 ```{eval-rst}
 .. autoclass:: open_atp.harness.claude_code.ClaudeCodeHarness
    :show-inheritance:
-   :exclude-members: stage, name
+   :exclude-members: stage
 
 .. autoclass:: open_atp.harness.codex.CodexHarness
    :show-inheritance:
-   :exclude-members: stage, name
+   :exclude-members: stage
 
 .. autoclass:: open_atp.harness.opencode.OpenCodeHarness
    :show-inheritance:
-   :exclude-members: stage, name
+   :exclude-members: stage
 
 .. autoclass:: open_atp.harness.vibe.VibeHarness
    :show-inheritance:
-   :exclude-members: stage, name
+   :exclude-members: stage
 
 .. autoclass:: open_atp.harness.axprover.AxProverHarness
    :show-inheritance:
-   :exclude-members: stage, name
+   :exclude-members: stage
 ```
 
 ## Pricing

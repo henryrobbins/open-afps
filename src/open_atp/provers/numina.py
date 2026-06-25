@@ -121,6 +121,9 @@ class NuminaProver(AgentProver):
 
     Parameters
     ----------
+    backend : ComputeBackend
+        The sandbox the agent runs in. Generation reuses it via a live session and
+        verification runs in that same hot sandbox.
     skills : list[str], optional
         Extra named/path skills to mount alongside Numina's vendored scaffold. Default
         empty -- Numina's coordinator skill is staged from ``vendor/numina/skills``, not

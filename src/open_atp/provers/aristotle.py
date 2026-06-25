@@ -78,6 +78,9 @@ class AristotleProver(AutomatedProver):
 
     Parameters
     ----------
+    backend : ComputeBackend
+        The sandbox used only for the final verify; Aristotle generates over the
+        network, so there is no live session to reuse.
     api_key : str, optional
         The Harmonic API key. ``None`` (default) reads it from the host
         ``ARISTOTLE_API_KEY`` env var.
