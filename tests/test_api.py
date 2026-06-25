@@ -31,7 +31,7 @@ from open_atp.harness import (
     OpenCodeHarness,
 )
 from open_atp.images import DEFAULT_IMAGE, Image
-from open_atp.lean import LeanProject, ProofTask, ToolchainMismatch, stage_files
+from open_atp.lean import LeanProject, ProofTask, ToolchainMismatch, create_project
 from open_atp.provers.agent_prover import AgentProver
 from open_atp.provers.aristotle import AristotleProver
 from open_atp.provers.base import AutomatedProver, ProofResult
@@ -234,18 +234,18 @@ def test_to_dict_carries_error_for_a_failed_result(tmp_path: Path) -> None:
 # --- staging bare files ----------------------------------------------------
 
 
-def test_stage_files_builds_a_project_from_bare_lean(tmp_path: Path) -> None:
-    project = stage_files([FIXTURE / "MILExample.lean"], tmp_path / "staged")
+def test_create_project_builds_a_project_from_bare_lean(tmp_path: Path) -> None:
+    project = create_project([FIXTURE / "MILExample.lean"], tmp_path / "staged")
     assert isinstance(project, LeanProject)
     assert (project.root / "MILExample.lean").is_file()
     assert (project.root / "lean-toolchain").is_file()
     assert project.lean_toolchain == DEFAULT_IMAGE.lean_toolchain
 
 
-def test_stage_files_rejects_non_lean(tmp_path: Path) -> None:
+def test_create_project_rejects_non_lean(tmp_path: Path) -> None:
     (tmp_path / "foo.txt").write_text("nope")
     with pytest.raises(ValueError, match="Expected a .lean file"):
-        stage_files([tmp_path / "foo.txt"], tmp_path / "staged")
+        create_project([tmp_path / "foo.txt"], tmp_path / "staged")
 
 
 # --- Docker integration: real verify ---------------------------------------

@@ -24,7 +24,7 @@ from open_atp.config import (
     standard_provers,
 )
 from open_atp.images import DEFAULT_IMAGE, Image
-from open_atp.lean import LeanProject, ProofTask, stage_files
+from open_atp.lean import LeanProject, ProofTask, create_project
 from open_atp.provers.base import AutomatedProver, ProofResult
 from open_atp.verify import VerificationReport
 
@@ -41,5 +41,5 @@ __all__ = [
     "build_prover",
     "build_backend",
     "build_harness",
-    "stage_files",
+    "create_project",
 ]

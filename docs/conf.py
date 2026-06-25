@@ -106,7 +106,7 @@ numpydoc_xref_aliases = {
     "build_prover": "open_atp.config.build_prover",
     "build_harness": "open_atp.config.build_harness",
     "build_backend": "open_atp.config.build_backend",
-    "stage_files": "open_atp.lean.stage_files",
+    "create_project": "open_atp.lean.create_project",
     # Lean input contract
     "LeanProject": "open_atp.lean.LeanProject",
     "ProofTask": "open_atp.lean.ProofTask",

@@ -3,7 +3,7 @@
 The package ships a handful of tiny example tasks — each a single `sorry`'d exercise
 from [*Mathematics in Lean*](https://leanprover-community.github.io/mathematics_in_lean/).
 They double as a setup smoke test: {func}`~open_atp.examples.example_task` stages one
-into the pinned Mathlib skeleton (via {func}`~open_atp.lean.stage_files`) and hands you
+into the pinned Mathlib skeleton (via {func}`~open_atp.lean.create_project`) and hands you
 a ready-to-run {class}`~open_atp.lean.ProofTask`.
 
 ```python

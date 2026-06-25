@@ -45,7 +45,7 @@ src/open_atp/
   api.py            Platform + prover registry — the dispatch/orchestration layer
   __main__.py       `open-atp solve | build-image | build-modal-image` CLI
   images/           image name + toolchain pins (DEFAULT_IMAGE, DEFAULT_TOOLCHAIN)
-  lean.py           LeanProject, ProofTask, stage_files (the Lean input contract)
+  lean.py           LeanProject, ProofTask, create_project (the Lean input contract)
   verify.py         VerificationReport, Verifier (the shared final check)
   backends/         base.py  docker.py  modal.py            (ComputeBackend impls)
   provers/          agent_prover.py  numina.py  numina_tracker.py  aristotle.py

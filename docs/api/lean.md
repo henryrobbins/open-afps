@@ -1,25 +1,37 @@
+---
+tocdepth: 3
+---
+
 # `lean`
 
 The Lean input contract: the project to complete, the task describing what to fill,
 and the staging helper. A project is a *full lake project* carrying its own
 `lean-toolchain` and `lake-manifest.json`.
 
+## Project
+
+A full lake project on disk is just `LeanProject(Path(path))`.
+{func}`~open_atp.lean.create_project` stages one or more bare `.lean` files into the
+pinned Mathlib skeleton.
+
 ```{eval-rst}
 .. autoclass:: open_atp.lean.LeanProject
 
-.. autoclass:: open_atp.lean.ProofTask
-
-.. autoexception:: open_atp.lean.ToolchainMismatch
-   :no-members:
-
-.. autofunction:: open_atp.lean.stage_files
+.. autofunction:: open_atp.lean.create_project
 ```
 
-## Staging input
+## Task
 
-A full lake project on disk is just `LeanProject(Path(path))`.
-{func}`~open_atp.lean.stage_files` stages one or more bare `.lean` files into the
-pinned Mathlib skeleton.
+```{eval-rst}
+.. autoclass:: open_atp.lean.ProofTask
+```
+
+## Exceptions
+
+```{eval-rst}
+.. autoexception:: open_atp.lean.ToolchainMismatch
+   :no-members:
+```
 
 ## Image defaults
 

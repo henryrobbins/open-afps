@@ -7,7 +7,7 @@ we are about to run it in, rather than failing deep inside a build.
 
 A full lake project on disk is already a :class:`LeanProject` (just
 ``LeanProject(Path(path))``); the only nontrivial case is staging one or more bare
-``.lean`` files into the pinned Mathlib skeleton, which :func:`stage_files` does.
+``.lean`` files into the pinned Mathlib skeleton, which :func:`create_project` does.
 """
 
 from __future__ import annotations
@@ -154,7 +154,7 @@ class ProofTask:
         return self.project.files_with_sorry()
 
 
-def stage_files(
+def create_project(
     files: Sequence[Path | str],
     dest: Path | str,
     *,
@@ -168,6 +168,24 @@ def stage_files(
     skeleton (and the baked image) provide -- a file needing a different Mathlib
     revision or extra deps must arrive as a full lake project instead.
 
+    Parameters
+    ----------
+    files : Sequence[Path | str]
+        Bare ``.lean`` files to stage. Each is copied to the root of ``dest``; a
+        non-``.lean`` path raises ``ValueError``.
+    dest : Path | str
+        Destination directory for the new project. Created if missing.
+    skeleton : Path
+        Project skeleton to copy the ``lakefile.toml``/``lean-toolchain`` (and, when
+        present, ``lakefile.lean``/``lake-manifest.json``) from. Default
+        :data:`~open_atp.images.SKELETON_DIR` -- the baked image's skeleton, only
+        present in a source checkout.
+
+    Returns
+    -------
+    LeanProject
+        A complete project rooted at ``dest``, ready to verify.
+
     Examples
     --------
 
@@ -177,14 +195,14 @@ def stage_files(
 
     >>> import tempfile
     >>> from pathlib import Path
-    >>> from open_atp.lean import stage_files
+    >>> from open_atp.lean import create_project
     >>> skeleton = Path(tempfile.mkdtemp())
     >>> _ = (skeleton / "lakefile.toml").write_text('name = "demo"\\n')
     >>> _ = (skeleton / "lean-toolchain").write_text("leanprover/lean4:v4.31.0\\n")
     >>> bare = Path(tempfile.mkdtemp()) / "Bare.lean"
     >>> _ = bare.write_text("theorem t : True := by sorry\\n")
     >>> dest = Path(tempfile.mkdtemp()) / "project"
-    >>> project = stage_files([bare], dest, skeleton=skeleton)
+    >>> project = create_project([bare], dest, skeleton=skeleton)
     >>> project.lean_toolchain
     'leanprover/lean4:v4.31.0'
     >>> [p.name for p in project.lean_files()]

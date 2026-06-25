@@ -3,7 +3,7 @@
 Each example is a single bare ``.lean`` file (an exercise from *Mathematics in
 Lean*, stated with ``sorry``) shipped under ``examples/assets``. :func:`example_task`
 stages the chosen file into the pinned Mathlib skeleton with
-:func:`~open_atp.lean.stage_files`, yielding a complete
+:func:`~open_atp.lean.create_project`, yielding a complete
 :class:`~open_atp.lean.ProofTask`.
 
 So :func:`example_task` doubles as a setup smoke test: handing its result to
@@ -30,7 +30,7 @@ import tempfile
 from enum import Enum
 from pathlib import Path
 
-from open_atp.lean import ProofTask, stage_files
+from open_atp.lean import ProofTask, create_project
 
 #: Directory holding the bundled example ``.lean`` assets.
 _ASSETS_DIR = Path(__file__).resolve().parent / "assets"
@@ -69,14 +69,14 @@ def example_task(name: EXAMPLE) -> ProofTask:
 
     ``name`` is an :class:`EXAMPLE` member (the exercise sources are shown on the
     :doc:`/examples` page). The bare ``.lean`` asset is staged into the pinned Mathlib
-    skeleton (:func:`~open_atp.lean.stage_files`) under a fresh temp directory, so the
-    returned task is a complete lake project pinned to
+    skeleton (:func:`~open_atp.lean.create_project`) under a fresh temp directory, so
+    the returned task is a complete lake project pinned to
     :data:`~open_atp.DEFAULT_IMAGE` -- hand it straight to
     :meth:`~open_atp.provers.base.AutomatedProver.prove`.
     """
     asset = _ASSETS_DIR / f"{name.value}.lean"
     dest = Path(tempfile.mkdtemp()) / "project"
-    return ProofTask(stage_files([asset], dest))
+    return ProofTask(create_project([asset], dest))
 
 
 __all__ = ["EXAMPLE", "example_task"]
