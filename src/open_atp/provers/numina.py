@@ -26,7 +26,6 @@ still tracked (and surfaced in metadata) for parity/observability.
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
 from pathlib import Path
@@ -142,13 +141,11 @@ class NuminaProver(AgentProver):
         Behavior on a weakened/deleted target theorem: ``error`` stops the run and
         restores the originals; ``warn`` restores and continues. Default ``error``
         (rejects; safe).
-    extra_env : dict[str, str], optional
-        Additional environment variables forwarded into the agent sandbox, applied
-        after :attr:`env`. Default empty.
     timeout_s : int
         Wall-clock budget for the generation run, in seconds. Default ``1800``.
     env : dict[str, str], optional
-        Extra environment variables exported into the run. Default empty.
+        Extra literal environment variables forwarded into the agent sandbox (Numina
+        pins its harness, so its env knobs live here). Default empty.
 
     Attributes
     ----------
@@ -181,20 +178,21 @@ class NuminaProver(AgentProver):
         helper_env_keys: tuple[str, ...] = _DEFAULT_HELPER_ENV_KEYS,
         guard_statements: bool = True,
         on_statement_change: Literal["error", "warn"] = "error",
-        extra_env: dict[str, str] | None = None,
         timeout_s: int = 1800,
         env: dict[str, str] | None = None,
     ) -> None:
         # The harness is pinned: Numina is claude_code-driven (no plugins; it ships its
         # own scaffold) and not configurable. Default skills are empty -- the
         # coordinator skill is staged from the vendored scaffold, not the shared list.
+        # Numina owns its env: helper-skill keys become the harness's optional_env
+        # (forwarded if present, never a hard failure) and any literal extras its env.
         super().__init__(
             backend=backend,
-            harness=ClaudeCodeHarness(plugins=[]),
+            harness=ClaudeCodeHarness(
+                plugins=[], optional_env=tuple(helper_env_keys), env=env
+            ),
             skills=skills if skills is not None else [],
-            extra_env=extra_env,
             timeout_s=timeout_s,
-            env=env,
         )
         #: Maximum number of coordinator rounds before the run stops.
         self.max_rounds = max_rounds
@@ -525,12 +523,3 @@ class NuminaProver(AgentProver):
             for p in sorted(workdir.rglob("*.lean"))
             if ".lake" not in p.parts and _SORRY_RE.search(p.read_text())
         ]
-
-    def _auth(self, harness: Harness) -> tuple[dict[str, str], list[tuple[str, str]]]:
-        """Extend the base auth with Numina's helper-skill credentials."""
-        env, mounts = super()._auth(harness)
-        for key in self.helper_env_keys:
-            value = os.environ.get(key)
-            if value is not None:
-                env.setdefault(key, value)
-        return env, mounts

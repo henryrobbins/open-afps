@@ -148,8 +148,6 @@ class AutomatedProver(abc.ABC):
         final check.
     timeout_s : int
         Wall-clock budget for the generation run, in seconds. Default ``1800``.
-    env : dict[str, str], optional
-        Extra environment variables exported into the run. Default empty.
     """
 
     name: str = "base"
@@ -159,12 +157,9 @@ class AutomatedProver(abc.ABC):
         *,
         backend: ComputeBackend,
         timeout_s: int = 1800,
-        env: dict[str, str] | None = None,
     ) -> None:
         # Documented as a class Parameter above; not a separately documented member.
         self.timeout_s = timeout_s
-        # Documented as a class Parameter above; not a separately documented member.
-        self.env = dict(env or {})
         # The backend's image carries the toolchain + Mathlib pins the verifier rejects
         # mismatched projects against. Agentic provers reuse this same backend (via a
         # live session over it) for generation, then verify in that hot sandbox -- see

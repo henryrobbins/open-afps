@@ -196,13 +196,11 @@ def _stage(run_dir: Path) -> Path:
 
 
 def _auth(harness: Harness, backend: ComputeBackend) -> tuple[dict, list]:
-    """Resolve the harness AuthSpec into backend env + mounts (mirrors prove())."""
-    spec = harness.auth_spec()
-    env = {k: os.environ[k] for k in spec.env if k in os.environ}
-    env.update(harness.static_env())
+    """Map the harness's resolved AgentAuth into backend env + mounts (like prove())."""
+    auth = harness.agent_auth()
     home = backend.container_home
-    mounts = [(str(src), f"{home}/{dest}") for src, dest in spec.home_dirs]
-    return env, mounts
+    mounts = [(str(src), f"{home}/{dest}") for src, dest in auth.mounts]
+    return auth.env, mounts
 
 
 def _run(harness_name: str, backend_name: str, run_dir: Path, action: str) -> Path:

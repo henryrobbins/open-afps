@@ -78,9 +78,9 @@ class AristotleProver(AutomatedProver):
 
     Parameters
     ----------
-    api_key_env : str
-        Name of the environment variable holding the Harmonic API key. Default
-        ``ARISTOTLE_API_KEY``.
+    api_key : str, optional
+        The Harmonic API key. ``None`` (default) reads it from the host
+        ``ARISTOTLE_API_KEY`` env var.
     allow_agent_questions : bool
         Whether to let the hosted agent ask clarifying questions. Off by default:
         this is a headless API path and a prompt for stdin would hang the run.
@@ -96,8 +96,6 @@ class AristotleProver(AutomatedProver):
         Default ``5.0``.
     timeout_s : int
         Wall-clock budget for the generation run, in seconds. Default ``1800``.
-    env : dict[str, str], optional
-        Extra environment variables exported into the run. Default empty.
 
     Attributes
     ----------
@@ -114,8 +112,8 @@ class AristotleProver(AutomatedProver):
     >>> from open_atp.provers.aristotle import AristotleProver
     >>> backend = DockerBackend()
     >>> prover = AristotleProver(backend=backend)
-    >>> prover.api_key_env
-    'ARISTOTLE_API_KEY'
+    >>> prover.name
+    'aristotle'
     """
 
     name = "aristotle"
@@ -124,17 +122,16 @@ class AristotleProver(AutomatedProver):
         self,
         *,
         backend: ComputeBackend,
-        api_key_env: str = "ARISTOTLE_API_KEY",
+        api_key: str | None = None,
         allow_agent_questions: bool = False,
         max_connection_retries: int = 5,
         max_resume_attempts: int = 20,
         resume_backoff_seconds: float = 5.0,
         timeout_s: int = 1800,
-        env: dict[str, str] | None = None,
     ) -> None:
-        super().__init__(backend=backend, timeout_s=timeout_s, env=env)
-        #: Name of the env var holding the Harmonic API key.
-        self.api_key_env = api_key_env
+        super().__init__(backend=backend, timeout_s=timeout_s)
+        #: The Harmonic API key, or ``None`` to read ``ARISTOTLE_API_KEY`` at run time.
+        self._api_key = api_key
         #: Whether to let the hosted agent ask clarifying questions.
         self.allow_agent_questions = allow_agent_questions
         #: Bounds per-call retries when a connection drops.
@@ -208,7 +205,7 @@ class AristotleProver(AutomatedProver):
         import aristotlelib
         from aristotlelib import AgentQuestionsSetting, Project
 
-        key = os.environ.get(self.api_key_env)
+        key = self._api_key or os.environ.get("ARISTOTLE_API_KEY")
         if key:
             aristotlelib.set_api_key(key)
 

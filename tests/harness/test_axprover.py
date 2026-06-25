@@ -97,14 +97,25 @@ def test_registered_and_construction_carries_max_iterations() -> None:
     assert harness.max_iterations == 20
 
 
-def test_auth_spec_requires_a_provider_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_agent_auth_requires_the_selected_provider_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # claude-* selects the anthropic provider, so it requires ANTHROPIC_API_KEY.
     harness = AxProverHarness(model="claude-opus-4-8")
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"):
         monkeypatch.delenv(key, raising=False)
     with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
-        harness.auth_spec()
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    assert harness.auth_spec().env == ["ANTHROPIC_API_KEY"]
+        harness.agent_auth()
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-host")
+    assert harness.agent_auth().env == {"ANTHROPIC_API_KEY": "sk-host"}
+
+
+def test_agent_auth_explicit_provider_key_overrides_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    harness = AxProverHarness(model="claude-opus-4-8", provider_api_key="sk-explicit")
+    assert harness.agent_auth().env == {"ANTHROPIC_API_KEY": "sk-explicit"}
 
 
 def test_agent_command_is_self_discovering_script() -> None:

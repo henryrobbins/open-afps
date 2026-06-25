@@ -21,7 +21,7 @@ See the per-harness prover pages under {doc}`../provers/index` for credential se
 .. autoclass:: open_atp.harness.base.HarnessRunResult
    :no-members:
 
-.. autoclass:: open_atp.harness.base.AuthSpec
+.. autoclass:: open_atp.harness.base.AgentAuth
    :no-members:
 ```
 

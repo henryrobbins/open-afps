@@ -16,7 +16,6 @@ changed. The shared :class:`~open_atp.verify.Verifier` (owned by the base
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 from pathlib import Path
 from typing import TextIO
@@ -121,13 +120,8 @@ class AgentProver(AutomatedProver):
         vendored ``leanprover/skills`` catalog) or a full path to a ``SKILL.md``
         tree. Default ``["lean-proof"]``; an empty list mounts none. Staged into
         every skill-supporting harness's location; ignored by ax-prover.
-    extra_env : dict[str, str], optional
-        Additional environment variables forwarded into the agent sandbox, applied
-        after :attr:`env`. Default empty.
     timeout_s : int
         Wall-clock budget for the generation run, in seconds. Default ``1800``.
-    env : dict[str, str], optional
-        Extra environment variables exported into the run. Default empty.
 
     Attributes
     ----------
@@ -156,17 +150,13 @@ class AgentProver(AutomatedProver):
         backend: ComputeBackend,
         harness: Harness | None = None,
         skills: list[str] | None = None,
-        extra_env: dict[str, str] | None = None,
         timeout_s: int = 1800,
-        env: dict[str, str] | None = None,
     ) -> None:
-        super().__init__(backend=backend, timeout_s=timeout_s, env=env)
+        super().__init__(backend=backend, timeout_s=timeout_s)
         #: The harness this prover drives.
         self.harness = harness or ClaudeCodeHarness()
         #: Skills to mount into the agent workdir (names or paths).
         self.skills = skills if skills is not None else ["lean-proof"]
-        #: Additional environment variables forwarded into the agent sandbox.
-        self.extra_env = dict(extra_env or {})
 
     @property
     def prover_prompt(self) -> str:
@@ -269,19 +259,11 @@ class AgentProver(AutomatedProver):
         }
 
     def _auth(self, harness: Harness) -> tuple[dict[str, str], list[tuple[str, str]]]:
-        """Resolve the harness's :class:`AuthSpec` into backend env + mounts."""
-        spec = harness.auth_spec()
-        env: dict[str, str] = {}
-        for key in spec.env:
-            value = os.environ.get(key)
-            if value is not None:
-                env[key] = value
-        env.update(harness.static_env())
-        env.update(self.env)
-        env.update(self.extra_env)
+        """Map the harness's resolved :class:`AgentAuth` onto backend env + mounts."""
+        auth = harness.agent_auth()
         home = self.verifier.backend.container_home
-        mounts = [(str(src), f"{home}/{dest}") for src, dest in spec.home_dirs]
-        return env, mounts
+        mounts = [(str(src), f"{home}/{dest}") for src, dest in auth.mounts]
+        return auth.env, mounts
 
     def _run_agent(
         self,

@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
 from open_atp.harness._paths import _SCRIPTS
 from open_atp.harness.base import (
-    AuthSpec,
     Harness,
     HarnessRunResult,
     _infer_provider,
@@ -24,6 +22,12 @@ class OpenCodeHarness(Harness):
     provider : str, optional
         API provider name. ``None`` infers it from the model prefix (``claude-*`` ->
         ``anthropic``, ``gpt-*`` -> ``openai``, ...).
+    provider_api_key : str, optional
+        The selected provider's API key, forwarded under its canonical env var
+        (``ANTHROPIC_API_KEY`` / ``OPENAI_API_KEY`` / ...). ``None`` (default) reads
+        that env var from the host; resolution fails if neither is set. The key is
+        assumed to match :attr:`provider` (OpenAI and DeepSeek keys are
+        indistinguishable, so no format check is done).
     """
 
     name = "opencode"
@@ -36,9 +40,13 @@ class OpenCodeHarness(Harness):
         model: str = "claude-opus-4-8",
         effort: str = "high",
         provider: str | None = None,
+        provider_api_key: str | None = None,
+        env: dict[str, str] | None = None,
+        optional_env: tuple[str, ...] = (),
     ) -> None:
-        super().__init__(model=model, effort=effort)
+        super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
         self._provider = provider
+        self._provider_api_key = provider_api_key
 
     @property
     def provider(self) -> str:
@@ -77,18 +85,8 @@ class OpenCodeHarness(Harness):
             },
         }
 
-    def auth_spec(self) -> AuthSpec:
-        env = [
-            key
-            for key in (
-                "ANTHROPIC_API_KEY",
-                "OPENAI_API_KEY",
-                "GOOGLE_API_KEY",
-                "DEEPSEEK_API_KEY",
-            )
-            if key in os.environ
-        ]
-        return AuthSpec(env=env)
+    def _required_env(self) -> dict[str, str]:
+        return self._provider_key_env(self.provider, self._provider_api_key)
 
     def _agent_command(self) -> str:
         template = (_SCRIPTS / "opencode_agent.sh").read_text()

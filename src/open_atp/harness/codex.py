@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from open_atp.harness._paths import _SCRIPTS
-from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
+from open_atp.harness.base import Harness, HarnessRunResult
 
 
 class CodexHarness(Harness):
@@ -16,20 +16,35 @@ class CodexHarness(Harness):
 
     Codex authenticates via ChatGPT/OpenAI, so it must run an OpenAI model; ``model``
     defaults to ``gpt-5.5`` rather than the Anthropic base default.
+
+    Parameters
+    ----------
+    auth_file : Path, optional
+        The Codex ``auth.json`` to mount. ``None`` (default) uses ``~/.codex/auth.json``
+        (from ``codex login``); resolution fails if the file is absent.
     """
 
     name = "codex"
 
     skills_dest = ".agents/skills"
 
-    #: Holds the staged minimal ``.codex`` so it outlives :meth:`auth_spec` until the
+    #: Holds the staged minimal ``.codex`` so it outlives :meth:`_home_dirs` until the
     #: backend pushes/bind-mounts it; cleaned up when the harness is collected.
     _codex_home: tempfile.TemporaryDirectory[str] | None = None
 
-    def __init__(self, *, model: str = "gpt-5.5", effort: str = "high") -> None:
-        super().__init__(model=model, effort=effort)
+    def __init__(
+        self,
+        *,
+        model: str = "gpt-5.5",
+        effort: str = "high",
+        auth_file: Path | None = None,
+        env: dict[str, str] | None = None,
+        optional_env: tuple[str, ...] = (),
+    ) -> None:
+        super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
+        self._auth_file = auth_file
 
-    def auth_spec(self) -> AuthSpec:
+    def _home_dirs(self) -> list[tuple[Path, str]]:
         # Mount ONLY the auth credential, never the whole ~/.codex: the host's
         # config.toml registers personal MCP servers (e.g. a localhost Zotero server)
         # that don't exist in the sandbox, and codex aborts when one is unreachable.
@@ -37,7 +52,7 @@ class CodexHarness(Harness):
         # the lean-lsp MCP via -c overrides, so no host config is needed. Staged once
         # and cached so both _auth() calls (mounts, then env) return the same dir and
         # it survives until the backend mounts it.
-        auth = Path.home() / ".codex" / "auth.json"
+        auth = self._auth_file or Path.home() / ".codex" / "auth.json"
         if not auth.is_file():
             raise RuntimeError(
                 "codex harness requires ~/.codex/auth.json from `codex login`"
@@ -46,7 +61,7 @@ class CodexHarness(Harness):
             self._codex_home = tempfile.TemporaryDirectory(prefix="codex-home-")
             # copy2 preserves auth.json's 0600 mode, which codex requires.
             shutil.copy2(auth, Path(self._codex_home.name) / "auth.json")
-        return AuthSpec(home_dirs=[(Path(self._codex_home.name), ".codex")])
+        return [(Path(self._codex_home.name), ".codex")]
 
     def _agent_command(self) -> str:
         return self._render((_SCRIPTS / "codex_agent.sh").read_text())

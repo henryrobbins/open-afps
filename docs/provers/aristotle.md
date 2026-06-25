@@ -10,9 +10,9 @@ Docker sandbox. This is the platform's simplest end-to-end slice.
 
 ## Authentication
 
-The prover reads an API key from the environment variable named by
-{attr}`~open_atp.provers.aristotle.AristotleProver.api_key_env` (default
-`ARISTOTLE_API_KEY`). Set it on the host:
+The prover reads the Harmonic API key from the `ARISTOTLE_API_KEY` environment
+variable (or pass it explicitly as
+{attr}`~open_atp.provers.aristotle.AristotleProver` `api_key`). Set it on the host:
 
 ```bash
 export ARISTOTLE_API_KEY=...

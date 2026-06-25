@@ -123,13 +123,20 @@ def test_agent_command_omits_unset_guards() -> None:
     assert "--max-price" not in script
 
 
-def test_auth_spec_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_agent_auth_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     harness = VibeHarness(model="labs-leanstral-2603")
     monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="MISTRAL_API_KEY"):
-        harness.auth_spec()
-    monkeypatch.setenv("MISTRAL_API_KEY", "sk-test")
-    assert harness.auth_spec().env == ["MISTRAL_API_KEY"]
+        harness.agent_auth()
+    monkeypatch.setenv("MISTRAL_API_KEY", "sk-host")
+    assert harness.agent_auth().env == {"MISTRAL_API_KEY": "sk-host"}
+
+
+def test_agent_auth_explicit_key_overrides_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    harness = VibeHarness(mistral_api_key="sk-explicit")
+    # Resolves from the constructor without the host env var set.
+    assert harness.agent_auth().env == {"MISTRAL_API_KEY": "sk-explicit"}
 
 
 # --- stage -----------------------------------------------------------------

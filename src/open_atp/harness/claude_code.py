@@ -9,7 +9,7 @@ from pathlib import Path
 
 from open_atp.harness._catalog import resolve_plugin
 from open_atp.harness._paths import _MCP_JSON, _SCRIPTS
-from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
+from open_atp.harness.base import Harness, HarnessRunResult
 
 
 class ClaudeCodeHarness(Harness):
@@ -24,6 +24,10 @@ class ClaudeCodeHarness(Harness):
         Claude Code plugins to load, each a name (resolved from the vendored
         ``lean4-skills`` catalog) or a full path to a ``.claude-plugin/plugin.json``
         tree. Default ``["lean4"]``; an empty list loads none.
+    oauth_token : str, optional
+        The ``CLAUDE_CODE_OAUTH_TOKEN`` (from ``claude setup-token``) to forward into
+        the sandbox. ``None`` (default) reads it from the host
+        ``CLAUDE_CODE_OAUTH_TOKEN`` env var; resolution fails if neither is set.
     """
 
     name = "claude_code"
@@ -40,10 +44,14 @@ class ClaudeCodeHarness(Harness):
         model: str = "claude-opus-4-8",
         effort: str = "high",
         plugins: list[str] | None = None,
+        oauth_token: str | None = None,
+        env: dict[str, str] | None = None,
+        optional_env: tuple[str, ...] = (),
     ) -> None:
-        super().__init__(model=model, effort=effort)
+        super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
         #: Claude Code plugins to load (names or paths).
         self.plugins = plugins if plugins is not None else ["lean4"]
+        self._oauth_token = oauth_token
 
     def stage(self, wd: Path) -> None:
         super().stage(wd)
@@ -80,7 +88,7 @@ class ClaudeCodeHarness(Harness):
             for p in self._resolved_plugins()
         )
 
-    def static_env(self) -> dict[str, str]:
+    def _static_env(self) -> dict[str, str]:
         # Lets bypassPermissions run non-interactively in the container.
         env = {"IS_SANDBOX": "1"}
         # Plugin-provided subagents (e.g. lean4's sorry-filler-deep) are only
@@ -89,15 +97,16 @@ class ClaudeCodeHarness(Harness):
             env["CLAUDE_CODE_FORK_SUBAGENT"] = "1"
         return env
 
-    def auth_spec(self) -> AuthSpec:
+    def _required_env(self) -> dict[str, str]:
         # A long-lived token (from `claude setup-token`) bills against a Claude
         # subscription rather than at the higher per-API-call rate.
-        if "CLAUDE_CODE_OAUTH_TOKEN" not in os.environ:
+        token = self._oauth_token or os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
+        if not token:
             raise RuntimeError(
                 "claude_code harness requires CLAUDE_CODE_OAUTH_TOKEN"
                 " from `claude setup-token`"
             )
-        return AuthSpec(env=["CLAUDE_CODE_OAUTH_TOKEN"])
+        return {"CLAUDE_CODE_OAUTH_TOKEN": token}
 
     def _agent_command(self) -> str:
         template = self._render((_SCRIPTS / "claude_code_agent.sh").read_text())

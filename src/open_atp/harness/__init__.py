@@ -10,7 +10,7 @@ from open_atp.harness.axprover import AxProverHarness
 from open_atp.harness.base import (
     PROMPT_FILE,
     SCRIPT_FILE,
-    AuthSpec,
+    AgentAuth,
     Harness,
     HarnessRunResult,
 )
@@ -36,7 +36,7 @@ _HARNESSES: dict[str, type[Harness]] = {
 __all__ = [
     "Harness",
     "HarnessRunResult",
-    "AuthSpec",
+    "AgentAuth",
     "SCRIPT_FILE",
     "PROMPT_FILE",
     "ClaudeCodeHarness",

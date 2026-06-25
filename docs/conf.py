@@ -129,7 +129,7 @@ numpydoc_xref_aliases = {
     # Harnesses
     "Harness": "open_atp.harness.base.Harness",
     "HarnessRunResult": "open_atp.harness.base.HarnessRunResult",
-    "AuthSpec": "open_atp.harness.base.AuthSpec",
+    "AgentAuth": "open_atp.harness.base.AgentAuth",
     "ClaudeCodeHarness": "open_atp.harness.claude_code.ClaudeCodeHarness",
     "CodexHarness": "open_atp.harness.codex.CodexHarness",
     "OpenCodeHarness": "open_atp.harness.opencode.OpenCodeHarness",

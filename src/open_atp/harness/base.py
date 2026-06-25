@@ -6,7 +6,7 @@ A :class:`Harness` knows, for one agent CLI (Claude Code / Codex / OpenCode):
   config, skills) -- :meth:`Harness.stage` -- and where to write the prompt the
   prover hands it -- :meth:`Harness.write_prompt`;
 * the bash command that launches the agent -- :attr:`Harness.command`;
-* which credentials to forward into the sandbox -- :meth:`Harness.auth_spec`; and
+* which credentials to resolve and forward -- :meth:`Harness.agent_auth`; and
 * how to read token/cost totals out of the agent's streamed JSON
   -- :meth:`Harness.parse`.
 
@@ -21,11 +21,22 @@ the prover (``AgentProver.skills``, resolved to source dirs and handed to
 
 from __future__ import annotations
 
+import os
 import shutil
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
+
+#: Provider name (see :func:`_infer_provider`) -> the canonical env var the agent
+#: CLI reads its key from. OpenCode/ax-prover forward the selected provider's key
+#: under this name.
+_PROVIDER_ENV = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "google": "GOOGLE_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+}
 
 #: Files the harness writes into the workdir; named so they never collide with a
 #: project's own sources.
@@ -34,20 +45,25 @@ PROMPT_FILE = "agent_prompt.txt"
 
 
 @dataclass(frozen=True)
-class AuthSpec:
-    """Compute-agnostic description of the credentials a harness needs.
+class AgentAuth:
+    """Resolved credentials a harness hands the prover to wire into the sandbox.
+
+    Unlike a declarative spec, ``env`` here holds resolved name->**value** pairs --
+    the harness has already read the host environment (and any explicit overrides)
+    and validated that required credentials are present. The prover only forwards
+    them; it never touches ``os.environ``.
 
     Attributes
     ----------
     env:
-        Host environment-variable names to forward into the sandbox.
-    home_dirs:
+        Environment variables (name -> value) to forward into the sandbox.
+    mounts:
         Host directories to expose under the sandbox's ``$HOME``, as
         ``(host_dir, dest_basename)`` pairs (e.g. ``(~/.codex, ".codex")``).
     """
 
-    env: list[str] = field(default_factory=list)
-    home_dirs: list[tuple[Path, str]] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)
+    mounts: list[tuple[Path, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -79,11 +95,24 @@ class Harness(ABC):
     #: (ax-prover ships its own). Read by :meth:`stage_skills` and the prover.
     skills_dest: ClassVar[str | None] = None
 
-    def __init__(self, *, model: str = "claude-opus-4-8", effort: str = "high") -> None:
+    def __init__(
+        self,
+        *,
+        model: str = "claude-opus-4-8",
+        effort: str = "high",
+        env: dict[str, str] | None = None,
+        optional_env: tuple[str, ...] = (),
+    ) -> None:
         #: Model id this harness runs.
         self.model = model
         #: Reasoning-effort level passed to harnesses that support it.
         self.effort = effort
+        #: Literal env vars (name -> value) forwarded verbatim; win over resolved
+        #: credentials on a key clash.
+        self._env = dict(env or {})
+        #: Best-effort credential names: forwarded from the host if present, never
+        #: a hard failure when absent (e.g. helper-skill keys).
+        self._optional_env = tuple(optional_env)
 
     @property
     def command(self) -> str:
@@ -95,13 +124,56 @@ class Harness(ABC):
         """
         return f'export PROMPT="$(cat {PROMPT_FILE})" && bash {SCRIPT_FILE}'
 
-    def static_env(self) -> dict[str, str]:
+    def agent_auth(self) -> AgentAuth:
+        """Resolve this harness's credentials into a ready-to-forward auth bundle.
+
+        Merges, in order: non-secret constants (:meth:`_static_env`), resolved
+        required credentials (:meth:`_required_env`, which raises if a needed key is
+        absent), best-effort :attr:`_optional_env` names present on the host, and the
+        caller's literal :attr:`_env` overrides (which win). Mount dirs come from
+        :meth:`_home_dirs`.
+        """
+        env: dict[str, str] = {}
+        env.update(self._static_env())
+        env.update(self._required_env())
+        for key in self._optional_env:
+            value = os.environ.get(key)
+            if value is not None:
+                env.setdefault(key, value)
+        env.update(self._env)
+        return AgentAuth(env=env, mounts=self._home_dirs())
+
+    def _static_env(self) -> dict[str, str]:
         """Non-secret env vars to set for this harness (e.g. ``IS_SANDBOX``)."""
         return {}
 
-    def auth_spec(self) -> AuthSpec:
-        """Credentials to forward into the sandbox for this harness."""
-        return AuthSpec()
+    def _required_env(self) -> dict[str, str]:
+        """Resolve the harness's required credentials (name -> value).
+
+        Override to read explicit constructor overrides or fall back to the host
+        environment, raising if a required key is absent.
+        """
+        return {}
+
+    def _home_dirs(self) -> list[tuple[Path, str]]:
+        """``(src, basename)`` dirs to mount under the sandbox ``$HOME``."""
+        return []
+
+    def _provider_key_env(self, provider: str, explicit: str | None) -> dict[str, str]:
+        """Resolve a provider API key, forwarded under its canonical env-var name.
+
+        ``explicit`` (a constructor override) wins; otherwise read the host env under
+        :data:`_PROVIDER_ENV`'s name for ``provider``. Raise if neither is set. No
+        format check -- OpenAI and DeepSeek keys are both ``sk-...`` and
+        indistinguishable, so the key is assumed correct for the selected provider.
+        """
+        env_name = _PROVIDER_ENV[provider]
+        key = explicit or os.environ.get(env_name)
+        if not key:
+            raise RuntimeError(
+                f"{self.name} harness requires {env_name} for provider {provider!r}"
+            )
+        return {env_name: key}
 
     def stage(self, wd: Path) -> None:
         """Populate ``wd`` with the harness's launch script.

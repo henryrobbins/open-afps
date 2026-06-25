@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from pathlib import Path
 from typing import Any, ClassVar
 
 from open_atp.harness._paths import _SCRIPTS
 from open_atp.harness.base import (
-    AuthSpec,
     Harness,
     HarnessRunResult,
     _infer_provider,
@@ -67,28 +65,25 @@ class AxProverHarness(Harness):
         model: str = "claude-opus-4-8",
         effort: str = "high",
         max_iterations: int | None = None,
+        provider_api_key: str | None = None,
+        env: dict[str, str] | None = None,
+        optional_env: tuple[str, ...] = (),
     ) -> None:
-        super().__init__(model=model, effort=effort)
+        super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
         #: Cap on ax-prover's proposer->builder->reviewer loop; ``None`` keeps
         #: ax-prover's own default (50).
         self.max_iterations = max_iterations
+        self._provider_api_key = provider_api_key
         #: Set in :meth:`stage`; where :meth:`parse` looks for usage files.
         self._wd: Path | None = None
 
-    def auth_spec(self) -> AuthSpec:
-        # Raw provider keys, exactly like OpenCodeHarness; ax-prover reads them from
-        # the process env (ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY).
-        env = [
-            key
-            for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY")
-            if key in os.environ
-        ]
-        if not env:
-            raise RuntimeError(
-                "axprover harness requires one of ANTHROPIC_API_KEY / "
-                "OPENAI_API_KEY / GOOGLE_API_KEY"
-            )
-        return AuthSpec(env=env)
+    def _required_env(self) -> dict[str, str]:
+        # ax-prover reads the provider key from the process env; forward the selected
+        # provider's key under its canonical name (ANTHROPIC_API_KEY / OPENAI_API_KEY
+        # / GOOGLE_API_KEY / DEEPSEEK_API_KEY).
+        return self._provider_key_env(
+            _infer_provider(self.model), self._provider_api_key
+        )
 
     def stage(self, wd: Path) -> None:
         # ax-prover has its own prompts and ignores the written prompt, but the base

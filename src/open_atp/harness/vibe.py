@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from open_atp.harness._paths import _SCRIPTS, _VIBE_ASSETS
-from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
+from open_atp.harness.base import Harness, HarnessRunResult
 
 
 class VibeHarness(Harness):
@@ -54,25 +54,30 @@ class VibeHarness(Harness):
         agent: str = "lean-standin",
         max_turns: int | None = None,
         max_price: float | None = None,
+        mistral_api_key: str | None = None,
+        env: dict[str, str] | None = None,
+        optional_env: tuple[str, ...] = (),
     ) -> None:
-        super().__init__(model=model, effort=effort)
+        super().__init__(model=model, effort=effort, env=env, optional_env=optional_env)
         #: Which vibe agent profile to drive: ``lean`` (Leanstral) or a model-templated
         #: stand-in.
         self.agent = agent
         #: ``vibe -p`` programmatic-run guards; ``None`` leaves them unset.
         self.max_turns = max_turns
         self.max_price = max_price
+        self._mistral_api_key = mistral_api_key
         #: Set in :meth:`stage`; where :meth:`parse` looks for session logs.
         self._session_log_dir: Path | None = None
 
-    def auth_spec(self) -> AuthSpec:
+    def _required_env(self) -> dict[str, str]:
         # The lean agent's provider reads MISTRAL_API_KEY from the process env
-        # (api_key_env_var); forward it from the host into the sandbox.
-        if "MISTRAL_API_KEY" not in os.environ:
+        # (api_key_env_var in lean-standin.toml); forward it into the sandbox.
+        key = self._mistral_api_key or os.environ.get("MISTRAL_API_KEY")
+        if not key:
             raise RuntimeError(
                 "vibe harness requires MISTRAL_API_KEY (a Mistral La Plateforme key)"
             )
-        return AuthSpec(env=["MISTRAL_API_KEY"])
+        return {"MISTRAL_API_KEY": key}
 
     def stage(self, wd: Path) -> None:
         super().stage(wd)

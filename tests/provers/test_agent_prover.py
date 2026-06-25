@@ -119,7 +119,7 @@ def test_claude_code_stage_writes_assets(tmp_path: Path) -> None:
     plugin_json = tmp_path / ".plugins" / "lean4" / ".claude-plugin" / "plugin.json"
     assert plugin_json.is_file()
     assert "--plugin-dir .plugins/lean4" in script
-    assert harness.static_env().get("CLAUDE_CODE_FORK_SUBAGENT") == "1"
+    assert harness._static_env().get("CLAUDE_CODE_FORK_SUBAGENT") == "1"
     # stage() does not mount the skills list -- that is the prover's job.
     assert not (tmp_path / ".claude" / "skills").exists()
 
@@ -175,7 +175,36 @@ def test_empty_plugins_mount_nothing_for_claude(tmp_path: Path) -> None:
     # (the header comment may mention the flag generically; the command must not).
     script = (tmp_path / "agent.sh").read_text()
     assert script.rstrip().endswith("--effort 'high'")
-    assert "CLAUDE_CODE_FORK_SUBAGENT" not in harness.static_env()
+    assert "CLAUDE_CODE_FORK_SUBAGENT" not in harness._static_env()
+
+
+def test_claude_agent_auth_resolves_oauth_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Missing on the host and not passed explicitly -> hard failure.
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+    with pytest.raises(RuntimeError, match="CLAUDE_CODE_OAUTH_TOKEN"):
+        ClaudeCodeHarness(plugins=[]).agent_auth()
+    # Host env var is forwarded with its value, alongside the static IS_SANDBOX.
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok-host")
+    env = ClaudeCodeHarness(plugins=[]).agent_auth().env
+    assert env["CLAUDE_CODE_OAUTH_TOKEN"] == "tok-host"
+    assert env["IS_SANDBOX"] == "1"
+    # An explicit token wins over (and does not need) the host env var.
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+    explicit = ClaudeCodeHarness(plugins=[], oauth_token="tok-explicit").agent_auth()
+    assert explicit.env["CLAUDE_CODE_OAUTH_TOKEN"] == "tok-explicit"
+
+
+def test_optional_env_forwarded_only_when_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
+    monkeypatch.delenv("HELPER_KEY", raising=False)
+    harness = ClaudeCodeHarness(plugins=[], optional_env=("HELPER_KEY",))
+    assert "HELPER_KEY" not in harness.agent_auth().env  # absent -> skipped, no raise
+    monkeypatch.setenv("HELPER_KEY", "hk")
+    assert harness.agent_auth().env["HELPER_KEY"] == "hk"
 
 
 # --- _generate() diff logic (no Docker) ------------------------------------
