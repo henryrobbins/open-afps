@@ -21,12 +21,12 @@ from pathlib import Path
 
 import pytest
 
-from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.docker import DockerBackend
 from open_atp.harness import Harness
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.base import ProofResult
-from open_atp.provers.numina import NuminaProver, NuminaProverConfig
+from open_atp.provers.numina import NuminaProver
 from open_atp.provers.numina_tracker import (
     StatementTracker,
     extract_statements_from_file,
@@ -136,12 +136,8 @@ def make_prover(fake_session_backend: object) -> object:
     round-loop unit tests (which stub ``_run_agent``) off Docker."""
 
     def _make(*, real: bool = False, **overrides: object) -> NuminaProver:
-        backend = (
-            DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-            if real
-            else fake_session_backend
-        )
-        return NuminaProver(NuminaProverConfig(**overrides), backend)
+        backend = DockerBackend(image=DEFAULT_IMAGE) if real else fake_session_backend
+        return NuminaProver(backend=backend, **overrides)
 
     return _make
 

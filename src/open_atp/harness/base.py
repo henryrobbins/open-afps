@@ -14,19 +14,18 @@ The *compute* concern (where that command runs, with Lean+Mathlib and a warm
 cache) lives in the injected :class:`~open_atp.backends.base.ComputeBackend`.
 
 Ported from milp_flare's ``harness/`` package. The skills to mount are owned by
-the prover (``AgentProverConfig.skills``, resolved to source dirs and handed to
+the prover (``AgentProver.skills``, resolved to source dirs and handed to
 :meth:`Harness.stage_skills`); plugins are Claude-only and live on
-``ClaudeCodeHarnessConfig.plugins``.
+``ClaudeCodeHarness.plugins``.
 """
 
 from __future__ import annotations
 
 import shutil
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar, Self
+from typing import ClassVar
 
 #: Files the harness writes into the workdir; named so they never collide with a
 #: project's own sources.
@@ -80,18 +79,11 @@ class Harness(ABC):
     #: (ax-prover ships its own). Read by :meth:`stage_skills` and the prover.
     skills_dest: ClassVar[str | None] = None
 
-    def __init__(self, config: HarnessConfig) -> None:
-        self.config = config
-
-    @property
-    def model(self) -> str:
-        """The model id this harness runs (read from its :class:`HarnessConfig`)."""
-        return self.config.model
-
-    @property
-    def effort(self) -> str:
-        """The reasoning-effort level (read from its :class:`HarnessConfig`)."""
-        return self.config.effort
+    def __init__(self, *, model: str = "claude-opus-4-8", effort: str = "high") -> None:
+        #: Model id this harness runs.
+        self.model = model
+        #: Reasoning-effort level passed to harnesses that support it.
+        self.effort = effort
 
     @property
     def command(self) -> str:
@@ -154,7 +146,7 @@ class Harness(ABC):
         Each ``<name>/SKILL.md`` tree lands at ``wd/<skills_dest>/<dir-name>/`` (an
         upstream ``tests/`` fixture dir is dropped). A no-op for a harness that does
         not consume skills (``skills_dest is None``, e.g. ax-prover). The prover owns
-        the *list* (``AgentProverConfig.skills``, resolved by :func:`resolve_skill`);
+        the *list* (``AgentProver.skills``, resolved by :func:`resolve_skill`);
         the harness owns *where* it goes.
         """
         if self.skills_dest is None or not skill_dirs:
@@ -181,46 +173,6 @@ class Harness(ABC):
 
     @abstractmethod
     def _parse_lines(self, lines: list[str]) -> HarnessRunResult: ...
-
-
-@dataclass
-class HarnessConfig:
-    """Declarative, serializable config for one agent CLI harness.
-
-    Mirrors the :class:`~open_atp.backends.base.BackendConfig` ->
-    :class:`~open_atp.backends.base.ComputeBackend` split: this config is the spec
-    (the knob set), and :meth:`build` constructs the runtime :class:`Harness` from
-    it. Each harness ships a subclass next to it that sets :attr:`harness_cls` and
-    adds the knobs that harness honours (e.g.
-    :class:`~open_atp.harness.vibe.VibeHarnessConfig`'s ``agent``/``max_turns``/
-    ``max_price``). ``model`` and ``effort`` are shared by every harness and live
-    here on the base.
-
-    Attributes
-    ----------
-    model : str
-        Model id the harness runs. Default ``claude-opus-4-8``.
-    effort : str
-        Reasoning-effort level passed to harnesses that support it. Default
-        ``high``.
-    """
-
-    model: str = "claude-opus-4-8"
-    effort: str = "high"
-
-    #: The harness class :meth:`build` instantiates; set by each subclass.
-    harness_cls: ClassVar[type[Harness]]
-
-    def build(self) -> Harness:
-        """Construct the harness this config describes."""
-        return self.harness_cls(self)
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, object]) -> Self:
-        """Build from a mapping (e.g. parsed JSON), ignoring unknown keys."""
-        known = {f.name for f in fields(cls) if f.init}
-        kwargs: dict[str, Any] = {k: v for k, v in data.items() if k in known}
-        return cls(**kwargs)
 
 
 def _infer_provider(model: str) -> str:

@@ -19,16 +19,15 @@ via {meth}`~open_atp.provers.base.AutomatedProver.prove`, which returns a
 {class}`~open_atp.provers.base.ProofResult` with verification and cost. This is the
 top-level surface re-exported from `open_atp` itself.
 
-{class}`~open_atp.provers.PROVERS` enumerates the available provers (e.g.
-`PROVERS.CLAUDE`, `PROVERS.CODEX`, `PROVERS.ARISTOTLE`).
-{func}`~open_atp.provers.get_prover` maps a member (or its string value) to a constructed
+{data}`~open_atp.provers.PROVER_TYPES` maps each available prover name to its class (e.g.
+`"agent"`, `"codex"`, `"aristotle"`).
+{func}`~open_atp.provers.get_prover` maps a name to a constructed
 {class}`~open_atp.provers.base.AutomatedProver`, wiring in the shared image/toolchain and
-compute backend. Agentic provers run generation in a live session over that backend and
-verify in the same hot sandbox.
+compute backend (e.g. `get_prover("agent")`, `get_prover("codex")`). Agentic provers run
+generation in a live session over that backend and verify in the same hot sandbox.
 
 ```{eval-rst}
-.. autoclass:: open_atp.provers.PROVERS
-   :members:
+.. autodata:: open_atp.provers.PROVER_TYPES
 
 .. autofunction:: open_atp.provers.get_prover
 
@@ -45,9 +44,6 @@ generate, then verify in the sandbox) so subclasses only implement `_generate`.
 .. autoclass:: open_atp.provers.base.AutomatedProver
    :exclude-members: name
 
-.. autoclass:: open_atp.provers.base.AutomatedProverConfig
-   :exclude-members: timeout_s, env
-
 .. autoclass:: open_atp.provers.base.ProofResult
    :exclude-members: prover, verification, output_dir, completed_files, cost_usd, duration_s, metadata, error, wd, logs_dir, success
 ```
@@ -58,15 +54,11 @@ generate, then verify in the sandbox) so subclasses only implement `_generate`.
 .. autoclass:: open_atp.provers.agent_prover.AgentProver
    :show-inheritance:
    :exclude-members: name
-
-.. autoclass:: open_atp.provers.agent_prover.AgentProverConfig
-   :show-inheritance:
-   :no-members:
 ```
 
-`AgentProverConfig.harness` is a {class}`~open_atp.harness.HarnessConfig` — pick the
+`AgentProver`'s `harness` is a {class}`~open_atp.harness.Harness` — pick the
 CLI and its knobs by composing one (e.g.
-`AgentProverConfig(harness=VibeHarnessConfig(max_turns=8))`). The per-harness configs
+`AgentProver(harness=VibeHarness(max_turns=8), backend=...)`). The per-harness classes
 are documented under {doc}`harness`.
 
 ## NuminaProver
@@ -75,10 +67,6 @@ are documented under {doc}`harness`.
 .. autoclass:: open_atp.provers.numina.NuminaProver
    :show-inheritance:
    :exclude-members: name
-
-.. autoclass:: open_atp.provers.numina.NuminaProverConfig
-   :show-inheritance:
-   :no-members:
 ```
 
 ## AristotleProver
@@ -87,8 +75,4 @@ are documented under {doc}`harness`.
 .. autoclass:: open_atp.provers.aristotle.AristotleProver
    :show-inheritance:
    :exclude-members: name
-
-.. autoclass:: open_atp.provers.aristotle.AristotleProverConfig
-   :show-inheritance:
-   :no-members:
 ```

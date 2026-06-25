@@ -16,10 +16,10 @@ from pathlib import Path
 
 import pytest
 
-from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.docker import DockerBackend
 from open_atp.harness import (
-    HARNESS_CONFIGS,
-    ClaudeCodeHarnessConfig,
+    HARNESSES,
+    ClaudeCodeHarness,
     Harness,
     compute_cost_usd,
     resolve_plugin,
@@ -27,7 +27,7 @@ from open_atp.harness import (
 )
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
-from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
+from open_atp.provers.agent_prover import AgentProver
 from open_atp.provers.base import ProofResult
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
@@ -48,12 +48,8 @@ def make_prover(fake_session_backend: object) -> object:
     diff unit tests off Docker."""
 
     def _make(*, real: bool = False) -> AgentProver:
-        backend = (
-            DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-            if real
-            else fake_session_backend
-        )
-        return AgentProver(AgentProverConfig(), backend)
+        backend = DockerBackend(image=DEFAULT_IMAGE) if real else fake_session_backend
+        return AgentProver(backend=backend)
 
     return _make
 
@@ -62,7 +58,7 @@ def make_prover(fake_session_backend: object) -> object:
 
 
 def test_claude_code_parse_lines_tokens_and_cost() -> None:
-    harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high").build()
+    harness = ClaudeCodeHarness(model="claude-opus-4-8", effort="high")
     result = harness.parse(STREAM.read_text().splitlines())
 
     assert result.input_tokens == 18432
@@ -73,7 +69,7 @@ def test_claude_code_parse_lines_tokens_and_cost() -> None:
 
 
 def test_parse_ignores_blank_and_malformed_lines() -> None:
-    harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8").build()
+    harness = ClaudeCodeHarness(model="claude-opus-4-8")
     lines = ["", "   ", "not json", '{"type":"system"}']
     result = harness.parse(lines)
     assert result.input_tokens == 0
@@ -90,7 +86,7 @@ def test_compute_cost_usd_known_and_unknown_model() -> None:
 
 def test_codex_cost_falls_back_to_token_table() -> None:
     """Codex reports no USD, so prove() must estimate from token totals."""
-    harness = HARNESS_CONFIGS["codex"](model="gpt-5.4", effort="high").build()
+    harness = HARNESSES["codex"](model="gpt-5.4", effort="high")
     lines = [
         '{"type":"turn.completed","usage":{"input_tokens":2000000,'
         '"output_tokens":1000000}}',
@@ -108,7 +104,7 @@ def test_codex_cost_falls_back_to_token_table() -> None:
 def test_claude_code_stage_writes_assets(tmp_path: Path) -> None:
     """stage() writes the harness/bundle assets and (Claude-only) plugins -- but NOT
     the skills list, which the prover stages via stage_skills()."""
-    harness = ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high").build()
+    harness = ClaudeCodeHarness(model="claude-opus-4-8", effort="high")
     harness.stage(tmp_path)
     harness.write_prompt(tmp_path, "fill the sorrys")
 
@@ -119,7 +115,7 @@ def test_claude_code_stage_writes_assets(tmp_path: Path) -> None:
     assert "<<MODEL>>" not in script and "<<PLUGIN_FLAGS>>" not in script
     assert (tmp_path / "agent_prompt.txt").read_text() == "fill the sorrys"
     assert (tmp_path / ".mcp.json").is_file()
-    # The default lean4 plugin (from ClaudeCodeHarnessConfig.plugins) is mounted under
+    # The default lean4 plugin (from ClaudeCodeHarness.plugins) is mounted under
     # .plugins/ and loaded via a --plugin-dir flag.
     plugin_json = tmp_path / ".plugins" / "lean4" / ".claude-plugin" / "plugin.json"
     assert plugin_json.is_file()
@@ -156,9 +152,7 @@ def test_stage_skills_copies_into_harness_location(
     tmp_path: Path, harness_name: str, dest: str
 ) -> None:
     """The prover-resolved skills list lands in each harness's skill location."""
-    harness = HARNESS_CONFIGS[harness_name](
-        model="claude-opus-4-8", effort="high"
-    ).build()
+    harness = HARNESSES[harness_name](model="claude-opus-4-8", effort="high")
     harness.stage_skills(tmp_path, [resolve_skill("lean-proof")])
     assert (tmp_path / dest / "lean-proof" / "SKILL.md").is_file()
     # Upstream skill `tests/` fixtures are dropped at mount time.
@@ -167,16 +161,14 @@ def test_stage_skills_copies_into_harness_location(
 
 def test_axprover_ignores_skills(tmp_path: Path) -> None:
     """ax-prover ships its own prompts and consumes no skills (skills_dest is None)."""
-    harness = HARNESS_CONFIGS["axprover"](model="claude-opus-4-8").build()
+    harness = HARNESSES["axprover"](model="claude-opus-4-8")
     assert harness.skills_dest is None
     harness.stage_skills(tmp_path, [resolve_skill("lean-proof")])  # no-op, no error
     assert not list(tmp_path.iterdir())
 
 
 def test_empty_plugins_mount_nothing_for_claude(tmp_path: Path) -> None:
-    harness = ClaudeCodeHarnessConfig(
-        model="claude-opus-4-8", effort="high", plugins=[]
-    ).build()
+    harness = ClaudeCodeHarness(model="claude-opus-4-8", effort="high", plugins=[])
     harness.stage(tmp_path)
     assert not (tmp_path / ".plugins").exists()
     assert harness._plugin_flags() == ""

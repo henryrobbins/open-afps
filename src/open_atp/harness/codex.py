@@ -5,16 +5,18 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar
 
 from open_atp.harness._paths import _SCRIPTS
-from open_atp.harness.base import AuthSpec, Harness, HarnessConfig, HarnessRunResult
+from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
 
 
 class CodexHarness(Harness):
-    """Codex CLI, authenticated by a mounted ``auth.json`` credential."""
+    """Codex CLI, authenticated by a mounted ``auth.json`` credential.
+
+    Codex authenticates via ChatGPT/OpenAI, so it must run an OpenAI model; ``model``
+    defaults to ``gpt-5.5`` rather than the Anthropic base default.
+    """
 
     name = "codex"
 
@@ -23,6 +25,9 @@ class CodexHarness(Harness):
     #: Holds the staged minimal ``.codex`` so it outlives :meth:`auth_spec` until the
     #: backend pushes/bind-mounts it; cleaned up when the harness is collected.
     _codex_home: tempfile.TemporaryDirectory[str] | None = None
+
+    def __init__(self, *, model: str = "gpt-5.5", effort: str = "high") -> None:
+        super().__init__(model=model, effort=effort)
 
     def auth_spec(self) -> AuthSpec:
         # Mount ONLY the auth credential, never the whole ~/.codex: the host's
@@ -81,15 +86,3 @@ class CodexHarness(Harness):
                 result.stop_reason = sr
         # Codex does not surface USD; left as None so the prover fills from tokens.
         return result
-
-
-@dataclass
-class CodexHarnessConfig(HarnessConfig):
-    """:class:`~open_atp.harness.base.HarnessConfig` for the Codex CLI.
-
-    Codex authenticates via ChatGPT/OpenAI, so it must run an OpenAI model; ``model``
-    defaults to ``gpt-5.5`` rather than the Anthropic base default.
-    """
-
-    model: str = "gpt-5.5"
-    harness_cls: ClassVar[type[Harness]] = CodexHarness

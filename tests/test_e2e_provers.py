@@ -30,8 +30,8 @@ from pathlib import Path
 import pytest
 
 from open_atp.backends.base import ComputeBackend
-from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.backends.modal import ModalBackend, ModalConfig
+from open_atp.backends.docker import DockerBackend
+from open_atp.backends.modal import ModalBackend
 from open_atp.images import DEFAULT_IMAGE, Image
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers import available_provers, get_prover
@@ -42,9 +42,9 @@ FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
 def make_backend(kind: str, image: Image = DEFAULT_IMAGE) -> ComputeBackend:
     """Construct a compute backend by name (``docker`` | ``modal``)."""
     if kind == "docker":
-        return DockerBackend(DockerConfig(image=image))
+        return DockerBackend(image=image)
     if kind == "modal":
-        return ModalBackend(ModalConfig(image=image))
+        return ModalBackend(image=image)
     raise ValueError(f"Unknown backend {kind!r}; choose 'docker' or 'modal'.")
 
 
@@ -102,19 +102,19 @@ PROVERS = [
         id="agent",
     ),
     pytest.param(
-        "agent:codex",
+        "codex",
         _need_codex,
         marks=pytest.mark.agent_api,
         id="agent-codex",
     ),
     pytest.param(
-        "agent:opencode",
+        "opencode",
         _need_env("ANTHROPIC_API_KEY"),
         marks=pytest.mark.agent_api,
         id="agent-opencode",
     ),
     pytest.param(
-        "agent:axprover",
+        "axprover",
         _need_env("ANTHROPIC_API_KEY"),
         marks=pytest.mark.agent_api,
         id="agent-axprover",
@@ -149,7 +149,7 @@ def test_prover_solves_trivial_theorem(
             pytest.skip(reason)
 
     compute = make_backend(backend, DEFAULT_IMAGE)
-    prover = get_prover(spec, verification_backend=compute)
+    prover = get_prover(spec, backend=compute)
     proof = prover.prove(ProofTask(LeanProject(FIXTURE)), tmp_path / "run")
 
     assert proof.completed_files, f"{spec} returned no changed files"
@@ -159,7 +159,7 @@ def test_prover_solves_trivial_theorem(
 def test_registry_is_fully_covered() -> None:
     """Every registered prover has an e2e row (so new provers can't slip through)."""
     covered = {p.values[0] for p in PROVERS}
-    registry = {p.value for p in available_provers()}
+    registry = set(available_provers())
     assert covered >= registry, (
         f"provers missing an e2e case: {sorted(registry - covered)}"
     )

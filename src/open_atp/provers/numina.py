@@ -29,24 +29,32 @@ import json
 import os
 import re
 import shutil
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from open_atp.backends.base import ComputeSession
+from open_atp.backends.base import ComputeBackend, ComputeSession
 from open_atp.harness import (
-    ClaudeCodeHarnessConfig,
+    ClaudeCodeHarness,
     Harness,
-    HarnessConfig,
     HarnessRunResult,
     compute_cost_usd,
     resolve_skill,
 )
 from open_atp.harness._paths import _vendor_numina_dir
 from open_atp.lean import LeanProject, ProofTask
-from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
+from open_atp.provers.agent_prover import AgentProver
 from open_atp.provers.base import ProofResult, compose_prompt
 from open_atp.provers.numina_tracker import StatementTracker
+
+#: Helper-skill credentials forwarded into the sandbox when present in the host env;
+#: skills degrade/skip when their key is absent. ``ANTHROPIC_API_KEY`` backs the
+#: informal-prover skill's Claude calls.
+_DEFAULT_HELPER_ENV_KEYS = (
+    "GEMINI_API_KEY",
+    "OPENAI_API_KEY",
+    "LEAN_LEANDEX_API_KEY",
+    "ANTHROPIC_API_KEY",
+)
 
 # Directories never worth copying into the agent workdir (mirrors AgentProver).
 _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
@@ -99,22 +107,22 @@ _SORRY_RE = re.compile(r"\bsorry\b")
 _HELPER_USAGE_FILE = Path(".claude") / "helper_usage.jsonl"
 
 
-@dataclass
-class NuminaProverConfig(AgentProverConfig):
-    """Configuration for :class:`NuminaProver`.
+class NuminaProver(AgentProver):
+    """Run the Numina coordinator/subagent scaffold as an :class:`AgentProver`.
 
-    Extends :class:`~open_atp.provers.agent_prover.AgentProverConfig` with the
-    Numina coordinator's round-loop and helper-skill knobs.
+    A specialization of :class:`AgentProver` wired to Numina's vendored scaffold
+    (coordinator prompt + skills + subagent prompts, staged by
+    :meth:`_stage_numina_assets`); generation and the shared
+    :class:`~open_atp.verify.Verifier` work exactly as in the base agent prover.
 
-    Attributes
+    The harness is fixed to a :class:`~open_atp.harness.ClaudeCodeHarness` with no
+    plugins (Numina ships its own scaffold) and is *not* configurable -- Numina is
+    claude-CLI driven, and :meth:`_stage_numina_assets` mounts the vendored scaffold
+    straight into the known ``.claude/`` locations.
+
+    Parameters
     ----------
-    harness : HarnessConfig
-        Fixed to a :class:`~open_atp.harness.ClaudeCodeHarnessConfig` with no plugins
-        (Numina ships its own scaffold): Numina is claude-CLI driven and not
-        configurable (pinned ``init=False``). Because the harness is pinned to Claude,
-        :meth:`NuminaProver._stage_numina_assets` mounts the vendored scaffold straight
-        into the known ``.claude/`` locations.
-    skills : list[str]
+    skills : list[str], optional
         Extra named/path skills to mount alongside Numina's vendored scaffold. Default
         empty -- Numina's coordinator skill is staged from ``vendor/numina/skills``, not
         this list.
@@ -125,8 +133,8 @@ class NuminaProverConfig(AgentProverConfig):
         Default ``2``.
     helper_env_keys : tuple[str, ...]
         Helper-skill credentials forwarded into the sandbox when present in the host
-        env; skills degrade/skip when their key is absent. ``ANTHROPIC_API_KEY``
-        backs the informal-prover skill's Claude calls.
+        env; skills degrade/skip when their key is absent. Default
+        :data:`_DEFAULT_HELPER_ENV_KEYS`.
     guard_statements : bool
         Whether to snapshot the target theorems and reject runs that weaken or
         delete them. Default ``True``.
@@ -134,53 +142,60 @@ class NuminaProverConfig(AgentProverConfig):
         Behavior on a weakened/deleted target theorem: ``error`` stops the run and
         restores the originals; ``warn`` restores and continues. Default ``error``
         (rejects; safe).
-    extra_env : dict[str, str]
+    extra_env : dict[str, str], optional
         Additional environment variables forwarded into the agent sandbox. Default
         empty.
-    """
-
-    harness: HarnessConfig = field(
-        default_factory=lambda: ClaudeCodeHarnessConfig(plugins=[]), init=False
-    )
-    skills: list[str] = field(default_factory=list)
-    max_rounds: int = 20
-    max_consecutive_limits: int = 2
-    helper_env_keys: tuple[str, ...] = (
-        "GEMINI_API_KEY",
-        "OPENAI_API_KEY",
-        "LEAN_LEANDEX_API_KEY",
-        "ANTHROPIC_API_KEY",
-    )
-    guard_statements: bool = True
-    on_statement_change: Literal["error", "warn"] = "error"
-    extra_env: dict[str, str] = field(default_factory=dict)
-
-
-class NuminaProver(AgentProver):
-    """Run the Numina coordinator/subagent scaffold as an :class:`AgentProver`.
-
-    A specialization of :class:`AgentProver` wired to Numina's vendored scaffold
-    (coordinator prompt + skills + subagent prompts, staged by
-    :meth:`_stage_numina_assets`); generation and the shared
-    :class:`~open_atp.verify.Verifier` work exactly as in the base agent prover.
 
     Examples
     --------
 
-    Build the config and construct the prover directly:
+    Construct the prover directly:
 
-    >>> from open_atp.backends.docker import DockerBackend, DockerConfig
-    >>> from open_atp.provers.numina import NuminaProver, NuminaProverConfig
-    >>> backend = DockerBackend(DockerConfig())
-    >>> config = NuminaProverConfig()
-    >>> prover = NuminaProver(config, verification_backend=backend)
-    >>> prover.config.max_rounds
+    >>> from open_atp.backends.docker import DockerBackend
+    >>> from open_atp.provers.numina import NuminaProver
+    >>> backend = DockerBackend()
+    >>> prover = NuminaProver(backend=backend)
+    >>> prover.max_rounds
     20
     """
 
     name = "numina"
 
-    config: NuminaProverConfig
+    def __init__(
+        self,
+        *,
+        backend: ComputeBackend,
+        skills: list[str] | None = None,
+        max_rounds: int = 20,
+        max_consecutive_limits: int = 2,
+        helper_env_keys: tuple[str, ...] = _DEFAULT_HELPER_ENV_KEYS,
+        guard_statements: bool = True,
+        on_statement_change: Literal["error", "warn"] = "error",
+        extra_env: dict[str, str] | None = None,
+        timeout_s: int = 1800,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        # The harness is pinned: Numina is claude_code-driven (no plugins; it ships its
+        # own scaffold) and not configurable. Default skills are empty -- the
+        # coordinator skill is staged from the vendored scaffold, not the shared list.
+        super().__init__(
+            backend=backend,
+            harness=ClaudeCodeHarness(plugins=[]),
+            skills=skills if skills is not None else [],
+            extra_env=extra_env,
+            timeout_s=timeout_s,
+            env=env,
+        )
+        #: Maximum number of coordinator rounds before the run stops.
+        self.max_rounds = max_rounds
+        #: Reset (start a fresh session) after this many consecutive LIMIT rounds.
+        self.max_consecutive_limits = max_consecutive_limits
+        #: Helper-skill credentials forwarded into the sandbox when present.
+        self.helper_env_keys = tuple(helper_env_keys)
+        #: Whether to snapshot target theorems and reject weakened/deleted ones.
+        self.guard_statements = guard_statements
+        #: Behavior on a weakened/deleted target theorem (``error`` | ``warn``).
+        self.on_statement_change = on_statement_change
 
     @property
     def prover_prompt(self) -> str:
@@ -202,17 +217,17 @@ class NuminaProver(AgentProver):
         # 3. Stage the workdir: the harness launch script, Numina's vendored scaffold
         #    (coordinator skill + subagent prompts), any config skills, then the
         #    coordinator prompt (+ the task's optional user prompt).
-        harness = self.config.harness.build()
+        harness = self.harness
         harness.stage(wd)
         self._stage_numina_assets(wd)
-        harness.stage_skills(wd, [resolve_skill(s) for s in self.config.skills])
+        harness.stage_skills(wd, [resolve_skill(s) for s in self.skills])
         harness.write_prompt(wd, compose_prompt(self.prover_prompt, task.user_prompt))
         stdout_path = logs_dir / "stdout.txt"
 
         # 4. Statement-change guard: snapshot the target theorems before the run.
         tracked = self._tracked_files(task, wd)
         tracker: StatementTracker | None = None
-        if self.config.guard_statements and tracked:
+        if self.guard_statements and tracked:
             tracker = StatementTracker(tracked)
 
         # 5. Round-continuation loop, with the final check, in one persistent sandbox:
@@ -220,7 +235,7 @@ class NuminaProver(AgentProver):
         #    per-round nor a separate verify spin-up.
         _, mounts = self._auth(harness)
         with self.verifier.backend.session(
-            wd, mounts=mounts, timeout_s=self.config.timeout_s
+            wd, mounts=mounts, timeout_s=self.timeout_s
         ) as session:
             loop = self._run_rounds(wd, harness, stdout_path, tracker, session=session)
             # Final pull so the host workdir (helper-usage ledger, completed files)
@@ -276,8 +291,8 @@ class NuminaProver(AgentProver):
         result.cost_usd = loop["total_cost_usd"] + helper["cost_usd"]
         result.metadata = {
             "harness": harness.name,
-            "model": self.config.harness.model,
-            "effort": self.config.harness.effort,
+            "model": self.harness.model,
+            "effort": self.harness.effort,
             "input_tokens": loop["input_tokens"],
             "output_tokens": loop["output_tokens"],
             # cost_usd above bundles agent + helper; keep the split visible.
@@ -292,7 +307,7 @@ class NuminaProver(AgentProver):
             "rounds": loop["rounds"],
             "end_reason": loop["end_reason"],
             "session_resets": loop["session_resets"],
-            "guard_statements": self.config.guard_statements,
+            "guard_statements": self.guard_statements,
             "statement_changed": loop["statement_changed"],
             "statement_changes": loop["statement_changes"],
             "round_history": loop["round_history"],
@@ -330,10 +345,10 @@ class NuminaProver(AgentProver):
         statement_changed = False
         statement_changes: list[str] = []
 
-        for round_num in range(1, self.config.max_rounds + 1):
+        for round_num in range(1, self.max_rounds + 1):
             # A fresh session is started whenever we have hit too many consecutive
             # LIMITs (and, in this backend, every round -- see module docstring).
-            if consecutive_limits >= self.config.max_consecutive_limits:
+            if consecutive_limits >= self.max_consecutive_limits:
                 consecutive_limits = 0
                 session_resets += 1
 
@@ -353,7 +368,7 @@ class NuminaProver(AgentProver):
             if round_cost is None:
                 round_cost = (
                     compute_cost_usd(
-                        self.config.harness.model,
+                        self.harness.model,
                         parsed.input_tokens,
                         parsed.output_tokens,
                     )
@@ -383,7 +398,7 @@ class NuminaProver(AgentProver):
                     # Push the restored statements back so the sandbox reflects them
                     # for the next round (no-op on bind-mounted Docker).
                     session.sync_in()
-                    if self.config.on_statement_change == "error":
+                    if self.on_statement_change == "error":
                         end_reason = "STATEMENT_CHANGED"
                         record["end_reason"] = end_reason
                         round_history.append(record)
@@ -504,7 +519,7 @@ class NuminaProver(AgentProver):
     def _auth(self, harness: Harness) -> tuple[dict[str, str], list[tuple[str, str]]]:
         """Extend the base auth with Numina's helper-skill credentials."""
         env, mounts = super()._auth(harness)
-        for key in self.config.helper_env_keys:
+        for key in self.helper_env_keys:
             value = os.environ.get(key)
             if value is not None:
                 env.setdefault(key, value)

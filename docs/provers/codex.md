@@ -11,27 +11,26 @@ check. See {doc}`index` for the staging/diff lifecycle every agent harness share
 ## Usage
 
 ```python
-from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.harness import CodexHarnessConfig
+from open_atp.backends.docker import DockerBackend
+from open_atp.harness import CodexHarness
 from open_atp.images import DEFAULT_IMAGE
-from open_atp.provers import AgentProver, AgentProverConfig
+from open_atp.provers import AgentProver
 
-backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-config = AgentProverConfig(harness=CodexHarnessConfig(effort="high"))
-prover = AgentProver(config, verification_backend=backend)
+backend = DockerBackend(image=DEFAULT_IMAGE)
+prover = AgentProver(harness=CodexHarness(effort="high"), backend=backend)
 ```
 
-{class}`~open_atp.harness.CodexHarnessConfig` selects the Codex CLI. Because Codex
+{class}`~open_atp.harness.CodexHarness` selects the Codex CLI. Because Codex
 authenticates through ChatGPT/OpenAI it must run an OpenAI model, so its `model`
 defaults to `gpt-5.5` rather than the Anthropic base default.
 
 Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
-`agent:codex`.
+`codex`.
 
 ## Harness details
 
 Codex does not auto-discover `.mcp.json`, so the prover stages the
-`AgentProverConfig.skills` — the host-agnostic
+`AgentProver`'s `skills` — the host-agnostic
 [`leanprover/skills`](https://github.com/leanprover/skills) — under
 `.agents/skills/` and the lean-lsp MCP server is wired through `-c` overrides on
 the command line instead of a config file. The launch script

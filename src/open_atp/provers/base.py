@@ -22,10 +22,8 @@ from __future__ import annotations
 import abc
 import json
 import time
-from collections.abc import Mapping
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Self
 
 from open_atp.backends.base import ComputeBackend
 from open_atp.lean import LeanProject, ProofTask
@@ -47,63 +45,6 @@ def compose_prompt(prover_prompt: str, user_prompt: str | None) -> str:
     if user_prompt:
         return prover_prompt + _ADDITIONAL_INSTRUCTIONS.format(user_prompt=user_prompt)
     return prover_prompt
-
-
-@dataclass
-class AutomatedProverConfig:
-    """Base configuration shared by all provers.
-
-    Subclasses extend with their own knobs:
-
-    * :class:`~open_atp.provers.agent_prover.AgentProverConfig`: harness
-      (claude/opencode/codex), effort, skills, MCP.
-    * :class:`~open_atp.provers.numina.NuminaProverConfig`: extends the agent config
-      + max_rounds, helper API keys.
-    * :class:`~open_atp.provers.aristotle.AristotleProverConfig`: api key, mode,
-      poll interval.
-
-    The sandbox image (its tag plus the Lean toolchain + Mathlib pins the shared
-    verifier checks every project against) lives on the backend's
-    :class:`~open_atp.backends.base.BackendConfig`, not here -- a prover inherits
-    whatever image its verification backend runs.
-
-    Attributes
-    ----------
-    timeout_s : int
-        Wall-clock budget for the generation run, in seconds. Default ``1800``.
-    env : dict[str, str]
-        Extra environment variables exported into the run. Default empty.
-    """
-
-    timeout_s: int = 1800
-    env: dict[str, str] = field(default_factory=dict)
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, object]) -> Self:
-        """Build a config from a mapping (e.g. parsed JSON), ignoring unknown keys.
-
-        The inverse of :func:`dataclasses.asdict`: any tuple-typed field is
-        restored from the list JSON round-trips it to. Unknown keys are dropped
-        so a serialized superset (or a sibling subclass's extra knobs) loads
-        cleanly. Non-init fields (e.g. a per-harness config's pinned ``harness``)
-        are skipped -- they are fixed by the class, not loaded. Subclasses inherit
-        this unchanged -- ``cls`` resolves to the concrete config, so its own
-        fields are honoured.
-        """
-        known = {f.name: f for f in fields(cls) if f.init}
-        kwargs: dict[str, Any] = {}
-        for key, value in data.items():
-            f = known.get(key)
-            if f is None:
-                continue
-            if (
-                isinstance(value, list)
-                and isinstance(f.type, str)
-                and f.type.startswith("tuple")
-            ):
-                value = tuple(tuple(v) if isinstance(v, list) else v for v in value)
-            kwargs[key] = value
-        return cls(**kwargs)
 
 
 @dataclass
@@ -193,19 +134,42 @@ class ProofResult:
 
 
 class AutomatedProver(abc.ABC):
-    """Generate candidate proofs, then verify them in a shared sandbox."""
+    """Generate candidate proofs, then verify them in a shared sandbox.
+
+    The sandbox image (its tag plus the Lean toolchain + Mathlib pins the shared
+    verifier checks every project against) comes from ``backend`` -- a prover inherits
+    whatever image its backend runs.
+
+    Parameters
+    ----------
+    backend : ComputeBackend
+        The one backend for this prover. Agentic provers reuse it (via a live session)
+        for generation, then verify in that hot sandbox; Aristotle uses it only for the
+        final check.
+    timeout_s : int
+        Wall-clock budget for the generation run, in seconds. Default ``1800``.
+    env : dict[str, str], optional
+        Extra environment variables exported into the run. Default empty.
+    """
 
     name: str = "base"
 
     def __init__(
-        self, config: AutomatedProverConfig, verification_backend: ComputeBackend
+        self,
+        *,
+        backend: ComputeBackend,
+        timeout_s: int = 1800,
+        env: dict[str, str] | None = None,
     ) -> None:
-        self.config = config
-        # The one backend for this prover. Its image carries the toolchain + Mathlib
-        # pins the verifier rejects mismatched projects against. Agentic provers reuse
-        # this same backend (via a live session over it) for generation, then verify in
-        # that hot sandbox -- see ``AgentProver._generate``.
-        self.verifier = Verifier(verification_backend)
+        #: Wall-clock budget for the generation run, in seconds.
+        self.timeout_s = timeout_s
+        #: Extra environment variables exported into the run.
+        self.env = dict(env or {})
+        # The backend's image carries the toolchain + Mathlib pins the verifier rejects
+        # mismatched projects against. Agentic provers reuse this same backend (via a
+        # live session over it) for generation, then verify in that hot sandbox -- see
+        # ``AgentProver._generate``.
+        self.verifier = Verifier(backend)
 
     @abc.abstractmethod
     def _generate(

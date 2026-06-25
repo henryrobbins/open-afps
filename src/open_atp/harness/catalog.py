@@ -4,12 +4,12 @@ Two kinds of asset are resolvable **by name** (from a vendored catalog) or **by 
 path**:
 
 * **skills** -- host-agnostic Agent Skills (``<name>/SKILL.md``) listed on
-  ``AgentProverConfig.skills`` and copied by the :class:`~...AgentProver` into each
+  ``AgentProver.skills`` and copied by the :class:`~...AgentProver` into each
   harness's skill location (``.claude/skills``, ``.agents/skills``,
   ``VIBE_HOME/skills``) via :meth:`~open_atp.harness.base.Harness.stage_skills`. The
   default is ``lean-proof`` from the vendored ``leanprover/skills`` catalog.
 * **plugins** -- Claude Code plugins (a dir with ``.claude-plugin/plugin.json``)
-  listed on ``ClaudeCodeHarnessConfig.plugins`` and loaded **only** by the Claude
+  listed on ``ClaudeCodeHarness.plugins`` and loaded **only** by the Claude
   harness via ``--plugin-dir`` (no other harness supports plugins). The default is
   the vendored ``lean4`` plugin.
 

@@ -5,27 +5,45 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar
 
 from open_atp.harness._paths import _MCP_JSON, _SCRIPTS
-from open_atp.harness.base import AuthSpec, Harness, HarnessConfig, HarnessRunResult
+from open_atp.harness.base import AuthSpec, Harness, HarnessRunResult
 from open_atp.harness.catalog import resolve_plugin
 
 
 class ClaudeCodeHarness(Harness):
-    """Claude Code CLI, authenticated by a long-lived ``CLAUDE_CODE_OAUTH_TOKEN``."""
+    """Claude Code CLI, authenticated by a long-lived ``CLAUDE_CODE_OAUTH_TOKEN``.
+
+    Claude Code is the only harness that loads plugins, so they live here rather than
+    on the prover's shared skills list.
+
+    Parameters
+    ----------
+    plugins : list[str], optional
+        Claude Code plugins to load, each a name (resolved from the vendored
+        ``lean4-skills`` catalog) or a full path to a ``.claude-plugin/plugin.json``
+        tree. Default ``["lean4"]``; an empty list loads none.
+    """
 
     name = "claude_code"
 
     skills_dest = ".claude/skills"
 
-    config: ClaudeCodeHarnessConfig
-
     #: Where plugin dirs are staged in the workdir (the launch script's
     #: ``--plugin-dir`` flags reference this, so the two must agree).
     PLUGINS_DIR = ".plugins"
+
+    def __init__(
+        self,
+        *,
+        model: str = "claude-opus-4-8",
+        effort: str = "high",
+        plugins: list[str] | None = None,
+    ) -> None:
+        super().__init__(model=model, effort=effort)
+        #: Claude Code plugins to load (names or paths).
+        self.plugins = plugins if plugins is not None else ["lean4"]
 
     def stage(self, wd: Path) -> None:
         super().stage(wd)
@@ -34,14 +52,14 @@ class ClaudeCodeHarness(Harness):
         self._copy_plugins(wd)
 
     def _resolved_plugins(self) -> list[Path]:
-        """``config.plugins`` (names or paths) resolved to plugin source dirs."""
-        return [resolve_plugin(p) for p in self.config.plugins]
+        """``self.plugins`` (names or paths) resolved to plugin source dirs."""
+        return [resolve_plugin(p) for p in self.plugins]
 
     def _copy_plugins(self, wd: Path) -> None:
         """Stage each configured plugin under ``wd/.plugins/<name>``.
 
-        Claude is the only harness that consumes plugins (so they live on
-        :class:`ClaudeCodeHarnessConfig`, not the shared skills list); the launch script
+        Claude is the only harness that consumes plugins (so they live on this harness,
+        not the shared skills list); the launch script
         loads them with ``--plugin-dir`` (see :meth:`_plugin_flags`). Plugins are copied
         *into* the workdir (not referenced from the host vendor tree) so they sync
         into the sandbox with everything else.
@@ -67,7 +85,7 @@ class ClaudeCodeHarness(Harness):
         env = {"IS_SANDBOX": "1"}
         # Plugin-provided subagents (e.g. lean4's sorry-filler-deep) are only
         # dispatchable in a headless `-p` run with subagent forking enabled.
-        if self.config.plugins:
+        if self.plugins:
             env["CLAUDE_CODE_FORK_SUBAGENT"] = "1"
         return env
 
@@ -106,22 +124,3 @@ class ClaudeCodeHarness(Harness):
                 result.input_tokens = usage.get("input_tokens", result.input_tokens)
                 result.output_tokens = usage.get("output_tokens", result.output_tokens)
         return result
-
-
-@dataclass
-class ClaudeCodeHarnessConfig(HarnessConfig):
-    """:class:`~open_atp.harness.base.HarnessConfig` for the Claude Code CLI.
-
-    Claude Code is the only harness that loads plugins, so they live here rather than
-    on the prover's shared skills list.
-
-    Attributes
-    ----------
-    plugins : list[str]
-        Claude Code plugins to load, each a name (resolved from the vendored
-        ``lean4-skills`` catalog) or a full path to a ``.claude-plugin/plugin.json``
-        tree. Default ``["lean4"]``; an empty list loads none.
-    """
-
-    plugins: list[str] = field(default_factory=lambda: ["lean4"])
-    harness_cls: ClassVar[type[Harness]] = ClaudeCodeHarness

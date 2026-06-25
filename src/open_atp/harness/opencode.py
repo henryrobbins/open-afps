@@ -4,33 +4,46 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any
 
 from open_atp.harness._paths import _SCRIPTS
 from open_atp.harness.base import (
     AuthSpec,
     Harness,
-    HarnessConfig,
     HarnessRunResult,
     _infer_provider,
 )
 
 
 class OpenCodeHarness(Harness):
-    """OpenCode CLI, authenticated by a provider API key forwarded from the host."""
+    """OpenCode CLI, authenticated by a provider API key forwarded from the host.
+
+    Parameters
+    ----------
+    provider : str, optional
+        API provider name. ``None`` infers it from the model prefix (``claude-*`` ->
+        ``anthropic``, ``gpt-*`` -> ``openai``, ...).
+    """
 
     name = "opencode"
 
     skills_dest = ".agents/skills"
 
-    config: OpenCodeHarnessConfig
+    def __init__(
+        self,
+        *,
+        model: str = "claude-opus-4-8",
+        effort: str = "high",
+        provider: str | None = None,
+    ) -> None:
+        super().__init__(model=model, effort=effort)
+        self._provider = provider
 
     @property
     def provider(self) -> str:
         """API provider, taken from config or inferred from the model prefix."""
-        return self.config.provider or _infer_provider(self.config.model)
+        return self._provider or _infer_provider(self.model)
 
     def stage(self, wd: Path) -> None:
         super().stage(wd)
@@ -116,18 +129,3 @@ class OpenCodeHarness(Harness):
             if isinstance(r, str):
                 result.stop_reason = r
         return result
-
-
-@dataclass
-class OpenCodeHarnessConfig(HarnessConfig):
-    """:class:`~open_atp.harness.base.HarnessConfig` for the OpenCode CLI.
-
-    Attributes
-    ----------
-    provider : str, optional
-        API provider name. ``None`` infers it from the model prefix (``claude-*`` ->
-        ``anthropic``, ``gpt-*`` -> ``openai``, ...).
-    """
-
-    provider: str | None = None
-    harness_cls: ClassVar[type[Harness]] = OpenCodeHarness

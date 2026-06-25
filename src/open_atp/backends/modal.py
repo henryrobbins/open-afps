@@ -37,13 +37,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from open_atp.backends.base import (
-    BackendConfig,
     CommandHandle,
     CommandResult,
     ComputeBackend,
     ComputeSession,
     wrap_command,
 )
+from open_atp.images import DEFAULT_IMAGE, Image
 
 if TYPE_CHECKING:
     import modal
@@ -85,29 +85,6 @@ def _modal_image_name(image: str) -> str:
     can't contain ``:``), so strip a trailing tag.
     """
     return image.rsplit(":", 1)[0]
-
-
-@dataclass
-class ModalConfig(BackendConfig):
-    """Configuration for :class:`ModalBackend`.
-
-    Extends :class:`~open_atp.backends.base.BackendConfig` (``image``, ``timeout_s``,
-    ``env``) with Modal-specific knobs.
-
-    Attributes
-    ----------
-    cpu : float
-        CPU cores requested for the Modal Sandbox. Default ``2.0``.
-    memory_mib : int
-        Memory (MiB) requested for the Modal Sandbox. Default ``4096``.
-    app : str
-        Modal app the Sandbox is associated with (also the publish target of
-        ``open-atp build-modal-image``). Default ``open-atp``.
-    """
-
-    cpu: float = 2.0
-    memory_mib: int = 4096
-    app: str = "open-atp"
 
 
 @dataclass
@@ -263,30 +240,53 @@ class ModalBackend(ComputeBackend):
 
     Unlike the bind-mounted Docker backend, the workdir is synced into the remote
     Sandbox and synced back out on completion. Construction is offline -- it just
-    holds the :class:`ModalConfig`; Modal is only contacted when a command runs.
+    records its knobs; Modal is only contacted when a command runs.
+
+    Parameters
+    ----------
+    cpu : float
+        CPU cores requested for the Modal Sandbox. Default ``2.0``.
+    memory_mib : int
+        Memory (MiB) requested for the Modal Sandbox. Default ``4096``.
+    app : str
+        Modal app the Sandbox is associated with (also the publish target of
+        ``open-atp build-modal-image``). Default ``open-atp``.
 
     Examples
     --------
 
-    >>> from open_atp.backends.modal import ModalBackend, ModalConfig
+    >>> from open_atp.backends.modal import ModalBackend
     >>> from open_atp.images import DEFAULT_IMAGE
-    >>> backend = ModalBackend(ModalConfig(image=DEFAULT_IMAGE, cpu=4.0))
+    >>> backend = ModalBackend(image=DEFAULT_IMAGE, cpu=4.0)
     >>> backend.name
     'modal'
-    >>> backend.config.cpu
+    >>> backend.cpu
     4.0
-    >>> backend.config.app
+    >>> backend.app
     'open-atp'
     """
-
-    config: ModalConfig
 
     # Modal ignores the image USER and runs everything as root; credential mounts
     # land under root's HOME.
     container_home = "/root"
 
-    def __init__(self, config: ModalConfig) -> None:
-        super().__init__(config)
+    def __init__(
+        self,
+        *,
+        image: Image | Mapping[str, object] = DEFAULT_IMAGE,
+        timeout_s: int = 1800,
+        env: Mapping[str, str] | None = None,
+        cpu: float = 2.0,
+        memory_mib: int = 4096,
+        app: str = "open-atp",
+    ) -> None:
+        super().__init__(image=image, timeout_s=timeout_s, env=env)
+        #: CPU cores requested for the Modal Sandbox.
+        self.cpu = cpu
+        #: Memory (MiB) requested for the Modal Sandbox.
+        self.memory_mib = memory_mib
+        #: Modal app the Sandbox is associated with.
+        self.app = app
 
     @property
     def name(self) -> str:
@@ -310,12 +310,12 @@ class ModalBackend(ComputeBackend):
         """
         import modal
 
-        app = modal.App.lookup(self.config.app, create_if_missing=True)
-        image = modal.Image.from_name(_modal_image_name(self.config.image.name))
+        app = modal.App.lookup(self.app, create_if_missing=True)
+        image = modal.Image.from_name(_modal_image_name(self.image.name))
 
-        cpu = self.config.cpu
+        cpu = self.cpu
         secret_dict: dict[str, str | None] = {
-            **self.config.env,
+            **self.env,
             **(env or {}),
             # Lets Claude Code's bypassPermissions run as root (Modal runs as root).
             "IS_SANDBOX": "1",
@@ -330,8 +330,8 @@ class ModalBackend(ComputeBackend):
             image=image,
             secrets=[secret],
             cpu=cpu,
-            memory=self.config.memory_mib,
-            timeout=timeout_s or self.config.timeout_s,
+            memory=self.memory_mib,
+            timeout=timeout_s or self.timeout_s,
         )
         try:
             # Push the workdir, then each extra (host, container) mount -- replaces

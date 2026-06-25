@@ -82,9 +82,9 @@ Names accepted by `--provers` and the `Platform` registry (`api.py`):
 | --- | --- | --- |
 | `aristotle` | Harmonic Aristotle (hosted) | remote API via `aristotlelib`, no local gen sandbox |
 | `agent` | Claude Code (`claude_code` harness) | default; coding agent + lean-lsp-mcp |
-| `agent:codex` | OpenAI Codex CLI | model `gpt-5.5` |
-| `agent:opencode` | opencode | |
-| `agent:axprover` | ax-prover (LangGraph) | proposer→builder→reviewer loop; default model `claude-opus-4-8`, effort `high` |
+| `codex` | OpenAI Codex CLI | model `gpt-5.5` |
+| `opencode` | opencode | |
+| `axprover` | ax-prover (LangGraph) | proposer→builder→reviewer loop; default model `claude-opus-4-8`, effort `high` |
 | `numina` | Numina skills/prompts on Claude Code | round-continuation loop |
 | `vibe` | Mistral Vibe `lean` scaffold | hosted model (default `magistral-medium-latest`), no GPU; `--model` configurable |
 
@@ -166,7 +166,7 @@ verify with `--agent-backend`.
   uv run open-atp build-modal-image --name open-atp --app open-atp
   uv run pytest -m modal          # needs MODAL_TOKEN_ID / MODAL_TOKEN_SECRET
   ```
-  `ModalConfig.image` (sans `:tag`) must match the `--name` you publish under.
+  `ModalBackend`'s `image` (sans `:tag`) must match the `--name` you publish under.
 
 Example splits:
 ```bash
@@ -211,7 +211,7 @@ skill/test degrade or skip:
 - `CLAUDE_CODE_OAUTH_TOKEN` — `agent_api` test with default claude_code harness
   (`claude setup-token`)
 - `GEMINI_API_KEY` / `OPENAI_API_KEY` / `LEAN_LEANDEX_API_KEY` — Numina helper skills
-- `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` — `agent:axprover` (raw provider key matching
+- `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` — `axprover` (raw provider key matching
   the configured `model`); `TAVILY_API_KEY` optional (ax-prover web search)
 - `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — Modal backend
 

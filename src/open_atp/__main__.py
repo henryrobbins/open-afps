@@ -17,10 +17,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.docker import DockerBackend
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
-from open_atp.provers import PROVERS, available_provers, get_prover
+from open_atp.provers import available_provers, get_prover
 
 #: ax-prover baked into the Modal image (mirrors the images/Dockerfile ARG). Pinned
 #: to a commit on our fork (henryrobbins/ax-prover-base) rather than the 0.1.1 PyPI
@@ -41,8 +41,8 @@ def _prove(args: argparse.Namespace) -> int:
     project = LeanProject(Path(args.lean_dir))
     task = ProofTask(project)
 
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    prover = get_prover(PROVERS(args.prover), verification_backend=backend)
+    backend = DockerBackend(image=DEFAULT_IMAGE)
+    prover = get_prover(args.prover, backend=backend)
     result = prover.prove(task, Path(args.output_dir))
 
     if args.json:
@@ -183,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     prove.add_argument(
         "prover",
-        choices=[p.value for p in available_provers()],
+        choices=available_provers(),
         help="Which prover to run.",
     )
     prove.add_argument("lean_dir", help="The lake project directory to complete.")
@@ -212,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
         "--name",
         default="open-atp",
         help="Name to publish the Modal image under (default: open-atp). "
-        "ModalConfig.image (sans :tag) must match this.",
+        "ModalBackend's image (sans :tag) must match this.",
     )
     build_modal.add_argument(
         "--app",

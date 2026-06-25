@@ -13,23 +13,23 @@ check. See {doc}`index` for the staging/diff lifecycle every agent harness share
 ## Usage
 
 ```python
-from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.harness import OpenCodeHarnessConfig
+from open_atp.backends.docker import DockerBackend
+from open_atp.harness import OpenCodeHarness
 from open_atp.images import DEFAULT_IMAGE
-from open_atp.provers import AgentProver, AgentProverConfig
+from open_atp.provers import AgentProver
 
-backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-config = AgentProverConfig(
-    harness=OpenCodeHarnessConfig(model="claude-opus-4-8", effort="medium"),
+backend = DockerBackend(image=DEFAULT_IMAGE)
+prover = AgentProver(
+    harness=OpenCodeHarness(model="claude-opus-4-8", effort="medium"),
+    backend=backend,
 )
-prover = AgentProver(config, verification_backend=backend)
 ```
 
-{class}`~open_atp.harness.OpenCodeHarnessConfig` selects the OpenCode CLI; its
+{class}`~open_atp.harness.OpenCodeHarness` selects the OpenCode CLI; its
 `provider` is inferred from the model prefix unless set explicitly.
 
 Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
-`agent:opencode`. The provider is inferred from the model prefix (`claude-*` →
+`opencode`. The provider is inferred from the model prefix (`claude-*` →
 `anthropic`, `gpt-*` → `openai`, and so on), so any provider's model is selected by
 name through the same `model` knob.
 
@@ -37,7 +37,7 @@ name through the same `model` knob.
 
 `stage` writes an `opencode.json` carrying the inferred provider, the model and
 its reasoning-effort config, and the lean-lsp MCP server; the prover then stages the
-`AgentProverConfig.skills` — the host-agnostic
+`AgentProver`'s `skills` — the host-agnostic
 [`leanprover/skills`](https://github.com/leanprover/skills) — under `.agents/skills/`.
 The MCP `timeout` is raised to **180 000 ms (180 s)**
 — the first `lean_diagnostic_messages` call starts `lake serve` and loads the file's

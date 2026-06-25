@@ -18,28 +18,24 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-from collections.abc import Mapping
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Self, TextIO
+from typing import TextIO
 
 from open_atp.backends.base import (
     CommandHandle,
     CommandResult,
+    ComputeBackend,
     ComputeSession,
 )
 from open_atp.harness import (
-    HARNESS_CONFIGS,
-    ClaudeCodeHarnessConfig,
+    ClaudeCodeHarness,
     Harness,
-    HarnessConfig,
     compute_cost_usd,
     resolve_skill,
 )
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.provers.base import (
     AutomatedProver,
-    AutomatedProverConfig,
     ProofResult,
     compose_prompt,
 )
@@ -99,69 +95,6 @@ Tips:
 _IGNORE = shutil.ignore_patterns(".lake", ".git", "*.tar.gz")
 
 
-@dataclass
-class AgentProverConfig(AutomatedProverConfig):
-    """Configuration for :class:`AgentProver`.
-
-    Extends :class:`~open_atp.provers.base.AutomatedProverConfig` (``timeout_s``,
-    ``env``) with the asset/skill orchestration knobs and -- by *composition* -- a
-    :class:`~open_atp.harness.HarnessConfig` describing which agent CLI to drive and
-    how (model, effort, and that harness's own guards). Customizing is explicit:
-    ``AgentProverConfig(harness=VibeHarnessConfig(max_turns=8))``.
-
-    Attributes
-    ----------
-    harness : HarnessConfig
-        The harness to drive and its knobs, as a
-        :class:`~open_atp.harness.HarnessConfig` instance:
-        :class:`~open_atp.harness.ClaudeCodeHarnessConfig` (default) |
-        :class:`~open_atp.harness.CodexHarnessConfig` |
-        :class:`~open_atp.harness.OpenCodeHarnessConfig` |
-        :class:`~open_atp.harness.VibeHarnessConfig` |
-        :class:`~open_atp.harness.AxProverHarnessConfig`. Carries ``model``/``effort``
-        plus any harness-specific knobs.
-    skills : list[str]
-        Skills to mount into the agent workdir, each a name (resolved from the
-        vendored ``leanprover/skills`` catalog) or a full path to a ``SKILL.md``
-        tree. Default ``["lean-proof"]``; an empty list mounts none. Staged into
-        every skill-supporting harness's location; ignored by ax-prover.
-    extra_env : dict[str, str]
-        Additional environment variables forwarded into the agent sandbox. Default
-        empty.
-
-    Note
-    ----
-    Plugins are Claude-only and live on
-    :class:`~open_atp.harness.ClaudeCodeHarnessConfig.plugins`, not here.
-    """
-
-    harness: HarnessConfig = field(default_factory=ClaudeCodeHarnessConfig)
-    skills: list[str] = field(default_factory=lambda: ["lean-proof"])
-    extra_env: dict[str, str] = field(default_factory=dict)
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, object]) -> Self:
-        """Rehydrate the composed ``harness`` config, then build as usual.
-
-        ``harness`` is a :class:`~open_atp.harness.HarnessConfig` instance, but a
-        serialized/hand-written config carries the harness by registry *name* (the
-        JSON-friendly form, matching ``result.metadata["harness"]``). Two forms are
-        accepted and resolved through :data:`~open_atp.harness.HARNESS_CONFIGS`: a bare
-        name string (``"vibe"`` -> defaults) or a mapping with a ``"name"`` key plus
-        knobs (``{"name": "vibe", "max_turns": 8}``). An already-built ``HarnessConfig``
-        passes through untouched.
-        """
-        harness = data.get("harness")
-        if isinstance(harness, str):
-            data = {**data, "harness": HARNESS_CONFIGS[harness]()}
-        elif isinstance(harness, Mapping):
-            sub = dict(harness)
-            name = sub.pop("name", None)
-            if isinstance(name, str):
-                data = {**data, "harness": HARNESS_CONFIGS[name].from_dict(sub)}
-        return super().from_dict(data)
-
-
 class AgentProver(AutomatedProver):
     """Generate proofs by driving an agent CLI harness in a compute backend.
 
@@ -172,24 +105,59 @@ class AgentProver(AutomatedProver):
     ``codex``, ``opencode``, ``axprover``, and ``vibe`` are this prover on a
     different harness.
 
+    Parameters
+    ----------
+    harness : Harness, optional
+        The harness to drive and its knobs:
+        :class:`~open_atp.harness.ClaudeCodeHarness` (default),
+        :class:`~open_atp.harness.CodexHarness`,
+        :class:`~open_atp.harness.OpenCodeHarness`,
+        :class:`~open_atp.harness.VibeHarness`, or
+        :class:`~open_atp.harness.AxProverHarness`. Carries ``model``/``effort`` plus
+        any harness-specific knobs. Plugins are Claude-only and live on
+        :class:`~open_atp.harness.ClaudeCodeHarness`.
+    skills : list[str], optional
+        Skills to mount into the agent workdir, each a name (resolved from the
+        vendored ``leanprover/skills`` catalog) or a full path to a ``SKILL.md``
+        tree. Default ``["lean-proof"]``; an empty list mounts none. Staged into
+        every skill-supporting harness's location; ignored by ax-prover.
+    extra_env : dict[str, str], optional
+        Additional environment variables forwarded into the agent sandbox. Default
+        empty.
+
     Examples
     --------
 
-    Build the config and construct the prover directly:
+    Construct the prover directly:
 
-    >>> from open_atp.backends.docker import DockerBackend, DockerConfig
-    >>> from open_atp.harness import CodexHarnessConfig
-    >>> from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
-    >>> backend = DockerBackend(DockerConfig())
-    >>> config = AgentProverConfig(harness=CodexHarnessConfig(effort="high"))
-    >>> prover = AgentProver(config, verification_backend=backend)
-    >>> prover.config.harness.model
+    >>> from open_atp.backends.docker import DockerBackend
+    >>> from open_atp.harness import CodexHarness
+    >>> from open_atp.provers.agent_prover import AgentProver
+    >>> backend = DockerBackend()
+    >>> prover = AgentProver(harness=CodexHarness(effort="high"), backend=backend)
+    >>> prover.harness.model
     'gpt-5.5'
     """
 
     name = "agent"
 
-    config: AgentProverConfig
+    def __init__(
+        self,
+        *,
+        backend: ComputeBackend,
+        harness: Harness | None = None,
+        skills: list[str] | None = None,
+        extra_env: dict[str, str] | None = None,
+        timeout_s: int = 1800,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(backend=backend, timeout_s=timeout_s, env=env)
+        #: The harness this prover drives.
+        self.harness = harness or ClaudeCodeHarness()
+        #: Skills to mount into the agent workdir (names or paths).
+        self.skills = skills if skills is not None else ["lean-proof"]
+        #: Additional environment variables forwarded into the agent sandbox.
+        self.extra_env = dict(extra_env or {})
 
     @property
     def prover_prompt(self) -> str:
@@ -212,9 +180,9 @@ class AgentProver(AutomatedProver):
         # 3. Stage the workdir: the harness launch script, then the config's skills
         #    (this prover owns the list; the harness owns where they land), then prompt
         #    (this prover's own prompt + the task's optional user prompt).
-        harness = self.config.harness.build()
+        harness = self.harness
         harness.stage(wd)
-        harness.stage_skills(wd, [resolve_skill(s) for s in self.config.skills])
+        harness.stage_skills(wd, [resolve_skill(s) for s in self.skills])
         harness.write_prompt(wd, compose_prompt(self.prover_prompt, task.user_prompt))
         stdout_path = logs_dir / "stdout.txt"
 
@@ -224,7 +192,7 @@ class AgentProver(AutomatedProver):
         #    when the session is created; per-command env is forwarded by _run_agent.
         _, mounts = self._auth(harness)
         with self.verifier.backend.session(
-            wd, mounts=mounts, timeout_s=self.config.timeout_s
+            wd, mounts=mounts, timeout_s=self.timeout_s
         ) as session:
             lines, stderr = self._run_agent(wd, harness, stdout_path, session)
             self._download_wd(wd, session)
@@ -268,7 +236,7 @@ class AgentProver(AutomatedProver):
         cost = parsed.cost_usd
         if cost is None:
             cost = compute_cost_usd(
-                self.config.harness.model, parsed.input_tokens, parsed.output_tokens
+                self.harness.model, parsed.input_tokens, parsed.output_tokens
             )
 
         completed: dict[str, str] = {}
@@ -284,8 +252,8 @@ class AgentProver(AutomatedProver):
         result.cost_usd = cost
         result.metadata = {
             "harness": harness.name,
-            "model": self.config.harness.model,
-            "effort": self.config.harness.effort,
+            "model": self.harness.model,
+            "effort": self.harness.effort,
             "input_tokens": parsed.input_tokens,
             "output_tokens": parsed.output_tokens,
             "stop_reason": parsed.stop_reason,
@@ -300,8 +268,8 @@ class AgentProver(AutomatedProver):
             if value is not None:
                 env[key] = value
         env.update(harness.static_env())
-        env.update(self.config.env)
-        env.update(self.config.extra_env)
+        env.update(self.env)
+        env.update(self.extra_env)
         home = self.verifier.backend.container_home
         mounts = [(str(src), f"{home}/{dest}") for src, dest in spec.home_dirs]
         return env, mounts

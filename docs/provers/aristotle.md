@@ -11,7 +11,7 @@ Docker sandbox. This is the platform's simplest end-to-end slice.
 ## Authentication
 
 The prover reads an API key from the environment variable named by
-{attr}`~open_atp.provers.aristotle.AristotleProverConfig.api_key_env` (default
+{attr}`~open_atp.provers.aristotle.AristotleProver.api_key_env` (default
 `ARISTOTLE_API_KEY`). Set it on the host:
 
 ```bash
@@ -23,19 +23,18 @@ or add it to a `.env` file in your project.
 ## Usage
 
 ```python
-from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.docker import DockerBackend
 from open_atp.images import DEFAULT_IMAGE
-from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
+from open_atp.provers.aristotle import AristotleProver
 
-backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-config = AristotleProverConfig()
-prover = AristotleProver(config, verification_backend=backend)
+backend = DockerBackend(image=DEFAULT_IMAGE)
+prover = AristotleProver(backend=backend)
 ```
 
 The remote interaction is isolated in
 `AristotleProver._submit_and_download`, so tests can stand in a fake result without
 touching the network or an API key. See {doc}`../user_guide/run_provers` for an
-end-to-end run and {class}`~open_atp.provers.aristotle.AristotleProverConfig` in the
+end-to-end run and {class}`~open_atp.provers.aristotle.AristotleProver` in the
 {doc}`../api/provers` reference for configuration.
 
 The prompt submitted to the hosted agent is Aristotle's own prover prompt, with the

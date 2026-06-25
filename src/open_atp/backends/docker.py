@@ -22,37 +22,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from open_atp.backends.base import (
-    BackendConfig,
     CommandHandle,
     CommandResult,
     ComputeBackend,
     ComputeSession,
     wrap_command,
 )
-
-
-@dataclass
-class DockerConfig(BackendConfig):
-    """Configuration for :class:`DockerBackend`.
-
-    Extends :class:`~open_atp.backends.base.BackendConfig` (``image``, ``timeout_s``,
-    ``env``) with Docker-specific knobs.
-
-    Attributes
-    ----------
-    workdir_mount : str
-        Path inside the container where the workdir is bind-mounted. Default
-        ``/workspace/wd``.
-    baked_lake : str
-        Image-baked warm cache to symlink the workdir's ``.lake`` to. Empty skips the
-        symlink. Default ``/workspace/.lake``.
-    volumes : tuple[tuple[str, str], ...]
-        Extra ``-v host:container`` mounts (e.g. agent credential dirs). Default empty.
-    """
-
-    workdir_mount: str = "/workspace/wd"
-    baked_lake: str = "/workspace/.lake"
-    volumes: tuple[tuple[str, str], ...] = ()
+from open_atp.images import DEFAULT_IMAGE, Image
 
 
 @dataclass
@@ -108,29 +84,53 @@ class DockerBackend(ComputeBackend):
     """Run sandboxes as local ``docker`` containers over a bind-mounted workdir.
 
     The workdir is bind-mounted (not copied), so a command's file edits land directly
-    on the host. Construction is offline -- it just holds the :class:`DockerConfig`;
-    the daemon is only contacted when a command runs.
+    on the host. Construction is offline -- it just records its knobs; the daemon is
+    only contacted when a command runs.
+
+    Parameters
+    ----------
+    workdir_mount : str
+        Path inside the container where the workdir is bind-mounted. Default
+        ``/workspace/wd``.
+    baked_lake : str
+        Image-baked warm cache to symlink the workdir's ``.lake`` to. Empty skips the
+        symlink. Default ``/workspace/.lake``.
+    volumes : tuple[tuple[str, str], ...]
+        Extra ``-v host:container`` mounts (e.g. agent credential dirs). Default empty.
 
     Examples
     --------
 
-    >>> from open_atp.backends.docker import DockerBackend, DockerConfig
+    >>> from open_atp.backends.docker import DockerBackend
     >>> from open_atp.images import DEFAULT_IMAGE
-    >>> backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    >>> backend = DockerBackend(image=DEFAULT_IMAGE)
     >>> backend.name
     'docker'
-    >>> backend.config.workdir_mount
+    >>> backend.workdir_mount
     '/workspace/wd'
     """
-
-    config: DockerConfig
 
     # The image runs as the non-root ``agent`` user (Lean's elan + Claude Code
     # both live under this HOME); credential mounts land here.
     container_home = "/home/agent"
 
-    def __init__(self, config: DockerConfig) -> None:
-        super().__init__(config)
+    def __init__(
+        self,
+        *,
+        image: Image | Mapping[str, object] = DEFAULT_IMAGE,
+        timeout_s: int = 1800,
+        env: Mapping[str, str] | None = None,
+        workdir_mount: str = "/workspace/wd",
+        baked_lake: str = "/workspace/.lake",
+        volumes: tuple[tuple[str, str], ...] = (),
+    ) -> None:
+        super().__init__(image=image, timeout_s=timeout_s, env=env)
+        #: Path inside the container where the workdir is bind-mounted.
+        self.workdir_mount = workdir_mount
+        #: Image-baked warm cache to symlink the workdir's ``.lake`` to.
+        self.baked_lake = baked_lake
+        #: Extra ``-v host:container`` mounts.
+        self.volumes = tuple(tuple(v) for v in volumes)
 
     @property
     def name(self) -> str:
@@ -138,7 +138,7 @@ class DockerBackend(ComputeBackend):
 
     def _wrap(self, command: str) -> str:
         """cd into the mount and wire up the warm Mathlib cache before ``command``."""
-        return wrap_command(self.config.workdir_mount, self.config.baked_lake, command)
+        return wrap_command(self.workdir_mount, self.baked_lake, command)
 
     def _build_cmd(
         self,
@@ -154,13 +154,13 @@ class DockerBackend(ComputeBackend):
             # Keep-alive container for a session; commands land via ``docker exec``.
             cmd.append("-d")
         cmd += ["--name", container]
-        cmd += ["-v", f"{workdir.resolve()}:{self.config.workdir_mount}"]
-        # Config-level mounts (baked in) then per-call mounts (e.g. credential dirs).
-        for host, dest in (*self.config.volumes, *mounts):
+        cmd += ["-v", f"{workdir.resolve()}:{self.workdir_mount}"]
+        # Backend-level mounts (baked in) then per-call mounts (e.g. credential dirs).
+        for host, dest in (*self.volumes, *mounts):
             cmd += ["-v", f"{host}:{dest}"]
-        for key, value in {**self.config.env, **env}.items():
+        for key, value in {**self.env, **env}.items():
             cmd += ["-e", f"{key}={value}"]
-        cmd += [self.config.image.name]
+        cmd += [self.image.name]
         return cmd
 
     def start(

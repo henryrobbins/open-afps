@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -13,7 +12,6 @@ from open_atp.harness._paths import _SCRIPTS
 from open_atp.harness.base import (
     AuthSpec,
     Harness,
-    HarnessConfig,
     HarnessRunResult,
     _infer_provider,
 )
@@ -55,8 +53,6 @@ class AxProverHarness(Harness):
 
     name = "axprover"
 
-    config: AxProverHarnessConfig
-
     #: open-atp provider name -> ax-prover's LangChain ``provider:model`` prefix.
     _AX_PROVIDER_PREFIX: ClassVar[dict[str, str]] = {
         "anthropic": "anthropic",
@@ -65,8 +61,17 @@ class AxProverHarness(Harness):
         "deepseek": "deepseek",
     }
 
-    def __init__(self, config: AxProverHarnessConfig) -> None:
-        super().__init__(config)
+    def __init__(
+        self,
+        *,
+        model: str = "claude-opus-4-8",
+        effort: str = "high",
+        max_iterations: int | None = None,
+    ) -> None:
+        super().__init__(model=model, effort=effort)
+        #: Cap on ax-prover's proposer->builder->reviewer loop; ``None`` keeps
+        #: ax-prover's own default (50).
+        self.max_iterations = max_iterations
         #: Set in :meth:`stage`; where :meth:`parse` looks for usage files.
         self._wd: Path | None = None
 
@@ -162,8 +167,8 @@ class AxProverHarness(Harness):
             },
             "prover": {"prover_llm": "${llm_configs.open_atp}"},
         }
-        if self.config.max_iterations is not None:
-            config["prover"]["max_iterations"] = int(self.config.max_iterations)
+        if self.max_iterations is not None:
+            config["prover"]["max_iterations"] = int(self.max_iterations)
         return json.dumps(config, indent=2)
 
     def _agent_command(self) -> str:
@@ -211,21 +216,3 @@ class AxProverHarness(Harness):
             if stripped:
                 result.result_text = stripped
         return result
-
-
-@dataclass
-class AxProverHarnessConfig(HarnessConfig):
-    """:class:`~open_atp.harness.base.HarnessConfig` for the ax-prover-base harness.
-
-    Defaults to ``high`` effort, matching ax-prover-base.
-
-    Attributes
-    ----------
-    max_iterations : int, optional
-        Cap on ax-prover's proposer->builder->reviewer loop. ``None`` keeps
-        ax-prover's own default (50).
-    """
-
-    effort: str = "high"
-    max_iterations: int | None = None
-    harness_cls: ClassVar[type[Harness]] = AxProverHarness

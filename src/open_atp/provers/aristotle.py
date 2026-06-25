@@ -19,14 +19,13 @@ import shutil
 import tarfile
 import tempfile
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
+from open_atp.backends.base import ComputeBackend
 from open_atp.lean import ProofTask
 from open_atp.provers.base import (
     AutomatedProver,
-    AutomatedProverConfig,
     ProofResult,
     compose_prompt,
 )
@@ -68,14 +67,16 @@ def _is_transient(exc: BaseException) -> bool:
     return False
 
 
-@dataclass
-class AristotleProverConfig(AutomatedProverConfig):
-    """Configuration for :class:`AristotleProver`.
+class AristotleProver(AutomatedProver):
+    """Prove by handing the whole project to Harmonic's hosted Aristotle agent.
 
-    Extends :class:`~open_atp.provers.base.AutomatedProverConfig` (``timeout_s``,
-    ``env``) with the hosted-API knobs.
+    Generation happens over the network (submit the lake project, wait, download the
+    result archive, unpack it over the workdir); the shared
+    :class:`~open_atp.verify.Verifier` then runs the same local compile/sorry/axiom
+    check. Generation is network-only, so the backend is used solely for that final
+    check -- unlike the agentic provers, there is no live session to reuse.
 
-    Attributes
+    Parameters
     ----------
     api_key_env : str
         Name of the environment variable holding the Harmonic API key. Default
@@ -93,42 +94,46 @@ class AristotleProverConfig(AutomatedProverConfig):
     resume_backoff_seconds : float
         Initial sleep between retries/resumes, doubling (capped) between tries.
         Default ``5.0``.
-    """
-
-    api_key_env: str = "ARISTOTLE_API_KEY"
-    allow_agent_questions: bool = False
-    max_connection_retries: int = 5
-    max_resume_attempts: int = 20
-    resume_backoff_seconds: float = 5.0
-
-
-class AristotleProver(AutomatedProver):
-    """Prove by handing the whole project to Harmonic's hosted Aristotle agent.
-
-    Generation happens over the network (submit the lake project, wait, download the
-    result archive, unpack it over the workdir); the shared
-    :class:`~open_atp.verify.Verifier` then runs the same local compile/sorry/axiom
-    check. Generation is network-only, so the backend is used solely for that final
-    check -- unlike the agentic provers, there is no live session to reuse.
 
     Examples
     --------
 
-    Build the config and construct the prover directly (network-only, so it takes
-    just the verify backend):
+    Construct the prover directly (network-only, so the backend is just the verify
+    backend):
 
-    >>> from open_atp.backends.docker import DockerBackend, DockerConfig
-    >>> from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
-    >>> backend = DockerBackend(DockerConfig())
-    >>> config = AristotleProverConfig()
-    >>> prover = AristotleProver(config, verification_backend=backend)
-    >>> prover.config.api_key_env
+    >>> from open_atp.backends.docker import DockerBackend
+    >>> from open_atp.provers.aristotle import AristotleProver
+    >>> backend = DockerBackend()
+    >>> prover = AristotleProver(backend=backend)
+    >>> prover.api_key_env
     'ARISTOTLE_API_KEY'
     """
 
     name = "aristotle"
 
-    config: AristotleProverConfig
+    def __init__(
+        self,
+        *,
+        backend: ComputeBackend,
+        api_key_env: str = "ARISTOTLE_API_KEY",
+        allow_agent_questions: bool = False,
+        max_connection_retries: int = 5,
+        max_resume_attempts: int = 20,
+        resume_backoff_seconds: float = 5.0,
+        timeout_s: int = 1800,
+        env: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(backend=backend, timeout_s=timeout_s, env=env)
+        #: Name of the env var holding the Harmonic API key.
+        self.api_key_env = api_key_env
+        #: Whether to let the hosted agent ask clarifying questions.
+        self.allow_agent_questions = allow_agent_questions
+        #: Bounds per-call retries when a connection drops.
+        self.max_connection_retries = max_connection_retries
+        #: Bounds re-attaches to the event stream when it drops mid-run.
+        self.max_resume_attempts = max_resume_attempts
+        #: Initial sleep between retries/resumes, doubling (capped) between tries.
+        self.resume_backoff_seconds = resume_backoff_seconds
 
     @property
     def prover_prompt(self) -> str:
@@ -194,13 +199,13 @@ class AristotleProver(AutomatedProver):
         import aristotlelib
         from aristotlelib import AgentQuestionsSetting, Project
 
-        key = os.environ.get(self.config.api_key_env)
+        key = os.environ.get(self.api_key_env)
         if key:
             aristotlelib.set_api_key(key)
 
         questions = (
             AgentQuestionsSetting.TIMEOUT_15_MIN
-            if self.config.allow_agent_questions
+            if self.allow_agent_questions
             else AgentQuestionsSetting.DISABLED
         )
 
@@ -250,22 +255,19 @@ class AristotleProver(AutomatedProver):
         Backs off exponentially (capped) and re-raises once the retry budget is spent
         or the error is not transient, so a genuine bad key/4xx still fails fast.
         """
-        delay = self.config.resume_backoff_seconds
-        for attempt in range(1, self.config.max_connection_retries + 1):
+        delay = self.resume_backoff_seconds
+        for attempt in range(1, self.max_connection_retries + 1):
             try:
                 return await op()
             except Exception as exc:  # noqa: BLE001 -- re-raised unless transient
-                if (
-                    not _is_transient(exc)
-                    or attempt == self.config.max_connection_retries
-                ):
+                if not _is_transient(exc) or attempt == self.max_connection_retries:
                     raise
                 log.warning(
                     "aristotle: %s failed (%s); retrying (attempt %d/%d)",
                     what,
                     exc,
                     attempt,
-                    self.config.max_connection_retries,
+                    self.max_connection_retries,
                 )
                 await asyncio.sleep(delay)
                 delay = min(delay * 2, 60.0)
@@ -290,8 +292,8 @@ class AristotleProver(AutomatedProver):
             TaskStatus.FAILED,
             TaskStatus.CANCELED,
         }
-        delay = self.config.resume_backoff_seconds
-        for attempt in range(1, self.config.max_resume_attempts + 1):
+        delay = self.resume_backoff_seconds
+        for attempt in range(1, self.max_resume_attempts + 1):
             try:
                 await agent_task.wait_for_completion()
             except Exception as exc:  # noqa: BLE001 -- re-raised unless transient
@@ -306,7 +308,7 @@ class AristotleProver(AutomatedProver):
                 "(attempt %d/%d)",
                 agent_task.status.name,
                 attempt,
-                self.config.max_resume_attempts,
+                self.max_resume_attempts,
             )
             await asyncio.sleep(delay)
             delay = min(delay * 2, 60.0)
@@ -315,7 +317,7 @@ class AristotleProver(AutomatedProver):
             "whatever output is available",
             agent_task.agent_task_id,
             agent_task.status.name,
-            self.config.max_resume_attempts,
+            self.max_resume_attempts,
         )
 
     async def _sync_run_info(

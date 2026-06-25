@@ -51,9 +51,9 @@ compile/sorry/axiom check regardless of which tool generated the proof.
 | --- | --- | --- | --- |
 | `aristotle` | Harmonic Aristotle (hosted) | remote API via `aristotlelib` | [harmonic.fun](https://www.harmonic.fun) · [aristotlelib](https://pypi.org/project/aristotlelib/) |
 | `agent` | Claude Code (`claude_code` harness) | coding agent + lean-lsp-mcp | [anthropics/claude-code](https://github.com/anthropics/claude-code) |
-| `agent:codex` | OpenAI Codex CLI | coding agent + lean-lsp-mcp | [openai/codex](https://github.com/openai/codex) |
-| `agent:opencode` | opencode | coding agent + lean-lsp-mcp | [sst/opencode](https://github.com/sst/opencode) |
-| `agent:axprover` | ax-prover (LangGraph Lean agent) | proposer→builder→reviewer loop | [Axiomatic-AI/ax-prover-base](https://github.com/Axiomatic-AI/ax-prover-base) ([fork](https://github.com/henryrobbins/ax-prover-base)) |
+| `codex` | OpenAI Codex CLI | coding agent + lean-lsp-mcp | [openai/codex](https://github.com/openai/codex) |
+| `opencode` | opencode | coding agent + lean-lsp-mcp | [sst/opencode](https://github.com/sst/opencode) |
+| `axprover` | ax-prover (LangGraph Lean agent) | proposer→builder→reviewer loop | [Axiomatic-AI/ax-prover-base](https://github.com/Axiomatic-AI/ax-prover-base) ([fork](https://github.com/henryrobbins/ax-prover-base)) |
 | `numina` | Numina skills/prompts on Claude Code | round-continuation loop | [vendor/numina/VENDOR.md](vendor/numina/VENDOR.md) |
 | `vibe` | Mistral Vibe `lean` scaffold (Leanstral stand-in on Magistral; `--model` configurable) | hosted model, no GPU | [mistralai/mistral-vibe](https://github.com/mistralai/mistral-vibe) |
 

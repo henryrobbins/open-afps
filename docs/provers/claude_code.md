@@ -12,23 +12,23 @@ check. See {doc}`index` for the staging/diff lifecycle every agent harness share
 ## Usage
 
 ```python
-from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.harness import ClaudeCodeHarnessConfig
+from open_atp.backends.docker import DockerBackend
+from open_atp.harness import ClaudeCodeHarness
 from open_atp.images import DEFAULT_IMAGE
-from open_atp.provers import AgentProver, AgentProverConfig
+from open_atp.provers import AgentProver
 
-backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-config = AgentProverConfig(
-    harness=ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high"),
+backend = DockerBackend(image=DEFAULT_IMAGE)
+prover = AgentProver(
+    harness=ClaudeCodeHarness(model="claude-opus-4-8", effort="high"),
+    backend=backend,
 )
-prover = AgentProver(config, verification_backend=backend)
 ```
 
-{class}`~open_atp.provers.agent_prover.AgentProverConfig` composes a
-{class}`~open_atp.harness.HarnessConfig`; here a
-{class}`~open_atp.harness.ClaudeCodeHarnessConfig` selects the Claude Code CLI and
-carries its `model`/`effort`. Swap in any other harness config to change CLI. Claude
-Code is the default, so a bare `AgentProverConfig()` already uses it.
+{class}`~open_atp.provers.agent_prover.AgentProver` composes a
+{class}`~open_atp.harness.Harness`; here a
+{class}`~open_atp.harness.ClaudeCodeHarness` selects the Claude Code CLI and
+carries its `model`/`effort`. Swap in any other harness to change CLI. Claude
+Code is the default, so a bare `AgentProver(backend=...)` already uses it.
 
 Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI: `agent`
 (Claude Code is the default harness, so no `:harness` suffix is needed).
@@ -36,10 +36,10 @@ Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI: `age
 ## Harness details
 
 `stage` writes a project-scope `.mcp.json` registering the lean-lsp MCP server. The
-prover then stages the `AgentProverConfig.skills` — the host-agnostic
+prover then stages the `AgentProver`'s `skills` — the host-agnostic
 [`leanprover/skills`](https://github.com/leanprover/skills), default `lean-proof` —
 under `.claude/skills/` (via `stage_skills`). Claude Code is the only harness that
-also loads **plugins**, so they live on `ClaudeCodeHarnessConfig.plugins` (default
+also loads **plugins**, so they live on `ClaudeCodeHarness`'s `plugins` (default
 `lean4`, vendored from
 [`cameronfreer/lean4-skills`](https://github.com/cameronfreer/lean4-skills)) rather
 than the shared bundle; each is staged under `.plugins/<name>/`. The launch script

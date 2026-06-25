@@ -40,17 +40,17 @@ server inside the sandbox, then diffs the `.lean` files it changed:
 ```python
 from pathlib import Path
 
-from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.docker import DockerBackend
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.images import DEFAULT_IMAGE
-from open_atp.harness import ClaudeCodeHarnessConfig
-from open_atp.provers import AgentProver, AgentProverConfig
+from open_atp.harness import ClaudeCodeHarness
+from open_atp.provers import AgentProver
 
-backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-config = AgentProverConfig(
-    harness=ClaudeCodeHarnessConfig(model="claude-opus-4-8", effort="high"),
+backend = DockerBackend(image=DEFAULT_IMAGE)
+prover = AgentProver(
+    harness=ClaudeCodeHarness(model="claude-opus-4-8", effort="high"),
+    backend=backend,
 )
-prover = AgentProver(config, verification_backend=backend)
 
 task = ProofTask(project=LeanProject("path/to/lake/project"))
 result = prover.prove(task, output_dir=Path("runs/demo"))
@@ -63,9 +63,9 @@ print("duration_s:", result.duration_s)
 `prove` populates `output_dir/{wd,logs}/`: `wd` is the completed lake project and
 `logs` holds the run record (`stdout.txt`, `stderr.txt`, `result.json`).
 
-Each agent CLI has its own {class}`~open_atp.harness.HarnessConfig`
-(`CodexHarnessConfig`, `OpenCodeHarnessConfig`, `VibeHarnessConfig`,
-`AxProverHarnessConfig`) carrying that harness's knobs — set `AgentProverConfig`'s
+Each agent CLI has its own {class}`~open_atp.harness.Harness`
+(`CodexHarness`, `OpenCodeHarness`, `VibeHarness`,
+`AxProverHarness`) carrying that harness's knobs — set `AgentProver`'s
 `harness` to any of them to switch CLI. See the per-harness prover pages under
 {doc}`../provers/index`.
 
@@ -78,14 +78,13 @@ result over the workdir, and runs the same shared verifier locally:
 ```python
 from pathlib import Path
 
-from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.docker import DockerBackend
 from open_atp.lean import LeanProject, ProofTask
 from open_atp.images import DEFAULT_IMAGE
-from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
+from open_atp.provers.aristotle import AristotleProver
 
-backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-config = AristotleProverConfig()
-prover = AristotleProver(config, verification_backend=backend)
+backend = DockerBackend(image=DEFAULT_IMAGE)
+prover = AristotleProver(backend=backend)
 
 task = ProofTask(project=LeanProject("path/to/lake/project"))
 result = prover.prove(task, output_dir=Path("runs/aristotle_demo"))

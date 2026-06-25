@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.docker import DockerBackend
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ToolchainMismatch
 from open_atp.verify import Verifier, docker_verifier
@@ -70,7 +70,7 @@ def test_toolchain_mismatch_is_rejected(tmp_path: Path) -> None:
 def test_session_persists_state_across_execs(tmp_path: Path) -> None:
     """One live container: a file written by one exec is visible to the next."""
     proj = _stage(tmp_path)
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    backend = DockerBackend(image=DEFAULT_IMAGE)
     with backend.session(proj) as session:
         session.exec("echo hello > marker.txt").wait()
         result = session.exec("cat marker.txt").wait()
@@ -86,7 +86,7 @@ def test_verify_in_session_matches_standalone(tmp_path: Path) -> None:
     proj = _stage(tmp_path)
     (proj / "MILExample.lean").write_text("import Mathlib\n\n" + SOLVED_PROOF)
 
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    backend = DockerBackend(image=DEFAULT_IMAGE)
     verifier = Verifier(backend)
     with backend.session(proj) as session:
         report = verifier.verify(LeanProject(proj), session=session)

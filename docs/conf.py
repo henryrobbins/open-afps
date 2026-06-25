@@ -100,7 +100,6 @@ numpydoc_xref_param_type = True
 numpydoc_xref_ignore = {"of", "or", "optional", "default"}
 numpydoc_xref_aliases = {
     # Registry
-    "PROVERS": "open_atp.provers.PROVERS",
     "get_prover": "open_atp.provers.get_prover",
     "stage_files": "open_atp.lean.stage_files",
     # Lean input contract
@@ -112,23 +111,17 @@ numpydoc_xref_aliases = {
     "Verifier": "open_atp.verify.Verifier",
     "ProofResult": "open_atp.provers.base.ProofResult",
     "AutomatedProver": "open_atp.provers.base.AutomatedProver",
-    "AutomatedProverConfig": "open_atp.provers.base.AutomatedProverConfig",
     # Backends
     "ComputeBackend": "open_atp.backends.base.ComputeBackend",
-    "BackendConfig": "open_atp.backends.base.BackendConfig",
     "CommandHandle": "open_atp.backends.base.CommandHandle",
     "CommandResult": "open_atp.backends.base.CommandResult",
     "DockerBackend": "open_atp.backends.docker.DockerBackend",
-    "DockerConfig": "open_atp.backends.docker.DockerConfig",
     "ModalBackend": "open_atp.backends.modal.ModalBackend",
-    "ModalConfig": "open_atp.backends.modal.ModalConfig",
     # Provers
     "AgentProver": "open_atp.provers.agent_prover.AgentProver",
-    "AgentProverConfig": "open_atp.provers.agent_prover.AgentProverConfig",
     "AristotleProver": "open_atp.provers.aristotle.AristotleProver",
-    "AristotleProverConfig": "open_atp.provers.aristotle.AristotleProverConfig",
     "NuminaProver": "open_atp.provers.numina.NuminaProver",
-    "NuminaProverConfig": "open_atp.provers.numina.NuminaProverConfig",
+    "PROVER_TYPES": "open_atp.provers.PROVER_TYPES",
     # Harnesses
     "Harness": "open_atp.harness.base.Harness",
     "HarnessRunResult": "open_atp.harness.base.HarnessRunResult",

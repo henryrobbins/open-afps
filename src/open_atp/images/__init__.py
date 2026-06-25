@@ -15,7 +15,7 @@ from pathlib import Path
 class Image:
     """A sandbox image: its container tag and the Lean pins baked into it.
 
-    Carried by a :class:`~open_atp.backends.base.BackendConfig` and used by the
+    Carried by a :class:`~open_atp.backends.base.ComputeBackend` and used by the
     :class:`~open_atp.verify.Verifier` as the compatibility contract: a project must
     match :attr:`lean_toolchain` (and, when it locks one, :attr:`mathlib_rev`) or it
     is rejected before any compute is spent.

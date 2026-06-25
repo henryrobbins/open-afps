@@ -24,14 +24,12 @@ from pathlib import Path
 import pytest
 
 from open_atp.harness import (
-    HARNESS_CONFIGS,
     HARNESSES,
     Harness,
     VibeHarness,
-    VibeHarnessConfig,
 )
 from open_atp.lean import LeanProject, ProofTask
-from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
+from open_atp.provers.agent_prover import AgentProver
 from open_atp.provers.base import ProofResult
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
@@ -83,36 +81,32 @@ def _write_session_log(log_dir: Path, stats: dict[str, object]) -> None:
 def prover(fake_session_backend: object) -> AgentProver:
     # The in-process fake session keeps the diff unit test (which stubs _run_agent)
     # off a live backend while _generate opens its session and verifies in it.
-    config = AgentProverConfig(
-        harness=VibeHarnessConfig(agent="lean-standin", model="magistral-medium-latest")
-    )
-    return AgentProver(config, fake_session_backend)
+    harness = VibeHarness(agent="lean-standin", model="magistral-medium-latest")
+    return AgentProver(harness=harness, backend=fake_session_backend)
 
 
 # --- construction / config -------------------------------------------------
 
 
-def test_registered_and_config_build_carries_vibe_knobs() -> None:
+def test_registered_and_construction_carries_vibe_knobs() -> None:
     assert HARNESSES["vibe"] is VibeHarness
-    assert HARNESS_CONFIGS["vibe"] is VibeHarnessConfig
 
-    config = VibeHarnessConfig(
+    harness = VibeHarness(
         agent="lean",
         model="labs-leanstral-2603",
         max_turns=8,
         max_price=0.5,
     )
-    harness = config.build()
     assert isinstance(harness, VibeHarness)
-    assert harness.config.agent == "lean"
-    assert harness.config.max_turns == 8
-    assert harness.config.max_price == 0.5
+    assert harness.agent == "lean"
+    assert harness.max_turns == 8
+    assert harness.max_price == 0.5
 
 
 def test_agent_command_renders_agent_and_run_guards() -> None:
-    harness = VibeHarnessConfig(
+    harness = VibeHarness(
         model="labs-leanstral-2603", agent="lean", max_turns=8, max_price=0.5
-    ).build()
+    )
     script = harness._agent_command()
     assert "--agent lean" in script
     assert "<<AGENT>>" not in script and "<<EXTRA>>" not in script
@@ -122,9 +116,7 @@ def test_agent_command_renders_agent_and_run_guards() -> None:
 
 
 def test_agent_command_omits_unset_guards() -> None:
-    harness = VibeHarnessConfig(
-        model="magistral-medium-latest", agent="lean-standin"
-    ).build()
+    harness = VibeHarness(model="magistral-medium-latest", agent="lean-standin")
     script = harness._agent_command()
     assert "--agent lean-standin" in script
     assert "--max-turns" not in script
@@ -132,7 +124,7 @@ def test_agent_command_omits_unset_guards() -> None:
 
 
 def test_auth_spec_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    harness = VibeHarnessConfig(model="labs-leanstral-2603").build()
+    harness = VibeHarness(model="labs-leanstral-2603")
     monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="MISTRAL_API_KEY"):
         harness.auth_spec()
@@ -144,9 +136,7 @@ def test_auth_spec_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_stage_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None:
-    harness = VibeHarnessConfig(
-        model="magistral-medium-latest", agent="lean-standin"
-    ).build()
+    harness = VibeHarness(model="magistral-medium-latest", agent="lean-standin")
     harness.stage(tmp_path)
     harness.write_prompt(tmp_path, "fill the sorrys")
 
@@ -186,7 +176,7 @@ def test_stage_bootstraps_workdir_local_vibe_home(tmp_path: Path) -> None:
 
 
 def test_parse_reads_cost_and_tokens_from_session_log(tmp_path: Path) -> None:
-    harness = VibeHarnessConfig(model="labs-leanstral-2603").build()
+    harness = VibeHarness(model="labs-leanstral-2603")
     harness.stage(tmp_path)
     _write_session_log(harness._session_log_dir, _session_stats())
 
@@ -198,7 +188,7 @@ def test_parse_reads_cost_and_tokens_from_session_log(tmp_path: Path) -> None:
 
 
 def test_parse_without_session_log_leaves_cost_none(tmp_path: Path) -> None:
-    harness = VibeHarnessConfig(model="labs-leanstral-2603").build()
+    harness = VibeHarness(model="labs-leanstral-2603")
     harness.stage(tmp_path)  # no log written
     result = harness.parse(STREAM_LINES)
     assert result.cost_usd is None

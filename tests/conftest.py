@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from open_atp.backends.base import CommandHandle, CommandResult, ComputeSession
-from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.docker import DockerBackend
 from open_atp.images import DEFAULT_IMAGE
 
 _ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
@@ -96,4 +96,4 @@ class FakeSessionBackend(DockerBackend):
 @pytest.fixture
 def fake_session_backend() -> FakeSessionBackend:
     """A backend with an in-process session for the no-Docker prover unit tests."""
-    return FakeSessionBackend(DockerConfig(image=DEFAULT_IMAGE))
+    return FakeSessionBackend(image=DEFAULT_IMAGE)

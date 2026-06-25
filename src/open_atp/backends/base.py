@@ -17,9 +17,9 @@ from __future__ import annotations
 import abc
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Self
+from typing import cast
 
 from open_atp.images import DEFAULT_IMAGE, Image
 
@@ -80,10 +80,10 @@ class ComputeSession(AbstractContextManager["ComputeSession"]):
 
     .. code-block:: python
 
-        from open_atp.backends.docker import DockerBackend, DockerConfig
+        from open_atp.backends.docker import DockerBackend
         from open_atp.images import DEFAULT_IMAGE
 
-        backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+        backend = DockerBackend(image=DEFAULT_IMAGE)
         with backend.session(workdir) as session:
             with session.exec("lake env lean Demo.lean") as handle:
                 result = handle.wait()
@@ -117,55 +117,6 @@ class ComputeSession(AbstractContextManager["ComputeSession"]):
         self.close()
 
 
-@dataclass
-class BackendConfig:
-    """Shared backend knobs. Subclasses add their own (Docker mounts, Modal CPU…).
-
-    Attributes
-    ----------
-    image : Image
-        The sandbox image carrying Lean + Mathlib -- its tag plus the toolchain and
-        Mathlib revision the verifier checks projects against. Default
-        :data:`~open_atp.images.DEFAULT_IMAGE`.
-    timeout_s : int
-        Wall-clock cap applied to a command when its call site does not pass an
-        explicit ``timeout_s``. Default ``1800``.
-    env : Mapping[str, str]
-        Environment variables baked into every command run in the sandbox. Default
-        empty.
-    """
-
-    image: Image = DEFAULT_IMAGE
-    timeout_s: int = 1800
-    env: Mapping[str, str] = field(default_factory=dict)
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, object]) -> Self:
-        """Build a config from a mapping (e.g. parsed JSON), ignoring unknown keys.
-
-        The inverse of :func:`dataclasses.asdict`: any tuple-typed field (e.g.
-        :attr:`~open_atp.backends.docker.DockerConfig.volumes`) is restored from
-        the list JSON round-trips it to. Unknown keys are dropped so a serialized
-        superset (or a sibling backend's extra knobs) loads cleanly. Subclasses
-        inherit this unchanged -- ``cls`` resolves to the concrete config, so its
-        own fields are honoured.
-        """
-        known = {f.name: f for f in fields(cls)}
-        kwargs: dict[str, Any] = {}
-        for key, value in data.items():
-            f = known.get(key)
-            if f is None:
-                continue
-            if (
-                isinstance(value, list)
-                and isinstance(f.type, str)
-                and f.type.startswith("tuple")
-            ):
-                value = tuple(tuple(v) if isinstance(v, list) else v for v in value)
-            kwargs[key] = value
-        return cls(**kwargs)
-
-
 def wrap_command(workdir_mount: str, baked_lake: str, command: str) -> str:
     """``cd`` into the workdir mount and wire the warm Mathlib cache before ``command``.
 
@@ -182,14 +133,45 @@ def wrap_command(workdir_mount: str, baked_lake: str, command: str) -> str:
 
 
 class ComputeBackend(abc.ABC):
-    """Runs commands over a workdir in a sandbox carrying Lean + Mathlib."""
+    """Runs commands over a workdir in a sandbox carrying Lean + Mathlib.
+
+    Parameters
+    ----------
+    image : Image
+        The sandbox image carrying Lean + Mathlib -- its tag plus the toolchain and
+        Mathlib revision the verifier checks projects against. Default
+        :data:`~open_atp.images.DEFAULT_IMAGE`. A mapping is coerced to an
+        :class:`~open_atp.images.Image` (so a parsed config's nested ``image:`` block
+        works).
+    timeout_s : int
+        Wall-clock cap applied to a command when its call site does not pass an
+        explicit ``timeout_s``. Default ``1800``.
+    env : Mapping[str, str], optional
+        Environment variables baked into every command run in the sandbox. Default
+        empty.
+    """
 
     #: Absolute ``$HOME`` inside the sandbox; per-run credential dirs (an agent's
     #: ``~/.codex``, say) are mounted under it. Overridden per backend.
     container_home: str = "/root"
 
-    def __init__(self, config: BackendConfig) -> None:
-        self.config = config
+    def __init__(
+        self,
+        *,
+        image: Image | Mapping[str, object] = DEFAULT_IMAGE,
+        timeout_s: int = 1800,
+        env: Mapping[str, str] | None = None,
+    ) -> None:
+        #: The sandbox image (Lean + Mathlib) the backend runs.
+        self.image = (
+            image
+            if isinstance(image, Image)
+            else Image(**cast("Mapping[str, str]", image))
+        )
+        #: Default wall-clock cap for a command, in seconds.
+        self.timeout_s = timeout_s
+        #: Environment variables baked into every command run in the sandbox.
+        self.env = dict(env or {})
 
     @property
     @abc.abstractmethod

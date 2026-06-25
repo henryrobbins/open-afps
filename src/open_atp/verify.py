@@ -20,8 +20,8 @@ import re
 from dataclasses import dataclass, field
 
 from open_atp.backends.base import ComputeBackend, ComputeSession
-from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.backends.modal import ModalBackend, ModalConfig
+from open_atp.backends.docker import DockerBackend
+from open_atp.backends.modal import ModalBackend
 from open_atp.images import DEFAULT_IMAGE, Image
 from open_atp.lean import LeanProject, MathlibRevMismatch, ToolchainMismatch
 
@@ -88,7 +88,7 @@ class VerificationReport:
 
 def docker_verifier(image: Image = DEFAULT_IMAGE) -> Verifier:
     """A :class:`Verifier` backed by a local Docker sandbox running ``image``."""
-    return Verifier(DockerBackend(DockerConfig(image=image)))
+    return Verifier(DockerBackend(image=image))
 
 
 def modal_verifier(image: Image = DEFAULT_IMAGE) -> Verifier:
@@ -97,7 +97,7 @@ def modal_verifier(image: Image = DEFAULT_IMAGE) -> Verifier:
     Needs Modal credentials and the image published via ``open-atp
     build-modal-image``. The image's ``:tag`` is dropped for the Modal name lookup.
     """
-    return Verifier(ModalBackend(ModalConfig(image=image)))
+    return Verifier(ModalBackend(image=image))
 
 
 class Verifier:
@@ -109,7 +109,7 @@ class Verifier:
     @property
     def image(self) -> Image:
         """The image the backend runs -- the compatibility contract projects match."""
-        return self.backend.config.image
+        return self.backend.image
 
     def check_compatible(self, project: LeanProject) -> None:
         """Reject a project whose pins differ from the backend image's.
@@ -127,7 +127,7 @@ class Verifier:
 
         >>> import tempfile
         >>> from pathlib import Path
-        >>> from open_atp.backends.docker import DockerBackend, DockerConfig
+        >>> from open_atp.backends.docker import DockerBackend
         >>> from open_atp.images import Image
         >>> from open_atp.lean import LeanProject
         >>> from open_atp.verify import Verifier
@@ -139,12 +139,12 @@ class Verifier:
         A matching pin passes silently:
 
         >>> image = Image(lean_toolchain="leanprover/lean4:v4.31.0")
-        >>> ok = Verifier(DockerBackend(DockerConfig(image=image)))
+        >>> ok = Verifier(DockerBackend(image=image))
         >>> ok.check_compatible(project)
 
         A differing pin is rejected up front:
 
-        >>> bad = Verifier(DockerBackend(DockerConfig(image=Image())))
+        >>> bad = Verifier(DockerBackend(image=Image()))
         >>> bad.check_compatible(project)  # doctest: +ELLIPSIS
         Traceback (most recent call last):
             ...
@@ -181,7 +181,7 @@ class Verifier:
 
         >>> import tempfile
         >>> from pathlib import Path
-        >>> from open_atp.backends.docker import DockerBackend, DockerConfig
+        >>> from open_atp.backends.docker import DockerBackend
         >>> from open_atp.images import Image
         >>> from open_atp.lean import LeanProject
         >>> from open_atp.verify import Verifier
@@ -189,7 +189,7 @@ class Verifier:
         >>> _ = (root / "lakefile.toml").write_text('name = "demo"\\n')
         >>> _ = (root / "lean-toolchain").write_text("leanprover/lean4:v4.31.0\\n")
         >>> image = Image(lean_toolchain="leanprover/lean4:v4.31.0")
-        >>> verifier = Verifier(DockerBackend(DockerConfig(image=image)))
+        >>> verifier = Verifier(DockerBackend(image=image))
         >>> report = verifier.verify(LeanProject(root))
         >>> report.verified
         True

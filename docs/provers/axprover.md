@@ -14,28 +14,28 @@ own reviewer). See {doc}`index` for the lifecycle every agent harness shares.
 ## Usage
 
 ```python
-from open_atp.backends.docker import DockerBackend, DockerConfig
-from open_atp.harness import AxProverHarnessConfig
+from open_atp.backends.docker import DockerBackend
+from open_atp.harness import AxProverHarness
 from open_atp.images import DEFAULT_IMAGE
-from open_atp.provers import AgentProver, AgentProverConfig
+from open_atp.provers import AgentProver
 
-backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-config = AgentProverConfig(
-    harness=AxProverHarnessConfig(
+backend = DockerBackend(image=DEFAULT_IMAGE)
+prover = AgentProver(
+    harness=AxProverHarness(
         model="claude-opus-4-8",
         effort="high",
         max_iterations=None,  # cap ax-prover's loop (its own default is 50)
     ),
+    backend=backend,
 )
-prover = AgentProver(config, verification_backend=backend)
 ```
 
-{class}`~open_atp.harness.AxProverHarnessConfig` selects the ax-prover harness and
-carries the AxProver-specific `max_iterations` knob (which lives only on this harness
-config, not the shared base).
+{class}`~open_atp.harness.AxProverHarness` selects the ax-prover harness and
+carries the AxProver-specific `max_iterations` knob (which lives only on this harness,
+not the shared base).
 
 Or by registry spec through {func}`~open_atp.provers.get_prover` / the CLI:
-`agent:axprover` (defaults: `claude-opus-4-8`, `effort="high"`). The
+`axprover` (defaults: `claude-opus-4-8`, `effort="high"`). The
 `max_iterations` field caps ax-prover's proposer → builder → reviewer loop.
 
 ## Harness details

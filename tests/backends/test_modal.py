@@ -95,11 +95,11 @@ def _live(fn: object) -> object:
 @_live
 def test_backend_run_smoke(tmp_path: Path) -> None:
     """``ModalBackend.run`` executes a command over a pushed workdir on Modal."""
-    from open_atp.backends.modal import ModalBackend, ModalConfig
+    from open_atp.backends.modal import ModalBackend
     from open_atp.images import DEFAULT_IMAGE
 
     proj = _stage(tmp_path)
-    backend = ModalBackend(ModalConfig(image=DEFAULT_IMAGE))
+    backend = ModalBackend(image=DEFAULT_IMAGE)
     result = backend.run(proj, "lake env lean MILExample.lean")
 
     # The sorry'd fixture compiles (exit 0) but warns about `sorry`.
@@ -148,13 +148,13 @@ def test_toolchain_mismatch_is_rejected(tmp_path: Path) -> None:
 @_live
 def test_session_runs_many_commands_in_one_sandbox(tmp_path: Path) -> None:
     """One Sandbox, two execs: an edit then an in-session verify, terminated once."""
-    from open_atp.backends.modal import ModalBackend, ModalConfig
+    from open_atp.backends.modal import ModalBackend
     from open_atp.images import DEFAULT_IMAGE
     from open_atp.verify import Verifier
 
     proj = _stage(tmp_path)
     (proj / "MILExample.lean").write_text("import Mathlib\n\n" + SOLVED_PROOF)
-    backend = ModalBackend(ModalConfig(image=DEFAULT_IMAGE))
+    backend = ModalBackend(image=DEFAULT_IMAGE)
     verifier = Verifier(backend)
 
     with backend.session(proj) as session:

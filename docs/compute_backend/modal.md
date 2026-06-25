@@ -32,23 +32,22 @@ open-atp build-modal-image
 ```
 
 This publishes a named Modal image (`open-atp` by default) that the backend looks
-up at run time. The name must match `ModalConfig.image` (sans `:tag`); pass `--name`
+up at run time. The name must match `ModalBackend`'s `image` (sans `:tag`); pass `--name`
 to publish under a different name and `--force` to rebuild even when Modal has cached
 layers. As with Docker, the first build pre-builds Mathlib and is expected to take a
 while.
 
 ## Using the Modal backend
 
-A {class}`~open_atp.backends.modal.ModalBackend` is constructed from a
-{class}`~open_atp.backends.modal.ModalConfig` and is a drop-in
+A {class}`~open_atp.backends.modal.ModalBackend` is a drop-in
 {class}`~open_atp.backends.base.ComputeBackend` — substitute it for the
 `DockerBackend` anywhere a compute backend is expected:
 
 ```python
-from open_atp.backends.modal import ModalBackend, ModalConfig
+from open_atp.backends.modal import ModalBackend
 from open_atp.images import DEFAULT_IMAGE
 
-backend = ModalBackend(ModalConfig(image=DEFAULT_IMAGE, cpu=4.0, memory_mib=4096))
+backend = ModalBackend(image=DEFAULT_IMAGE, cpu=4.0, memory_mib=4096)
 ```
 
 `cpu` is a guaranteed floor of cores (the Sandbox may burst higher) and `memory_mib`

@@ -17,9 +17,6 @@ filesystem -- without paying a second spin-up.
 .. autoclass:: open_atp.backends.base.ComputeBackend
    :exclude-members: name
 
-.. autoclass:: open_atp.backends.base.BackendConfig
-   :exclude-members: image, timeout_s, env
-
 .. autoclass:: open_atp.backends.base.CommandHandle
 
 .. autoclass:: open_atp.backends.base.CommandResult
@@ -35,10 +32,6 @@ filesystem -- without paying a second spin-up.
    :show-inheritance:
    :exclude-members: name, start
 
-.. autoclass:: open_atp.backends.docker.DockerConfig
-   :show-inheritance:
-   :no-members:
-
 .. autoclass:: open_atp.backends.docker.DockerSession
    :show-inheritance:
 ```
@@ -49,10 +42,6 @@ filesystem -- without paying a second spin-up.
 .. autoclass:: open_atp.backends.modal.ModalBackend
    :show-inheritance:
    :exclude-members: name, start
-
-.. autoclass:: open_atp.backends.modal.ModalConfig
-   :show-inheritance:
-   :no-members:
 
 .. autoclass:: open_atp.backends.modal.ModalSession
    :show-inheritance:

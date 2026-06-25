@@ -13,9 +13,9 @@ different behaviours:
 - the **statement tracker** — guard against the agent deleting or weakening the
   theorems it was asked to prove.
 
-Numina's helper skills call out to Leandex / Gemini / GPT, so its config carries
+Numina's helper skills call out to Leandex / Gemini / GPT, so the prover carries
 those API keys
-({attr}`~open_atp.provers.numina.NuminaProverConfig.helper_env_keys`) to forward
+({attr}`~open_atp.provers.numina.NuminaProver.helper_env_keys`) to forward
 into the sandbox.
 
 The `discussion_partner` skill (Gemini/GPT) appends a per-call token-usage record
@@ -38,14 +38,18 @@ still being implemented.
 ## Configuration
 
 ```python
-from open_atp.provers.numina import NuminaProverConfig
+from open_atp.backends.docker import DockerBackend
+from open_atp.images import DEFAULT_IMAGE
+from open_atp.provers.numina import NuminaProver
 
-config = NuminaProverConfig(
+backend = DockerBackend(image=DEFAULT_IMAGE)
+prover = NuminaProver(
+    backend=backend,
     max_rounds=20,
     guard_statements=True,
 )
 ```
 
-The `harness` is fixed to `claude_code` and `assets` to `numina`. See
-{class}`~open_atp.provers.numina.NuminaProverConfig` in the {doc}`../api/provers`
+The harness is fixed to `claude_code` and assets to `numina`. See
+{class}`~open_atp.provers.numina.NuminaProver` in the {doc}`../api/provers`
 reference for the full set of fields.

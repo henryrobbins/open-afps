@@ -23,19 +23,19 @@ from pathlib import Path
 
 import pytest
 
-from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.docker import DockerBackend
 from open_atp.harness import (
-    ClaudeCodeHarnessConfig,
-    CodexHarnessConfig,
-    OpenCodeHarnessConfig,
+    ClaudeCodeHarness,
+    CodexHarness,
+    OpenCodeHarness,
 )
 from open_atp.images import DEFAULT_IMAGE, Image
 from open_atp.lean import LeanProject, ProofTask, ToolchainMismatch, stage_files
-from open_atp.provers import PROVERS, available_provers, get_prover
-from open_atp.provers.agent_prover import AgentProver, AgentProverConfig
-from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
+from open_atp.provers import available_provers, get_prover
+from open_atp.provers.agent_prover import AgentProver
+from open_atp.provers.aristotle import AristotleProver
 from open_atp.provers.base import AutomatedProver, ProofResult
-from open_atp.provers.numina import NuminaProver, NuminaProverConfig
+from open_atp.provers.numina import NuminaProver
 from open_atp.verify import VerificationReport, Verifier
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mil_trivial"
@@ -72,9 +72,7 @@ class FakeProver(AutomatedProver):
         # check_compatible (a toolchain comparison against the image) needs no Docker.
         # The ``toolchain`` knob rides on the backend image to simulate a mismatch.
         self.name = name
-        self.verifier = Verifier(
-            DockerBackend(DockerConfig(image=Image(lean_toolchain=toolchain)))
-        )
+        self.verifier = Verifier(DockerBackend(image=Image(lean_toolchain=toolchain)))
         self._verified = verified
         self._cost = cost_usd
         self._raises = raises
@@ -102,62 +100,57 @@ def _task() -> ProofTask:
 
 
 def test_get_prover_constructs_each_registered_prover() -> None:
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))  # no docker call here
+    backend = DockerBackend(image=DEFAULT_IMAGE)  # no docker call here
 
-    def build(name: PROVERS) -> AutomatedProver:
-        return get_prover(name, verification_backend=backend)
+    def build(name: str) -> AutomatedProver:
+        return get_prover(name, backend=backend)
 
-    aristotle = build(PROVERS.ARISTOTLE)
+    aristotle = build("aristotle")
     assert isinstance(aristotle, AristotleProver)
-    assert isinstance(aristotle.config, AristotleProverConfig)
-    # The toolchain contract now rides on the verify backend's image, not the config.
+    # The toolchain contract rides on the verify backend's image, not the prover.
     assert aristotle.verifier.image.lean_toolchain == DEFAULT_IMAGE.lean_toolchain
 
-    agent = build(PROVERS.CLAUDE)
+    agent = build("agent")
     assert isinstance(agent, AgentProver) and not isinstance(agent, NuminaProver)
-    assert isinstance(agent.config, AgentProverConfig)
-    assert isinstance(agent.config.harness, ClaudeCodeHarnessConfig)
+    assert isinstance(agent.harness, ClaudeCodeHarness)
 
-    codex = build(PROVERS.CODEX)
+    codex = build("codex")
     assert isinstance(codex, AgentProver)
-    assert isinstance(codex.config.harness, CodexHarnessConfig)
-    assert codex.config.harness.model == "gpt-5.5"
+    assert isinstance(codex.harness, CodexHarness)
+    assert codex.harness.model == "gpt-5.5"
 
-    opencode = build(PROVERS.OPENCODE)
-    assert isinstance(opencode.config.harness, OpenCodeHarnessConfig)
+    opencode = build("opencode")
+    assert isinstance(opencode.harness, OpenCodeHarness)
 
-    numina = build(PROVERS.NUMINA)
+    numina = build("numina")
     assert isinstance(numina, NuminaProver)
-    assert isinstance(numina.config, NuminaProverConfig)
 
 
-def test_get_prover_accepts_string_value() -> None:
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    prover = get_prover("agent:codex", verification_backend=backend)
+def test_get_prover_accepts_harness_alias() -> None:
+    backend = DockerBackend(image=DEFAULT_IMAGE)
+    prover = get_prover("codex", backend=backend)
     assert isinstance(prover, AgentProver)
-    assert isinstance(prover.config.harness, CodexHarnessConfig)
+    assert isinstance(prover.harness, CodexHarness)
 
 
 def test_get_prover_uses_one_backend_for_generation_and_verify() -> None:
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+    backend = DockerBackend(image=DEFAULT_IMAGE)
 
-    agent = get_prover(PROVERS.CLAUDE, verification_backend=backend)
+    agent = get_prover("agent", backend=backend)
 
     assert isinstance(agent, AgentProver)
     # The factory builds the name's defaults; there is no override surface.
-    assert agent.config.harness.model == "claude-opus-4-8"
+    assert agent.harness.model == "claude-opus-4-8"
     # One backend: generation runs in a live session over it and verification reuses
     # that same hot sandbox.
     assert agent.verifier.backend is backend
 
 
 def test_get_prover_rejects_unknown_name() -> None:
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    with pytest.raises(ValueError, match="Unknown prover"):
-        get_prover("nope", verification_backend=backend)
-    assert {PROVERS.ARISTOTLE, PROVERS.CLAUDE, PROVERS.NUMINA} <= set(
-        available_provers()
-    )
+    backend = DockerBackend(image=DEFAULT_IMAGE)
+    with pytest.raises(ValueError, match="unknown prover"):
+        get_prover("nope", backend=backend)
+    assert {"aristotle", "agent", "numina"} <= set(available_provers())
 
 
 # --- prove: lifecycle ------------------------------------------------------
@@ -294,8 +287,8 @@ def test_prove_aristotle_with_real_verify(
     monkeypatch.setattr(
         AristotleProver, "_submit_and_download", _fake_aristotle_remote(solved=True)
     )
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    prover = get_prover(PROVERS.ARISTOTLE, verification_backend=backend)
+    backend = DockerBackend(image=DEFAULT_IMAGE)
+    prover = get_prover("aristotle", backend=backend)
 
     result = prover.prove(_task(), tmp_path / "run")
 
@@ -313,8 +306,8 @@ def test_prove_catches_real_unverified_proof(
     monkeypatch.setattr(
         AristotleProver, "_submit_and_download", _fake_aristotle_remote(solved=False)
     )
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    prover = get_prover(PROVERS.ARISTOTLE, verification_backend=backend)
+    backend = DockerBackend(image=DEFAULT_IMAGE)
+    prover = get_prover("aristotle", backend=backend)
 
     result = prover.prove(_task(), tmp_path / "run")
     assert not result.success

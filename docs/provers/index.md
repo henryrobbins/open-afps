@@ -8,9 +8,9 @@ then verify in the sandbox — so every prover gets the same final check for fre
 | Prover | Spec | Generation | Credential |
 | --- | --- | --- | --- |
 | [Claude Code](claude_code.md) | `agent` | AgentProver on the Claude Code CLI | `CLAUDE_CODE_OAUTH_TOKEN` |
-| [Codex](codex.md) | `agent:codex` | AgentProver on the Codex CLI (OpenAI) | `~/.codex` (OAuth) |
-| [OpenCode](opencode.md) | `agent:opencode` | AgentProver on the OpenCode CLI (any provider) | `<PROVIDER>_API_KEY` |
-| [AxProver](axprover.md) | `agent:axprover` | AgentProver driving ax-prover-base | `ANTHROPIC` / `OPENAI` / `GOOGLE_API_KEY` |
+| [Codex](codex.md) | `codex` | AgentProver on the Codex CLI (OpenAI) | `~/.codex` (OAuth) |
+| [OpenCode](opencode.md) | `opencode` | AgentProver on the OpenCode CLI (any provider) | `<PROVIDER>_API_KEY` |
+| [AxProver](axprover.md) | `axprover` | AgentProver driving ax-prover-base | `ANTHROPIC` / `OPENAI` / `GOOGLE_API_KEY` |
 | [Vibe / Leanstral](vibe.md) | `vibe` | AgentProver on Mistral Vibe's `lean` agent | `MISTRAL_API_KEY` |
 | [NuminaProver](numina.md) | `numina` | AgentProver (Claude) + Numina assets + round loop | harness + helper API keys |
 | [AristotleProver](aristotle.md) | `aristotle` | Harmonic's hosted Aristotle API | `ARISTOTLE_API_KEY` |
@@ -36,7 +36,7 @@ An {class}`~open_atp.provers.agent_prover.AgentProver` composes two concerns:
 place, then diffs the `.lean` files against the staged originals to report what
 changed. The shared {class}`~open_atp.verify.Verifier` does the final
 compile / sorry / axiom check. Configuration fields are documented under
-{class}`~open_atp.provers.agent_prover.AgentProverConfig` in the
+{class}`~open_atp.provers.agent_prover.AgentProver` in the
 {doc}`../api/provers` reference.
 
 ```{toctree}

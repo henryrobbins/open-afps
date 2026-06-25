@@ -18,8 +18,6 @@ See the per-harness prover pages under {doc}`../provers/index` for credential se
 .. autoclass:: open_atp.harness.base.Harness
    :exclude-members: name
 
-.. autoclass:: open_atp.harness.base.HarnessConfig
-
 .. autoclass:: open_atp.harness.base.HarnessRunResult
    :no-members:
 
@@ -29,64 +27,41 @@ See the per-harness prover pages under {doc}`../provers/index` for credential se
 
 ## Harnesses
 
-Each harness adapts one agent CLI and pairs with a
-{class}`~open_atp.harness.HarnessConfig` subclass (set as
-{class}`~open_atp.provers.agent_prover.AgentProverConfig`'s `harness`). The runtime
-harnesses are registered in {data}`~open_atp.harness.HARNESSES` and their configs in
-{data}`~open_atp.harness.HARNESS_CONFIGS`, both keyed by `name`.
+Each harness adapts one agent CLI and is a
+{class}`~open_atp.harness.Harness` subclass (set as
+{class}`~open_atp.provers.agent_prover.AgentProver`'s `harness`). The runtime
+harnesses are registered in {data}`~open_atp.harness.HARNESSES`, keyed by `name`.
 
 ```{eval-rst}
 .. autoclass:: open_atp.harness.claude_code.ClaudeCodeHarness
    :show-inheritance:
    :exclude-members: stage, name
 
-.. autoclass:: open_atp.harness.claude_code.ClaudeCodeHarnessConfig
-   :show-inheritance:
-   :no-members:
-
 .. autoclass:: open_atp.harness.codex.CodexHarness
    :show-inheritance:
    :exclude-members: stage, name
-
-.. autoclass:: open_atp.harness.codex.CodexHarnessConfig
-   :show-inheritance:
-   :no-members:
 
 .. autoclass:: open_atp.harness.opencode.OpenCodeHarness
    :show-inheritance:
    :exclude-members: stage, name
 
-.. autoclass:: open_atp.harness.opencode.OpenCodeHarnessConfig
-   :show-inheritance:
-   :no-members:
-
 .. autoclass:: open_atp.harness.vibe.VibeHarness
    :show-inheritance:
    :exclude-members: stage, name
-
-.. autoclass:: open_atp.harness.vibe.VibeHarnessConfig
-   :show-inheritance:
-   :no-members:
 
 .. autoclass:: open_atp.harness.axprover.AxProverHarness
    :show-inheritance:
    :exclude-members: stage, name
 
-.. autoclass:: open_atp.harness.axprover.AxProverHarnessConfig
-   :show-inheritance:
-   :no-members:
-
 .. autodata:: open_atp.harness.HARNESSES
-
-.. autodata:: open_atp.harness.HARNESS_CONFIGS
 ```
 
 ## Asset resolution
 
 Skills and plugins are named (resolved from a vendored catalog) or path-given, then
-resolved to their source directories. Skills are a list on `AgentProverConfig.skills`
+resolved to their source directories. Skills are a list on `AgentProver`'s `skills`
 (staged by the prover into each harness's skill location), plugins a list on
-`ClaudeCodeHarnessConfig.plugins` (Claude-only); the prompt is owned by the prover and
+`ClaudeCodeHarness`'s `plugins` (Claude-only); the prompt is owned by the prover and
 the task. Anything that isn't a simple named skill or plugin — e.g. Numina's
 root-mounted coordinator skill and subagent-prompt tree — is staged by that prover
 itself, not resolved here.

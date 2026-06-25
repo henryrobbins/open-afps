@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from open_atp.backends.docker import DockerBackend, DockerConfig
+from open_atp.backends.docker import DockerBackend
 from open_atp.images import DEFAULT_IMAGE
-from open_atp.provers.aristotle import AristotleProver, AristotleProverConfig
+from open_atp.provers.aristotle import AristotleProver
 from open_atp.provers.base import ProofResult
 
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "mil_trivial"
@@ -36,9 +36,8 @@ async def _noop_sleep(_seconds: float) -> None:
 
 
 def _make_prover() -> AristotleProver:
-    backend = DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
-    config = AristotleProverConfig()
-    return AristotleProver(config, backend)
+    backend = DockerBackend(image=DEFAULT_IMAGE)
+    return AristotleProver(backend=backend)
 
 
 def _fake_result(*, solved: bool) -> object:
@@ -180,7 +179,7 @@ def test_wait_until_terminal_gives_up_after_resume_budget(
             pass  # never reaches a terminal state
 
     prover = _make_prover()
-    prover.config.max_resume_attempts = 3
+    prover.max_resume_attempts = 3
     task = _StuckTask()
     asyncio.run(prover._wait_until_terminal(task))
 

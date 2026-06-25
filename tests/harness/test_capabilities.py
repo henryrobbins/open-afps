@@ -50,10 +50,10 @@ import pytest
 
 from open_atp.backends.base import ComputeBackend
 from open_atp.harness import (
-    HARNESS_CONFIGS,
-    ClaudeCodeHarnessConfig,
+    HARNESSES,
+    ClaudeCodeHarness,
     Harness,
-    VibeHarnessConfig,
+    VibeHarness,
 )
 from open_atp.images import DEFAULT_IMAGE
 
@@ -149,13 +149,13 @@ def _backend_available(backend: str) -> bool:
 
 def _make_backend(backend: str) -> ComputeBackend:
     if backend == "docker":
-        from open_atp.backends.docker import DockerBackend, DockerConfig
+        from open_atp.backends.docker import DockerBackend
 
-        return DockerBackend(DockerConfig(image=DEFAULT_IMAGE))
+        return DockerBackend(image=DEFAULT_IMAGE)
     if backend == "modal":
-        from open_atp.backends.modal import ModalBackend, ModalConfig
+        from open_atp.backends.modal import ModalBackend
 
-        return ModalBackend(ModalConfig(image=DEFAULT_IMAGE))
+        return ModalBackend(image=DEFAULT_IMAGE)
     raise AssertionError(backend)
 
 
@@ -163,17 +163,15 @@ def _make_harness(harness: str) -> Harness:
     if harness == "vibe":
         # The builtin ``lean`` agent is Labs-gated; drive the vendored non-Labs
         # ``lean-standin`` stand-in so the probe runs without Labs access.
-        return VibeHarnessConfig(
+        return VibeHarness(
             model=_MODELS["vibe"],
             effort="low",
             agent="lean-standin",
-        ).build()
+        )
     if harness == "claude_code":
         # No plugins -- plugin loading isn't what these probes exercise.
-        return ClaudeCodeHarnessConfig(
-            model=_MODELS[harness], effort="low", plugins=[]
-        ).build()
-    return HARNESS_CONFIGS[harness](model=_MODELS[harness], effort="low").build()
+        return ClaudeCodeHarness(model=_MODELS[harness], effort="low", plugins=[])
+    return HARNESSES[harness](model=_MODELS[harness], effort="low")
 
 
 def _make_run_dir(backend: str, case_id: str) -> Path:
