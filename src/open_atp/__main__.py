@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -54,6 +55,27 @@ from open_atp.provers.base import AutomatedProver
 AX_PROVER_REPO = "https://github.com/henryrobbins/ax-prover-base"
 AX_PROVER_REF = "361e5b3451267785bfd70f173e7ab0be667d4987"
 AX_PROVER_SPEC = f"git+{AX_PROVER_REPO}@{AX_PROVER_REF}"
+
+
+def _load_dotenv() -> None:
+    """Load credentials from a ``.env`` (``KEY=VALUE`` per line) for the CLI.
+
+    Searches the cwd and its parents for the first ``.env`` and seeds any missing
+    environment variables (e.g. ``ARISTOTLE_API_KEY``) so the provers find their
+    credentials. Real environment variables already set are left untouched.
+    """
+    cwd = Path.cwd()
+    for directory in (cwd, *cwd.parents):
+        env_file = directory / ".env"
+        if not env_file.is_file():
+            continue
+        for raw in env_file.read_text().splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+        return
 
 
 def _prove(args: argparse.Namespace) -> int:
@@ -294,6 +316,7 @@ def _build_modal_image(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _load_dotenv()
     parser = argparse.ArgumentParser(prog="open-atp")
     sub = parser.add_subparsers(dest="command", required=True)
 

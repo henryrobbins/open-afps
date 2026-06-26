@@ -105,6 +105,9 @@ result; otherwise it is derived from the prover/harness type):
 concurrent runs), and `--json` emits the
 {class}`~open_atp.benchmark.BenchmarkResult` as JSON.
 
+The CLI loads credentials from a `.env` in the working directory (or a parent), so
+provers like Aristotle find their API keys without exporting them by hand.
+
 ## Citing the benchmarks
 
 If you run these benchmarks, please cite their authors:

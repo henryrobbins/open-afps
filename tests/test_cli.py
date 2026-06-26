@@ -10,6 +10,7 @@ it, so no backend is exercised.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import pytest
@@ -70,6 +71,22 @@ def test_invalid_entry_rejected(tmp_path: Path) -> None:
     cfg.write_text("- 123\n")
     with pytest.raises(SystemExit):
         cli._load_provers(tmp_path, str(cfg), _backend())
+
+
+def test_load_dotenv_seeds_missing_without_overriding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".env").write_text(
+        "# comment\nNEW_KEY=from-dotenv\nEXISTING_KEY=should-not-win\n"
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("NEW_KEY", raising=False)
+    monkeypatch.setenv("EXISTING_KEY", "real-env")
+
+    cli._load_dotenv()
+
+    assert os.environ["NEW_KEY"] == "from-dotenv"
+    assert os.environ["EXISTING_KEY"] == "real-env"  # setdefault keeps real env
 
 
 def test_download_dispatches_to_download_dataset(
