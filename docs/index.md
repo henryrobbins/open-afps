@@ -39,6 +39,6 @@ user_guide/index
 provers/index
 examples
 development/index
-cli
 api/index
+cli
 ```
