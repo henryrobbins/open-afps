@@ -4,6 +4,10 @@ refs/
 # Integration test artifacts (agent logs, workdirs from test_agent_capabilities)
 tests/.runs/
 
+# Benchmark / prover run output (CLI default --output-dir, plus ad-hoc dirs)
+runs/
+/test/
+
 # Sphinx docs build
 docs/_build/
 # Generated from docs/provers.yaml at build time (see docs/_ext/provers_table.py)
