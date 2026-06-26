@@ -46,7 +46,7 @@ dev = [
     "python-dotenv",
 ]
 docs = [
-    "sphinx>=7",
+    "sphinx>=7,<9",  # furo 2025.12.19 breaks on Sphinx 9.x (missing _static/pygments.css)
     "myst-parser>=3",
     "furo",
     "sphinx-autodoc-typehints",
