@@ -35,7 +35,8 @@ aborts the sweep.
 Pairs run concurrently on a thread pool. `max_workers` caps the total in flight
 (`None` auto-sizes; `1` is serial), and `max_per_prover` (default `5`) caps how many
 runs any *single* prover may have in flight — so a rate-limited prover (e.g. a hosted
-model) stays under its limit even when other provers fill the pool.
+model) stays under its limit even when other provers fill the pool. Pass `only=[...]`
+to run a subset of the tasks (by name, in the given order) instead of the whole set.
 
 The `open-atp ex-benchmark` CLI command runs exactly this sweep over all
 {func}`~open_atp.config.standard_provers` and the five bundled
@@ -102,8 +103,9 @@ result; otherwise it is derived from the prover/harness type):
 
 `--compute {docker,modal}` picks the backend (standard image, default `docker`),
 `-n/--max-workers` bounds total parallelism (each prover is still capped at 5
-concurrent runs), and `--json` emits the
-{class}`~open_atp.benchmark.BenchmarkResult` as JSON.
+concurrent runs), `--tasks t1,t2` runs only those tasks (default: all in the
+directory), and `--json` emits the {class}`~open_atp.benchmark.BenchmarkResult` as
+JSON.
 
 The CLI loads credentials from a `.env` in the working directory (or a parent), so
 provers like Aristotle find their API keys without exporting them by hand.

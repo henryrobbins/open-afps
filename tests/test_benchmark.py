@@ -139,6 +139,23 @@ def test_table_has_a_row_per_pair(tmp_path: Path) -> None:
     assert "✓" in table and "✗" in table
 
 
+def test_only_restricts_and_orders_tasks(tmp_path: Path) -> None:
+    tasks = _many_tasks(4)  # t0, t1, t2, t3
+    provers = {"p": FakeProver("agent")}
+
+    result = run_benchmark(tasks, provers, tmp_path, only=["t2", "t0"])
+
+    assert [r.task for r in result.runs] == ["t2", "t0"]
+    assert (tmp_path / "t2" / "p").is_dir()
+    assert not (tmp_path / "t1").exists()  # skipped
+
+
+def test_only_unknown_task_raises(tmp_path: Path) -> None:
+    provers = {"p": FakeProver("agent")}
+    with pytest.raises(ValueError, match="unknown task"):
+        run_benchmark(_many_tasks(2), provers, tmp_path, only=["nope"])
+
+
 # --- parallelism -----------------------------------------------------------
 
 

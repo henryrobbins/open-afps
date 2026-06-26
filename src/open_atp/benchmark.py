@@ -30,7 +30,7 @@ import json
 import subprocess
 import tempfile
 import threading
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
@@ -123,6 +123,7 @@ def run_benchmark(
     provers: Mapping[str, AutomatedProver],
     output_dir: Path | str,
     *,
+    only: Sequence[str] | None = None,
     max_workers: int | None = None,
     max_per_prover: int = 5,
 ) -> BenchmarkResult:
@@ -151,6 +152,10 @@ def run_benchmark(
         ``agent:*`` is ``"agent"``) stay distinct on disk and in the table.
     output_dir : pathlib.Path or str
         Output root for the sweep, laid out as ``output_dir/<task>/<prover>/``.
+    only : Sequence[str], optional
+        Restrict the sweep to these task names (a subset of ``tasks``), in the given
+        order. ``None`` (default) runs every task. An unknown name raises
+        :class:`ValueError`.
     max_workers : int, optional
         Total ``prove`` calls in flight at once. ``None`` (default) lets the thread
         pool pick a default; ``1`` runs the sweep serially.
@@ -164,6 +169,11 @@ def run_benchmark(
         Every ``(task, prover)`` cell, with a :meth:`~BenchmarkResult.table` view.
     """
     output_dir = Path(output_dir)
+    if only is not None:
+        missing = [name for name in only if name not in tasks]
+        if missing:
+            raise ValueError(f"unknown task(s) {missing}; available: {sorted(tasks)}")
+        tasks = {name: tasks[name] for name in only}
     gates = {name: threading.Semaphore(max_per_prover) for name in provers}
 
     def run_pair(

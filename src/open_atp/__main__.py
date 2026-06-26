@@ -173,8 +173,15 @@ def _benchmark(args: argparse.Namespace) -> int:
     backend = build_backend({"type": args.compute})
     provers = _load_provers(directory, args.provers, backend)
     tasks = tasks_from_dir(directory)
+    only = (
+        [t.strip() for t in args.tasks.split(",") if t.strip()] if args.tasks else None
+    )
     result = run_benchmark(
-        tasks, provers, Path(args.output_dir), max_workers=args.max_workers
+        tasks,
+        provers,
+        Path(args.output_dir),
+        only=only,
+        max_workers=args.max_workers,
     )
     return _report(result, args.json)
 
@@ -356,6 +363,11 @@ def main(argv: list[str] | None = None) -> int:
         "--provers",
         help="YAML provers config (default: <directory>/provers.yaml if present, "
         "else all standard provers).",
+    )
+    benchmark.add_argument(
+        "--tasks",
+        help="Comma-separated task names to run (default: every task in the "
+        "directory).",
     )
     benchmark.add_argument(
         "--compute",
