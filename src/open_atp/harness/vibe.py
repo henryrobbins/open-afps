@@ -93,7 +93,6 @@ class VibeHarness(Harness):
         mistral_api_key: str | None = None,
     ) -> None:
         super().__init__(model=model, effort=effort)
-        # agent/max_turns/max_price documented as class Parameters/Attributes above.
         self.agent = agent
         self.max_turns = max_turns
         self.max_price = max_price

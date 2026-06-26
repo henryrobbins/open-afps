@@ -13,7 +13,7 @@ A :class:`Harness` knows, for one agent CLI (Claude Code / Codex / OpenCode):
 The *compute* concern (where that command runs, with Lean+Mathlib and a warm
 cache) lives in the injected :class:`~open_atp.backends.base.ComputeBackend`.
 
-Ported from milp_flare's ``harness/`` package. The skills to mount are owned by
+The skills to mount are owned by
 the prover (``AgentProver.skills``, resolved to source dirs and handed to
 :meth:`Harness.stage_skills`); plugins are Claude-only and live on
 ``ClaudeCodeHarness.plugins``.
@@ -83,11 +83,10 @@ class HarnessRunResult:
         when it must be estimated from token counts (Codex, ax-prover).
     subtype : str, optional
         Final ``type:"result"`` subtype (Claude Code: ``success`` /
-        ``error_max_turns`` / ``error_during_execution``). Used by NuminaProver's
-        round loop to decide continue-vs-stop when no END_REASON marker is present.
+        ``error_max_turns`` / ``error_during_execution``); ``None`` if not reported.
     result_text : str, optional
-        The agent's final result text (Claude Code's ``result`` field), where the
-        Numina coordinator prints its ``END_REASON:<reason>`` marker.
+        The agent's final result text (Claude Code's ``result`` field); ``None``
+        otherwise.
     """
 
     input_tokens: int = 0
@@ -128,7 +127,6 @@ class Harness(ABC):
         model: str = "claude-opus-4-8",
         effort: str = "high",
     ) -> None:
-        # model/effort documented as class Parameters/Attributes above.
         self.model = model
         self.effort = effort
 

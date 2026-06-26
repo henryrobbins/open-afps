@@ -1,10 +1,9 @@
 """Modal Sandbox backend.
 
-Ported from milp_flare ``harness/runner/modal.py``, generalised from "launch an
-agent" to "run an arbitrary command over a workdir" against our
+Runs an arbitrary command over a workdir against the
 :meth:`ComputeBackend.start` contract.
 
-The one idea driving the port: Docker **bind-mounts** the workdir (edits land on
+The one idea driving the design: Docker **bind-mounts** the workdir (edits land on
 the host with no copy step), but Modal Sandboxes have an **isolated filesystem**, so
 the backend must
 
@@ -12,7 +11,7 @@ the backend must
    before running, and
 2. **pull** it back out afterwards, so completed proofs land on the host.
 
-Everything else is a variation of that isolation. Notable details carried over:
+Everything else is a variation of that isolation. Notable details:
 
 * Run as root with ``IS_SANDBOX=1`` so Claude Code's ``bypassPermissions`` works
   (Modal ignores the image ``USER`` and runs everything as root).
@@ -133,8 +132,6 @@ class ModalCommandHandle(CommandHandle):
 
     def wait(self) -> CommandResult:
         """Flush stdout, pull the workdir + stderr back, then terminate the Sandbox."""
-        # Draining stdout (above) usually fills _stdout_lines; flush any unread
-        # chunks plus the trailing partial line, then return the exit code.
         self._flush()
         exit_code = self.proc.wait()
         stderr = _pull_stderr(self.sb)
@@ -207,7 +204,7 @@ def _pull_wd(sb: modal.Sandbox, wd: Path) -> None:
     usage files), so don't collapse every cause into one opaque message: check the
     tar exit code and log the real exception with a traceback. The distinct causes
     (dead sandbox vs. a non-zero ``tar`` on some file the agent created vs. a
-    missing tarball) need different fixes, and the bare warning hid which it was.
+    missing tarball) need different fixes.
     """
     try:
         proc = sb.exec(
@@ -297,11 +294,8 @@ class ModalBackend(ComputeBackend):
         app: str = "open-atp",
     ) -> None:
         super().__init__(image=image, timeout_s=timeout_s, env=env)
-        #: CPU cores requested for the Modal Sandbox.
         self.cpu = cpu
-        #: Memory (MiB) requested for the Modal Sandbox.
         self.memory_mib = memory_mib
-        #: Modal app the Sandbox is associated with.
         self.app = app
 
     @property
@@ -534,7 +528,5 @@ class ModalSession(ComputeSession):
 
     def close(self) -> None:
         """Pull final artifacts, then terminate the Sandbox. Idempotent."""
-        # Pull final artifacts, then terminate. Both are best-effort/idempotent, so a
-        # second close() (or close after a failed exec) is safe.
         _pull_wd(self.sb, self.workdir)
         _terminate(self.sb)

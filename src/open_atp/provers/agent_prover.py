@@ -175,9 +175,7 @@ class AgentProver(AutomatedProver):
         timeout_s: int = 1800,
     ) -> None:
         super().__init__(backend=backend, timeout_s=timeout_s)
-        #: The harness this prover drives.
         self.harness = harness or ClaudeCodeHarness()
-        #: Skills to mount into the agent workdir (names or paths).
         self.skills = skills if skills is not None else ["lean-proof"]
 
     @property

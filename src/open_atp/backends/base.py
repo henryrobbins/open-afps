@@ -6,10 +6,6 @@ back the output." It is used in two distinct roles:
 
 * **Agentic execution** -- run a coding-agent launch script (AgentProver, NuminaProver).
 * **Verification** -- run ``lake env lean ...`` over candidate files (every prover).
-
-This generalises milp_flare's agent-specific ``Runner``/``AgentRun`` into a plain
-command runner. Concrete backends (Docker, Modal) are ports of milp_flare's
-``runner/docker.py`` and ``runner/modal.py``.
 """
 
 from __future__ import annotations
@@ -162,11 +158,10 @@ class ComputeSession(AbstractContextManager["ComputeSession"]):
 def wrap_command(workdir_mount: str, baked_lake: str, command: str) -> str:
     """``cd`` into the workdir mount and wire the warm Mathlib cache before ``command``.
 
-    The one image-layout convention the backends own (mirroring milp_flare's
-    ``entrypoint.sh``): symlink the workdir's ``.lake`` to the image-baked olean cache
-    so uploaded projects reuse it. Identical for Docker (bind mount) and Modal (pushed
-    dir), so it lives here rather than in either backend. ``baked_lake`` empty skips
-    the symlink.
+    The one image-layout convention the backends own: symlink the workdir's ``.lake``
+    to the image-baked olean cache so uploaded projects reuse it. Identical for Docker
+    (bind mount) and Modal (pushed dir), so it lives here rather than in either backend.
+    ``baked_lake`` empty skips the symlink.
 
     Parameters
     ----------
@@ -219,15 +214,12 @@ class ComputeBackend(abc.ABC):
         timeout_s: int = 1800,
         env: Mapping[str, str] | None = None,
     ) -> None:
-        #: The sandbox image (Lean + Mathlib) the backend runs.
         self.image = (
             image
             if isinstance(image, Image)
             else Image(**cast("Mapping[str, str]", image))
         )
-        #: Default wall-clock cap for a command, in seconds.
         self.timeout_s = timeout_s
-        #: Environment variables baked into every command run in the sandbox.
         self.env = dict(env or {})
 
     @property

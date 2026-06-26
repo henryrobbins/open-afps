@@ -1,7 +1,6 @@
 """Local Docker backend.
 
-Ported from milp_flare ``harness/runner/docker.py``, generalised from "launch an
-agent" to "run an arbitrary command over a workdir". Mechanics:
+Runs an arbitrary command over a workdir in a Lean+Mathlib container. Mechanics:
 
 * ``docker run --rm --name afps-<uuid>`` with the workdir bind-mounted at
   ``/workspace/wd`` (so file mutations land on the host with no copy-out step).
@@ -48,8 +47,6 @@ class DockerCommandHandle(CommandHandle):
 
     def cancel(self) -> None:
         """``docker kill`` the container (bind-mounted artifacts already on host)."""
-        # The workdir is bind-mounted, so partial artifacts are already on the host;
-        # just kill the container.
         subprocess.run(
             ["docker", "kill", self.container],
             stdout=subprocess.DEVNULL,
@@ -140,11 +137,8 @@ class DockerBackend(ComputeBackend):
         volumes: tuple[tuple[str, str], ...] = (),
     ) -> None:
         super().__init__(image=image, timeout_s=timeout_s, env=env)
-        #: Path inside the container where the workdir is bind-mounted.
         self.workdir_mount = workdir_mount
-        #: Image-baked warm cache to symlink the workdir's ``.lake`` to.
         self.baked_lake = baked_lake
-        #: Extra ``-v host:container`` mounts.
         self.volumes = tuple(tuple(v) for v in volumes)
 
     @property
@@ -189,7 +183,6 @@ class DockerBackend(ComputeBackend):
         """
         cmd = ["docker", "run", "--rm"]
         if detach:
-            # Keep-alive container for a session; commands land via ``docker exec``.
             cmd.append("-d")
         cmd += ["--name", container]
         cmd += ["-v", f"{workdir.resolve()}:{self.workdir_mount}"]
@@ -283,9 +276,6 @@ class DockerBackend(ComputeBackend):
         ComputeSession
             A live :class:`DockerSession` over the workdir.
         """
-        # A detached keep-alive container (the workdir bind-mounted, all mounts wired
-        # at run time since Docker can't add them per-exec); commands land via
-        # ``docker exec`` until close() kills it.
         container = f"afps-{uuid.uuid4().hex[:12]}"
         argv = self._build_cmd(workdir, container, env or {}, mounts or (), detach=True)
         argv += ["sleep", "infinity"]
@@ -357,7 +347,6 @@ class DockerSession(ComputeSession):
 
     def close(self) -> None:
         """``docker kill`` the keep-alive container. Idempotent."""
-        # Idempotent: killing an already-gone container just errors out quietly.
         subprocess.run(
             ["docker", "kill", self.container],
             stdout=subprocess.DEVNULL,

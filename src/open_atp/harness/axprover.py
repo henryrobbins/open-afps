@@ -100,7 +100,6 @@ class AxProverHarness(Harness):
         provider_api_key: str | None = None,
     ) -> None:
         super().__init__(model=model, effort=effort)
-        # max_iterations documented as a class Parameter/Attribute above.
         self.max_iterations = max_iterations
         self._provider_api_key = provider_api_key
         #: Set in :meth:`stage_wd`; where :meth:`parse_result` looks for usage files.
@@ -116,7 +115,7 @@ class AxProverHarness(Harness):
 
     def stage_wd(self, wd: Path) -> None:
         # ax-prover has its own prompts and ignores the written prompt, but the base
-        # launch contract still cats it, so the prover writes it via write_prompt.
+        # launch contract still cats it, so one is still written.
         super().stage_wd(wd)
         (wd / "axprover.yaml").write_text(self._render_config())
         self._wd = wd

@@ -1,9 +1,8 @@
 """Token-cost fallback table.
 
-Ported near-verbatim from milp_flare's ``harness/cost.py``. Used to estimate a
-run's USD cost from token counts when the harness does not report cost directly
-(notably Codex). This is a fallback and will go stale; see the provider pricing
-pages for current numbers.
+Estimates a run's USD cost from token counts when the harness does not report
+cost directly (notably Codex). This is a fallback and will go stale; see the
+provider pricing pages for current numbers.
 """
 
 from __future__ import annotations

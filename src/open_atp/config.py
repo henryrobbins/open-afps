@@ -95,8 +95,7 @@ def _build_prover(
     """Construct a prover from a ``prover`` spec against an already-built ``backend``.
 
     Dispatches ``spec["type"]`` through the package-internal ``_PROVERS`` map, builds a
-    nested ``harness`` spec along the way, and wires the backend in. The prover half of
-    :func:`build_prover`, shared with :func:`standard_prover`.
+    nested ``harness`` spec along the way, and wires the backend in.
     """
     cls, kwargs = _split(_PROVERS, spec, "prover")
     if "harness" in kwargs:

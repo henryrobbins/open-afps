@@ -203,15 +203,10 @@ class NuminaProver(AgentProver):
             skills=skills if skills is not None else [],
             timeout_s=timeout_s,
         )
-        #: Maximum number of coordinator rounds before the run stops.
         self.max_rounds = max_rounds
-        #: Reset (start a fresh session) after this many consecutive LIMIT rounds.
         self.max_consecutive_limits = max_consecutive_limits
-        #: Helper-skill credentials forwarded into the sandbox when present.
         self.helper_env_keys = tuple(helper_env_keys)
-        #: Whether to snapshot target theorems and reject weakened/deleted ones.
         self.guard_statements = guard_statements
-        #: Behavior on a weakened/deleted target theorem (``error`` | ``warn``).
         self.on_statement_change = on_statement_change
 
     @property

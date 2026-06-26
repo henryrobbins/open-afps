@@ -67,7 +67,6 @@ class ClaudeCodeHarness(Harness):
         oauth_token: str | None = None,
     ) -> None:
         super().__init__(model=model, effort=effort)
-        # plugins documented as a class Parameter/Attribute above.
         self.plugins = plugins if plugins is not None else ["lean4"]
         self._oauth_token = oauth_token
 
@@ -84,11 +83,9 @@ class ClaudeCodeHarness(Harness):
     def _copy_plugins(self, wd: Path) -> None:
         """Stage each configured plugin under ``wd/.plugins/<name>``.
 
-        Claude is the only harness that consumes plugins (so they live on this harness,
-        not the shared skills list); the launch script
-        loads them with ``--plugin-dir`` (see :meth:`_plugin_flags`). Plugins are copied
-        *into* the workdir (not referenced from the host vendor tree) so they sync
-        into the sandbox with everything else.
+        Plugins are copied *into* the workdir (not referenced from the host vendor
+        tree) so they sync into the sandbox with everything else; the launch script
+        loads them with ``--plugin-dir`` (see :meth:`_plugin_flags`).
         """
         for plugin in self._resolved_plugins():
             shutil.copytree(

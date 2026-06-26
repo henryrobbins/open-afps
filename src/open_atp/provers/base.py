@@ -158,12 +158,7 @@ class AutomatedProver(abc.ABC):
         backend: ComputeBackend,
         timeout_s: int = 1800,
     ) -> None:
-        # Documented as a class Parameter above; not a separately documented member.
         self.timeout_s = timeout_s
-        # The backend's image carries the toolchain + Mathlib pins the verifier rejects
-        # mismatched projects against. Agentic provers reuse this same backend (via a
-        # live session over it) for generation, then verify in that hot sandbox -- see
-        # ``AgentProver._generate``.
         self.verifier = Verifier(backend)
 
     @abc.abstractmethod

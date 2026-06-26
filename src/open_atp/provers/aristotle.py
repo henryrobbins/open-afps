@@ -153,15 +153,10 @@ class AristotleProver(AutomatedProver):
         timeout_s: int = 1800,
     ) -> None:
         super().__init__(backend=backend, timeout_s=timeout_s)
-        #: The Harmonic API key, or ``None`` to read ``ARISTOTLE_API_KEY`` at run time.
         self._api_key = api_key
-        #: Whether to let the hosted agent ask clarifying questions.
         self.allow_agent_questions = allow_agent_questions
-        #: Bounds per-call retries when a connection drops.
         self.max_connection_retries = max_connection_retries
-        #: Bounds re-attaches to the event stream when it drops mid-run.
         self.max_resume_attempts = max_resume_attempts
-        #: Initial sleep between retries/resumes, doubling (capped) between tries.
         self.resume_backoff_seconds = resume_backoff_seconds
 
     @property
@@ -183,9 +178,8 @@ class AristotleProver(AutomatedProver):
 
         prompt = compose_prompt(self.prover_prompt, task.user_prompt)
         # The raw result archive and the full run record both belong with the run's
-        # logs, not the proof project. ``prove`` already created ``logs_dir``; the
-        # hosted agent has no live stdout stream, so its record (events, transcript,
-        # summary) is downloaded here rather than teed.
+        # logs, not the proof project. The hosted agent has no live stdout stream, so
+        # its record (events, transcript, summary) is downloaded here rather than teed.
         result_tar = logs_dir / "aristotle_result.tar.gz"
         downloaded, metadata = asyncio.run(
             self._submit_and_download(wd, prompt, result_tar, logs_dir)

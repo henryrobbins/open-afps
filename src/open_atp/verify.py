@@ -1,8 +1,7 @@
 """Verification: the verification report and the shared verifier.
 
 Every prover -- agentic, Numina, *and* Aristotle -- funnels its output through the
-:class:`Verifier`. The checks are lifted from milp_flare's ``entrypoint.sh`` +
-``FLARE._evaluate``:
+:class:`Verifier`, which runs three checks:
 
 1. Compile each target file with ``lake env lean <file>``.
 2. Scan the compile log for ``sorry`` warnings.
@@ -228,10 +227,9 @@ class Verifier:
     ) -> VerificationReport:
         """Compile ``project`` and return a :class:`VerificationReport`.
 
-        Standalone (``session is None``) the compile spins up its own sandbox via
-        ``backend.run`` -- the path Aristotle and the split-backend case take. When a
-        caller passes a live ``session`` (the agent/verify backend-reuse path), the
-        compile runs in that already-hot sandbox instead, avoiding a second spin-up.
+        With no ``session`` the compile spins up its own sandbox via ``backend.run``.
+        Passing a live ``session`` runs the compile in that already-hot sandbox
+        instead, avoiding a second spin-up.
 
         Parameters
         ----------
