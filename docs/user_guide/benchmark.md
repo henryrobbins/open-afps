@@ -46,10 +46,9 @@ multi-file task.
 
 ## Downloading a dataset
 
-{func}`~open_atp.benchmark.download_dataset` fetches the public benchmarks
-({class}`~open_atp.benchmark.DATASET`: PutnamBench, FATE) — a sparse clone of just the
-task subdirectory — straight into a directory ready for
-{func}`~open_atp.benchmark.tasks_from_dir`:
+{func}`~open_atp.benchmark.download_dataset` fetches one of the included public
+benchmarks — a sparse clone of just the task subdirectory — straight into a directory
+ready for {func}`~open_atp.benchmark.tasks_from_dir`:
 
 ```python
 from open_atp.benchmark import DATASET, download_dataset, run_benchmark, tasks_from_dir
@@ -58,5 +57,36 @@ src = download_dataset(DATASET.FATE_M, "datasets")  # datasets/fate-m/FATEM
 result = run_benchmark(tasks_from_dir(src), provers, Path("runs/fate-m"))
 ```
 
+Each {class}`~open_atp.benchmark.DATASET` member:
+
+| Benchmark | `DATASET` | Paper | Source |
+| --- | --- | --- | --- |
+| PutnamBench | `PUTNAM` | [Tsoukalas et al. 2024](https://arxiv.org/abs/2407.11214) | [trishullab/PutnamBench](https://github.com/trishullab/PutnamBench) |
+| FATE-H (hard) | `FATE_H` | [Jiang et al. 2025](https://arxiv.org/abs/2511.02872) | [frenzymath/FATE-H](https://github.com/frenzymath/FATE-H) |
+| FATE-M (medium) | `FATE_M` | [Jiang et al. 2025](https://arxiv.org/abs/2511.02872) | [frenzymath/FATE-M](https://github.com/frenzymath/FATE-M) |
+| FATE-X (extra) | `FATE_X` | [Jiang et al. 2025](https://arxiv.org/abs/2511.02872) | [frenzymath/FATE-X](https://github.com/frenzymath/FATE-X) |
+
 PutnamBench pins an older Lean than the default skeleton, so stage it against a
 matching skeleton (`tasks_from_dir(src, skeleton=...)`).
+
+## Citing the benchmarks
+
+If you run these benchmarks, please cite their authors:
+
+```bibtex
+@article{jiang2025fate,
+  title={Fate: A formal benchmark series for frontier algebra of multiple difficulty levels},
+  author={Jiang, Jiedong and He, Wanyi and Wang, Yuefeng and Gao, Guoxiong and Hu, Yongle and Wang, Jingting and Guan, Nailin and Wu, Peihao and Dai, Chunbo and Xiao, Liang and others},
+  journal={arXiv preprint arXiv:2511.02872},
+  year={2025}
+}
+
+@article{tsoukalas2024putnambench,
+  title={Putnambench: Evaluating neural theorem-provers on the putnam mathematical competition},
+  author={Tsoukalas, George and Lee, Jasper and Jennings, John and Xin, Jimmy and Ding, Michelle and Jennings, Michael and Thakur, Amitayush and Chaudhuri, Swarat},
+  journal={Advances in Neural Information Processing Systems},
+  volume={37},
+  pages={11545--11569},
+  year={2024}
+}
+```
