@@ -14,16 +14,24 @@ sweep.
 
 The returned :class:`BenchmarkResult` collects every cell and renders a terminal table
 (:meth:`BenchmarkResult.table`) for quick comparison.
+
+:func:`tasks_from_dir` builds the ``tasks`` mapping from a directory laid out like the
+public Lean benchmarks (`PutnamBench
+<https://github.com/trishullab/PutnamBench/tree/main/lean4/src>`_, `FATE
+<https://github.com/frenzymath/FATE>`_): a flat directory of standalone ``.lean``
+files, optionally with subdirectories grouping several files into one task.
 """
 
 from __future__ import annotations
 
 import json
+import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from open_atp.lean import ProofTask
+from open_atp.images import SKELETON_DIR
+from open_atp.lean import LeanProject, ProofTask, create_project
 from open_atp.provers.base import AutomatedProver, ProofResult
 
 
@@ -152,3 +160,72 @@ def run_benchmark(
             )
             runs.append(BenchmarkRun(task=task_name, prover=prover_name, result=result))
     return BenchmarkResult(output_dir=output_dir, runs=runs)
+
+
+def tasks_from_dir(
+    directory: Path | str,
+    *,
+    skeleton: Path = SKELETON_DIR,
+) -> dict[str, ProofTask]:
+    """Build a benchmark's ``tasks`` mapping from a directory of Lean files.
+
+    Mirrors the layout the public Lean benchmarks ship (PutnamBench, FATE):
+
+    - Each ``.lean`` file directly under ``directory`` becomes one task named by its
+      filename stem, staged into ``skeleton`` (a bare file carries no lake project).
+    - Each subdirectory becomes one task named by the subdirectory name. A subdirectory
+      that is *already* a complete lake project (carries its own ``lean-toolchain`` and
+      lakefile) is used as-is; otherwise its ``.lean`` files are staged into
+      ``skeleton``.
+
+    In both staged cases :func:`~open_atp.lean.create_project` supplies the skeleton.
+    Subdirectories with no ``.lean`` files (and entries whose name starts with ``.``)
+    are skipped. The result is ready to hand to :func:`run_benchmark`.
+
+    Parameters
+    ----------
+    directory : pathlib.Path or str
+        The benchmark directory: ``.lean`` files and/or per-task subdirectories.
+    skeleton : pathlib.Path
+        Project skeleton staged around bare files (see
+        :func:`~open_atp.lean.create_project`). Default
+        :data:`~open_atp.images.SKELETON_DIR` -- the baked image's pinned Mathlib
+        skeleton, only present in a source checkout. Pass a checkout of a benchmark's
+        own toolchain to stage against a non-default Lean/Mathlib pin.
+
+    Returns
+    -------
+    dict[str, ~open_atp.lean.ProofTask]
+        Tasks keyed by file stem (loose files) or subdirectory name.
+    """
+    directory = Path(directory)
+    tasks: dict[str, ProofTask] = {}
+    for entry in sorted(directory.iterdir()):
+        if entry.name.startswith("."):
+            continue
+        if entry.is_file() and entry.suffix == ".lean":
+            dest = Path(tempfile.mkdtemp()) / entry.stem
+            project = create_project([entry], dest, skeleton=skeleton)
+            tasks[entry.stem] = ProofTask(project)
+        elif entry.is_dir():
+            subdir_project = _subdir_project(entry, skeleton)
+            if subdir_project is not None:
+                tasks[entry.name] = ProofTask(subdir_project)
+    return tasks
+
+
+def _subdir_project(subdir: Path, skeleton: Path) -> LeanProject | None:
+    """The subdirectory as a project: itself if a lake project, else staged.
+
+    Returns ``None`` when the subdirectory is not a lake project and holds no ``.lean``
+    files (nothing to run).
+    """
+    try:
+        return LeanProject(subdir)
+    except FileNotFoundError:
+        pass
+    lean_files = [p for p in sorted(subdir.rglob("*.lean")) if ".lake" not in p.parts]
+    if not lean_files:
+        return None
+    dest = Path(tempfile.mkdtemp()) / subdir.name
+    return create_project(lean_files, dest, skeleton=skeleton)

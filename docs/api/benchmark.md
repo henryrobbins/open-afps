@@ -14,6 +14,18 @@ run never aborts the sweep.
 .. autofunction:: open_atp.benchmark.run_benchmark
 ```
 
+## Building tasks from a directory
+
+{func}`~open_atp.benchmark.tasks_from_dir` builds the `tasks` mapping from a directory
+laid out like the public Lean benchmarks
+([PutnamBench](https://github.com/trishullab/PutnamBench/tree/main/lean4/src),
+[FATE](https://github.com/frenzymath/FATE)) — a flat directory of standalone `.lean`
+files, optionally with subdirectories grouping several files into one task.
+
+```{eval-rst}
+.. autofunction:: open_atp.benchmark.tasks_from_dir
+```
+
 ## Results
 
 ```{eval-rst}

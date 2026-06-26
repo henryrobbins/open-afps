@@ -9,9 +9,10 @@ the sweep, and renders a table with one row per ``(task, prover)`` pair.
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
-from open_atp.benchmark import run_benchmark
+from open_atp.benchmark import run_benchmark, tasks_from_dir
 from open_atp.lean import LeanProject, ProofTask
 
 from .test_api import FIXTURE, FakeProver
@@ -20,6 +21,19 @@ from .test_api import FIXTURE, FakeProver
 def _tasks() -> dict[str, ProofTask]:
     task = ProofTask(LeanProject(FIXTURE))
     return {"alpha": task, "beta": task}
+
+
+def _skeleton(root: Path) -> Path:
+    """A minimal lake skeleton (lakefile + toolchain) for create_project staging."""
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "lakefile.toml").write_text('name = "demo"\n')
+    (root / "lean-toolchain").write_text("leanprover/lean4:v4.28.0\n")
+    return root
+
+
+def _lean(path: Path, *, name: str = "t") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"theorem {name} : True := by sorry\n")
 
 
 def test_layout_and_results_json(tmp_path: Path) -> None:
@@ -73,3 +87,67 @@ def test_table_has_a_row_per_pair(tmp_path: Path) -> None:
     # header + separator + 4 data rows
     assert len(lines) == 6
     assert "✓" in table and "✗" in table
+
+
+# --- tasks_from_dir --------------------------------------------------------
+
+
+def test_loose_lean_files_keyed_by_stem(tmp_path: Path) -> None:
+    skeleton = _skeleton(tmp_path / "skel")
+    bench = tmp_path / "bench"
+    _lean(bench / "putnam_1962_a1.lean")
+    _lean(bench / "putnam_1962_a2.lean")
+
+    tasks = tasks_from_dir(bench, skeleton=skeleton)
+
+    assert set(tasks) == {"putnam_1962_a1", "putnam_1962_a2"}
+    # A bare file is staged into the skeleton (its project root is not the source dir).
+    project = tasks["putnam_1962_a1"].project
+    assert project.root != bench
+    assert [p.name for p in project.lean_files()] == ["putnam_1962_a1.lean"]
+    assert (project.root / "lean-toolchain").is_file()
+
+
+def test_subdir_already_a_lake_project_used_as_is(tmp_path: Path) -> None:
+    bench = tmp_path / "bench"
+    proj = bench / "multi"
+    _skeleton(proj)
+    _lean(proj / "A.lean", name="a")
+    _lean(proj / "B.lean", name="b")
+
+    tasks = tasks_from_dir(bench, skeleton=_skeleton(tmp_path / "skel"))
+
+    assert set(tasks) == {"multi"}
+    # An existing lake project is used in place, not re-staged.
+    assert tasks["multi"].project.root == proj.resolve()
+
+
+def test_subdir_without_skeleton_is_staged(tmp_path: Path) -> None:
+    skeleton = _skeleton(tmp_path / "skel")
+    bench = tmp_path / "bench"
+    group = bench / "group"
+    _lean(group / "A.lean", name="a")
+    _lean(group / "B.lean", name="b")
+
+    tasks = tasks_from_dir(bench, skeleton=skeleton)
+
+    assert set(tasks) == {"group"}
+    project = tasks["group"].project
+    assert project.root != group  # staged into a fresh project
+    assert {p.name for p in project.lean_files()} == {"A.lean", "B.lean"}
+
+
+def test_skips_hidden_and_empty_dirs(tmp_path: Path) -> None:
+    skeleton = _skeleton(tmp_path / "skel")
+    bench = tmp_path / "bench"
+    _lean(bench / "keep.lean")
+    (bench / "scripts").mkdir(parents=True)  # no .lean, not a project
+    (bench / "scripts" / "run.py").write_text("print('hi')\n")
+    hidden = bench / ".git"
+    hidden.mkdir()
+    _lean(hidden / "ignored.lean")
+    shutil.copy2(skeleton / "lakefile.toml", bench / ".hidden.lean")  # leading dot
+
+    tasks = tasks_from_dir(bench, skeleton=skeleton)
+
+    assert set(tasks) == {"keep"}

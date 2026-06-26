@@ -16,7 +16,12 @@ Everything else is a candidate generator
 are then funnelled through the shared verifier.
 """
 
-from open_atp.benchmark import BenchmarkResult, BenchmarkRun, run_benchmark
+from open_atp.benchmark import (
+    BenchmarkResult,
+    BenchmarkRun,
+    run_benchmark,
+    tasks_from_dir,
+)
 from open_atp.config import (
     build_backend,
     build_harness,
@@ -46,4 +51,5 @@ __all__ = [
     "build_harness",
     "create_project",
     "run_benchmark",
+    "tasks_from_dir",
 ]
