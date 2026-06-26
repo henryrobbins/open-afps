@@ -369,7 +369,7 @@ def main(argv: list[str] | None = None) -> int:
     prove.add_argument("lean_dir", help="The lake project directory to complete.")
     prove.add_argument("output_dir", help="Where to write the run's {wd,logs} output.")
     prove.add_argument(
-        "--json", action="store_true", help="Emit the ProofResult as JSON."
+        "-j", "--json", action="store_true", help="Emit the ProofResult as JSON."
     )
 
     download = sub.add_parser(
@@ -390,22 +390,26 @@ def main(argv: list[str] | None = None) -> int:
         "directory", help="Directory of .lean tasks to benchmark (see tasks_from_dir)."
     )
     benchmark.add_argument(
+        "-p",
         "--provers",
         help="YAML provers config (default: <directory>/provers.yaml if present, "
         "else all standard provers).",
     )
     benchmark.add_argument(
+        "-t",
         "--tasks",
         help="Comma-separated task names to run (default: every task in the "
         "directory).",
     )
     benchmark.add_argument(
+        "-c",
         "--compute",
         choices=sorted(_BACKENDS),
         default="docker",
         help="Compute backend to run the sweep on (default: docker).",
     )
     benchmark.add_argument(
+        "-o",
         "--output-dir",
         default="runs/benchmark",
         help="Where to write the sweep's <task>/<prover>/ artifacts "
@@ -420,7 +424,7 @@ def main(argv: list[str] | None = None) -> int:
         "Any single prover is still capped at 5 concurrent runs.",
     )
     benchmark.add_argument(
-        "--json", action="store_true", help="Emit the BenchmarkResult as JSON."
+        "-j", "--json", action="store_true", help="Emit the BenchmarkResult as JSON."
     )
 
     ex_benchmark = sub.add_parser(
@@ -428,12 +432,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Run every standard prover over the 5 bundled examples; print a table.",
     )
     ex_benchmark.add_argument(
+        "-c",
         "--compute",
         choices=sorted(_BACKENDS),
         default="docker",
         help="Compute backend to run the sweep on (default: docker).",
     )
     ex_benchmark.add_argument(
+        "-o",
         "--output-dir",
         default="runs/ex-benchmark",
         help="Where to write the sweep's <task>/<prover>/ artifacts "
@@ -452,12 +458,16 @@ def main(argv: list[str] | None = None) -> int:
         "build-image", help="Build the sandbox Docker image from images/Dockerfile."
     )
     build.add_argument(
+        "-t",
         "--tag",
         default=DEFAULT_IMAGE.name,
         help=f"Image tag (default: {DEFAULT_IMAGE.name}).",
     )
     build.add_argument(
-        "--no-cache", action="store_true", help="Pass --no-cache to docker build."
+        "-C",
+        "--no-cache",
+        action="store_true",
+        help="Pass --no-cache to docker build.",
     )
 
     build_modal = sub.add_parser(
@@ -465,17 +475,20 @@ def main(argv: list[str] | None = None) -> int:
         help="Build the sandbox image on Modal (from images/Dockerfile) and publish.",
     )
     build_modal.add_argument(
+        "-n",
         "--name",
         default="open-atp",
         help="Name to publish the Modal image under (default: open-atp). "
         "ModalBackend's image (sans :tag) must match this.",
     )
     build_modal.add_argument(
+        "-a",
         "--app",
         default="open-atp",
         help="Modal app to associate the image build with (default: open-atp).",
     )
     build_modal.add_argument(
+        "-f",
         "--force",
         action="store_true",
         help="Force a rebuild even if Modal has cached layers.",
