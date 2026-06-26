@@ -29,7 +29,9 @@ from __future__ import annotations
 import json
 import subprocess
 import tempfile
+import threading
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -120,6 +122,9 @@ def run_benchmark(
     tasks: Mapping[str, ProofTask],
     provers: Mapping[str, AutomatedProver],
     output_dir: Path | str,
+    *,
+    max_workers: int | None = None,
+    max_per_prover: int = 5,
 ) -> BenchmarkResult:
     """Run every prover over every task, writing artifacts under ``output_dir``.
 
@@ -127,6 +132,14 @@ def run_benchmark(
     directory, which receives the prover's ``wd``/``logs`` and a ``results.json``
     dump of the :class:`~open_atp.provers.base.ProofResult`. A prover that raises is
     recorded as a failed result (its ``error`` captured) and the sweep continues.
+
+    Pairs run concurrently on a thread pool (``prove`` is I/O-bound on the sandbox and
+    the prover's API). Two independent limits bound the concurrency: ``max_workers``
+    caps the total in-flight pairs, and ``max_per_prover`` caps how many of those may
+    belong to any one prover -- so a rate-limited prover (e.g. a hosted model) never
+    has more than ``max_per_prover`` calls in flight even when other provers fill the
+    pool. The returned ``runs`` keep task-major, prover-minor order regardless of
+    completion order.
 
     Parameters
     ----------
@@ -138,6 +151,12 @@ def run_benchmark(
         ``agent:*`` is ``"agent"``) stay distinct on disk and in the table.
     output_dir : pathlib.Path or str
         Output root for the sweep, laid out as ``output_dir/<task>/<prover>/``.
+    max_workers : int, optional
+        Total ``prove`` calls in flight at once. ``None`` (default) lets the thread
+        pool pick a default; ``1`` runs the sweep serially.
+    max_per_prover : int
+        Most concurrent ``prove`` calls for any single prover. Default ``5``, to stay
+        under rate limits.
 
     Returns
     -------
@@ -145,11 +164,14 @@ def run_benchmark(
         Every ``(task, prover)`` cell, with a :meth:`~BenchmarkResult.table` view.
     """
     output_dir = Path(output_dir)
-    runs: list[BenchmarkRun] = []
-    for task_name, task in tasks.items():
-        for prover_name, prover in provers.items():
-            run_dir = output_dir / task_name / prover_name
-            run_dir.mkdir(parents=True, exist_ok=True)
+    gates = {name: threading.Semaphore(max_per_prover) for name in provers}
+
+    def run_pair(
+        task_name: str, task: ProofTask, prover_name: str, prover: AutomatedProver
+    ) -> BenchmarkRun:
+        run_dir = output_dir / task_name / prover_name
+        run_dir.mkdir(parents=True, exist_ok=True)
+        with gates[prover_name]:
             try:
                 result = prover.prove(task, run_dir)
             except Exception as exc:
@@ -159,10 +181,21 @@ def run_benchmark(
                     output_dir=run_dir,
                     error=str(exc),
                 )
-            (run_dir / "results.json").write_text(
-                json.dumps(result.to_dict(), indent=2, default=str)
-            )
-            runs.append(BenchmarkRun(task=task_name, prover=prover_name, result=result))
+        (run_dir / "results.json").write_text(
+            json.dumps(result.to_dict(), indent=2, default=str)
+        )
+        return BenchmarkRun(task=task_name, prover=prover_name, result=result)
+
+    jobs = [
+        (task_name, task, prover_name, prover)
+        for task_name, task in tasks.items()
+        for prover_name, prover in provers.items()
+    ]
+    if max_workers == 1:
+        runs = [run_pair(*job) for job in jobs]
+    else:
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            runs = list(pool.map(lambda job: run_pair(*job), jobs))
     return BenchmarkResult(output_dir=output_dir, runs=runs)
 
 

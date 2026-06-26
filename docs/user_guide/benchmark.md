@@ -32,6 +32,11 @@ prover that raises is recorded as a failed
 {class}`~open_atp.provers.base.ProofResult` (its `error` captured) so one bad run never
 aborts the sweep.
 
+Pairs run concurrently on a thread pool. `max_workers` caps the total in flight
+(`None` auto-sizes; `1` is serial), and `max_per_prover` (default `5`) caps how many
+runs any *single* prover may have in flight — so a rate-limited prover (e.g. a hosted
+model) stays under its limit even when other provers fill the pool.
+
 The `open-atp ex-benchmark` CLI command runs exactly this sweep over all
 {func}`~open_atp.config.standard_provers` and the five bundled
 {class}`~open_atp.examples.EXAMPLE` tasks; pick the backend with
@@ -95,8 +100,10 @@ result; otherwise it is derived from the prover/harness type):
   type: aristotle
 ```
 
-`--compute {docker,modal}` picks the backend (standard image, default `docker`), and
-`--json` emits the {class}`~open_atp.benchmark.BenchmarkResult` as JSON.
+`--compute {docker,modal}` picks the backend (standard image, default `docker`),
+`-n/--max-workers` bounds total parallelism (each prover is still capped at 5
+concurrent runs), and `--json` emits the
+{class}`~open_atp.benchmark.BenchmarkResult` as JSON.
 
 ## Citing the benchmarks
 

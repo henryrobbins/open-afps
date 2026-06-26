@@ -151,7 +151,9 @@ def _benchmark(args: argparse.Namespace) -> int:
     backend = build_backend({"type": args.compute})
     provers = _load_provers(directory, args.provers, backend)
     tasks = tasks_from_dir(directory)
-    result = run_benchmark(tasks, provers, Path(args.output_dir))
+    result = run_benchmark(
+        tasks, provers, Path(args.output_dir), max_workers=args.max_workers
+    )
     return _report(result, args.json)
 
 
@@ -166,7 +168,12 @@ def _ex_benchmark(args: argparse.Namespace) -> int:
     """Run every standard prover over the five bundled examples and print a table."""
     backend = build_backend({"type": args.compute})
     tasks = {member.value: example_task(member) for member in EXAMPLE}
-    result = run_benchmark(tasks, _all_standard_provers(backend), Path(args.output_dir))
+    result = run_benchmark(
+        tasks,
+        _all_standard_provers(backend),
+        Path(args.output_dir),
+        max_workers=args.max_workers,
+    )
     return _report(result, as_json=False)
 
 
@@ -340,6 +347,14 @@ def main(argv: list[str] | None = None) -> int:
         "(default: runs/benchmark).",
     )
     benchmark.add_argument(
+        "-n",
+        "--max-workers",
+        type=int,
+        default=None,
+        help="Max (task, prover) pairs in flight at once (default: auto; 1 = serial). "
+        "Any single prover is still capped at 5 concurrent runs.",
+    )
+    benchmark.add_argument(
         "--json", action="store_true", help="Emit the BenchmarkResult as JSON."
     )
 
@@ -358,6 +373,14 @@ def main(argv: list[str] | None = None) -> int:
         default="runs/ex-benchmark",
         help="Where to write the sweep's <task>/<prover>/ artifacts "
         "(default: runs/ex-benchmark).",
+    )
+    ex_benchmark.add_argument(
+        "-n",
+        "--max-workers",
+        type=int,
+        default=None,
+        help="Max (task, prover) pairs in flight at once (default: auto; 1 = serial). "
+        "Any single prover is still capped at 5 concurrent runs.",
     )
 
     build = sub.add_parser(

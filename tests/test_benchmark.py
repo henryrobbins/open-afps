@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -23,6 +25,7 @@ from open_atp.benchmark import (
     tasks_from_dir,
 )
 from open_atp.lean import LeanProject, ProofTask
+from open_atp.provers.base import ProofResult
 
 from .test_api import FIXTURE, FakeProver
 
@@ -30,6 +33,44 @@ from .test_api import FIXTURE, FakeProver
 def _tasks() -> dict[str, ProofTask]:
     task = ProofTask(LeanProject(FIXTURE))
     return {"alpha": task, "beta": task}
+
+
+class _Peak:
+    """Tracks the peak number of threads simultaneously inside its ``with`` block."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.current = 0
+        self.peak = 0
+
+    def __enter__(self) -> None:
+        with self._lock:
+            self.current += 1
+            self.peak = max(self.peak, self.current)
+
+    def __exit__(self, *_exc: object) -> None:
+        with self._lock:
+            self.current -= 1
+
+
+class ProbeProver(FakeProver):
+    """A ``FakeProver`` whose ``_generate`` sleeps while recording concurrency."""
+
+    def __init__(self, name: str, peak: _Peak) -> None:
+        super().__init__(name)
+        self._peak = peak
+
+    def _generate(
+        self, task: ProofTask, wd: Path, logs_dir: Path, result: ProofResult
+    ) -> None:
+        with self._peak:
+            time.sleep(0.02)
+        super()._generate(task, wd, logs_dir, result)
+
+
+def _many_tasks(n: int) -> dict[str, ProofTask]:
+    task = ProofTask(LeanProject(FIXTURE))
+    return {f"t{i}": task for i in range(n)}
 
 
 def _skeleton(root: Path) -> Path:
@@ -96,6 +137,49 @@ def test_table_has_a_row_per_pair(tmp_path: Path) -> None:
     # header + separator + 4 data rows
     assert len(lines) == 6
     assert "✓" in table and "✗" in table
+
+
+# --- parallelism -----------------------------------------------------------
+
+
+def test_runs_keep_task_major_order_when_parallel(tmp_path: Path) -> None:
+    provers = {"good": FakeProver("agent"), "bad": FakeProver("numina")}
+
+    runs = run_benchmark(_tasks(), provers, tmp_path, max_workers=4).runs
+
+    assert [(r.task, r.prover) for r in runs] == [
+        ("alpha", "good"),
+        ("alpha", "bad"),
+        ("beta", "good"),
+        ("beta", "bad"),
+    ]
+
+
+def test_max_workers_one_runs_serially(tmp_path: Path) -> None:
+    peak = _Peak()
+    provers = {"p": ProbeProver("agent", peak)}
+
+    run_benchmark(_many_tasks(4), provers, tmp_path, max_workers=1)
+
+    assert peak.peak == 1
+
+
+def test_per_prover_cap_bounds_one_prover(tmp_path: Path) -> None:
+    peak = _Peak()
+    provers = {"p": ProbeProver("agent", peak)}
+
+    run_benchmark(_many_tasks(8), provers, tmp_path, max_workers=8, max_per_prover=2)
+
+    assert peak.peak == 2  # capped below the 8 available workers
+
+
+def test_cap_is_per_prover_not_global(tmp_path: Path) -> None:
+    shared = _Peak()  # one tracker across both provers measures global concurrency
+    provers = {"a": ProbeProver("agent", shared), "b": ProbeProver("numina", shared)}
+
+    run_benchmark(_many_tasks(4), provers, tmp_path, max_workers=4, max_per_prover=1)
+
+    assert shared.peak == 2  # one run each from two provers overlap despite the cap
 
 
 # --- tasks_from_dir --------------------------------------------------------
