@@ -17,8 +17,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+from open_atp.backends import _BACKENDS
 from open_atp.backends.docker import DockerBackend
-from open_atp.config import standard_prover, standard_provers
+from open_atp.benchmark import run_benchmark
+from open_atp.config import build_backend, standard_prover, standard_provers
+from open_atp.examples import EXAMPLE, example_task
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask
 
@@ -56,6 +59,20 @@ def _prove(args: argparse.Namespace) -> int:
     print(f"{result.prover:<16} {status:<28} cost={cost:<10} time={dur}")
     print(f"output: {result.output_dir}")
     return 0 if result.success else 1
+
+
+def _ex_benchmark(args: argparse.Namespace) -> int:
+    """Run every standard prover over the five bundled examples and print a table."""
+    backend = build_backend({"type": args.compute})
+    tasks = {member.value: example_task(member) for member in EXAMPLE}
+    provers = {
+        name: standard_prover(name, backend=backend) for name in standard_provers()
+    }
+
+    result = run_benchmark(tasks, provers, Path(args.output_dir))
+    print(result.table())
+    print(f"\nartifacts: {result.output_dir}")
+    return 0 if all(run.result.success for run in result.runs) else 1
 
 
 def _build_image(args: argparse.Namespace) -> int:
@@ -193,6 +210,23 @@ def main(argv: list[str] | None = None) -> int:
         "--json", action="store_true", help="Emit the ProofResult as JSON."
     )
 
+    ex_benchmark = sub.add_parser(
+        "ex-benchmark",
+        help="Run every standard prover over the 5 bundled examples; print a table.",
+    )
+    ex_benchmark.add_argument(
+        "--compute",
+        choices=sorted(_BACKENDS),
+        default="docker",
+        help="Compute backend to run the sweep on (default: docker).",
+    )
+    ex_benchmark.add_argument(
+        "--output-dir",
+        default="runs/ex-benchmark",
+        help="Where to write the sweep's <task>/<prover>/ artifacts "
+        "(default: runs/ex-benchmark).",
+    )
+
     build = sub.add_parser(
         "build-image", help="Build the sandbox Docker image from images/Dockerfile."
     )
@@ -229,6 +263,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "prove":
         return _prove(args)
+    if args.command == "ex-benchmark":
+        return _ex_benchmark(args)
     if args.command == "build-image":
         return _build_image(args)
     if args.command == "build-modal-image":

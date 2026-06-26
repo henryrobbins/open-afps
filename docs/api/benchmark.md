@@ -1,0 +1,24 @@
+# `benchmark`
+
+Run a set of provers across a set of named {class}`~open_atp.lean.ProofTask`s and
+tabulate the results. {func}`~open_atp.benchmark.run_benchmark` runs every
+`(task, prover)` pair and lays the artifacts out under `output_dir` as
+`output_dir/<task>/<prover>/{wd,logs,results.json}`, returning a
+{class}`~open_atp.benchmark.BenchmarkResult` with a terminal-table view. A prover that
+raises is recorded as a failed {class}`~open_atp.provers.base.ProofResult` so one bad
+run never aborts the sweep.
+
+## Runner
+
+```{eval-rst}
+.. autofunction:: open_atp.benchmark.run_benchmark
+```
+
+## Results
+
+```{eval-rst}
+.. autoclass:: open_atp.benchmark.BenchmarkResult
+   :members: table, to_dict
+
+.. autoclass:: open_atp.benchmark.BenchmarkRun
+```

@@ -1,0 +1,154 @@
+"""Run a set of provers across a set of named proof tasks and tabulate the results.
+
+:func:`run_benchmark` is the matrix runner: given a name -> task mapping and a
+name -> prover mapping, it runs every ``(task, prover)`` pair and lays the artifacts
+out under ``output_dir`` as::
+
+    output_dir/<task>/<prover>/{wd,logs,results.json}
+
+``wd`` and ``logs`` are exactly what
+:meth:`~open_atp.provers.base.AutomatedProver.prove` writes; ``results.json`` is the
+:class:`~open_atp.provers.base.ProofResult` for that cell. A prover that raises is
+recorded as a failed result (its ``error`` captured) so one bad run never aborts the
+sweep.
+
+The returned :class:`BenchmarkResult` collects every cell and renders a terminal table
+(:meth:`BenchmarkResult.table`) for quick comparison.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
+
+from open_atp.lean import ProofTask
+from open_atp.provers.base import AutomatedProver, ProofResult
+
+
+@dataclass(frozen=True)
+class BenchmarkRun:
+    """One ``(task, prover)`` cell of a benchmark sweep.
+
+    Attributes
+    ----------
+    task : str
+        The task's key in the benchmark's ``tasks`` mapping.
+    prover : str
+        The prover's key in the benchmark's ``provers`` mapping (which may differ
+        from :attr:`~open_atp.provers.base.ProofResult.prover`, e.g. ``"agent:claude"``
+        vs the prover class's ``"agent"``).
+    result : ~open_atp.provers.base.ProofResult
+        The run's result. On an exception its
+        :attr:`~open_atp.provers.base.ProofResult.error` is set and
+        :attr:`~open_atp.provers.base.ProofResult.verification` is ``None``.
+    """
+
+    task: str
+    prover: str
+    result: ProofResult
+
+
+@dataclass(frozen=True)
+class BenchmarkResult:
+    """The collected cells of a benchmark sweep, with a table view.
+
+    Attributes
+    ----------
+    output_dir : pathlib.Path
+        The benchmark's output root, laid out as ``output_dir/<task>/<prover>/``.
+    runs : list[BenchmarkRun]
+        One :class:`BenchmarkRun` per ``(task, prover)`` pair, in run order.
+    """
+
+    output_dir: Path
+    runs: list[BenchmarkRun]
+
+    def table(self) -> str:
+        """A monospace table, one row per ``(task, prover)``: status, cost, time."""
+        header = ("task", "prover", "status", "cost", "time")
+        rows = [header]
+        for run in self.runs:
+            r = run.result
+            if r.success:
+                status = "✓"
+            elif r.error is not None:
+                status = "ERR"
+            else:
+                status = "✗"
+            cost = f"${r.cost_usd:.4f}" if r.cost_usd is not None else "—"
+            time = f"{r.duration_s:.0f}s" if r.duration_s is not None else "—"
+            rows.append((run.task, run.prover, status, cost, time))
+
+        widths = [max(len(row[i]) for row in rows) for i in range(len(header))]
+        lines = []
+        for n, row in enumerate(rows):
+            lines.append("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)))
+            if n == 0:
+                lines.append("  ".join("-" * w for w in widths))
+        return "\n".join(lines)
+
+    def to_dict(self) -> dict[str, object]:
+        """JSON-ready view: the output root plus each cell's task, prover, result."""
+        return {
+            "output_dir": str(self.output_dir),
+            "runs": [
+                {
+                    "task": run.task,
+                    "prover": run.prover,
+                    "result": run.result.to_dict(),
+                }
+                for run in self.runs
+            ],
+        }
+
+
+def run_benchmark(
+    tasks: Mapping[str, ProofTask],
+    provers: Mapping[str, AutomatedProver],
+    output_dir: Path | str,
+) -> BenchmarkResult:
+    """Run every prover over every task, writing artifacts under ``output_dir``.
+
+    Each ``(task, prover)`` pair runs in its own ``output_dir/<task>/<prover>/``
+    directory, which receives the prover's ``wd``/``logs`` and a ``results.json``
+    dump of the :class:`~open_atp.provers.base.ProofResult`. A prover that raises is
+    recorded as a failed result (its ``error`` captured) and the sweep continues.
+
+    Parameters
+    ----------
+    tasks : Mapping[str, ~open_atp.lean.ProofTask]
+        Tasks keyed by name; the name becomes the task's output subdirectory.
+    provers : Mapping[str, ~open_atp.provers.base.AutomatedProver]
+        Provers keyed by name; the name becomes the per-task output subdirectory.
+        A mapping (not a list) so several provers sharing a class ``name`` (every
+        ``agent:*`` is ``"agent"``) stay distinct on disk and in the table.
+    output_dir : pathlib.Path or str
+        Output root for the sweep, laid out as ``output_dir/<task>/<prover>/``.
+
+    Returns
+    -------
+    BenchmarkResult
+        Every ``(task, prover)`` cell, with a :meth:`~BenchmarkResult.table` view.
+    """
+    output_dir = Path(output_dir)
+    runs: list[BenchmarkRun] = []
+    for task_name, task in tasks.items():
+        for prover_name, prover in provers.items():
+            run_dir = output_dir / task_name / prover_name
+            run_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                result = prover.prove(task, run_dir)
+            except Exception as exc:
+                result = ProofResult(
+                    prover=prover.name,
+                    verification=None,
+                    output_dir=run_dir,
+                    error=str(exc),
+                )
+            (run_dir / "results.json").write_text(
+                json.dumps(result.to_dict(), indent=2, default=str)
+            )
+            runs.append(BenchmarkRun(task=task_name, prover=prover_name, result=result))
+    return BenchmarkResult(output_dir=output_dir, runs=runs)

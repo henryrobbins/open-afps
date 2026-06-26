@@ -7,6 +7,7 @@ The reference mirrors the package layout under `src/open_atp/`:
 - {doc}`backends` — `open_atp.backends`: the `ComputeBackend` sandbox primitive (`docker` | `modal`).
 - {doc}`lean` — `open_atp.lean`: the Lean input contract (`LeanProject`, `ProofTask`) and the `create_project` helper.
 - {doc}`verify` — `open_atp.verify`: the `VerificationReport` and the shared `Verifier`.
+- {doc}`benchmark` — `open_atp.benchmark`: run provers across named tasks and tabulate the results ({func}`~open_atp.benchmark.run_benchmark`).
 - {doc}`examples` — `open_atp.examples`: bundled `sorry`'d example tasks ({func}`~open_atp.examples.example_task`, {class}`~open_atp.examples.EXAMPLE`).
 
 ```{toctree}
@@ -17,5 +18,6 @@ harness
 backends
 lean
 verify
+benchmark
 examples
 ```
