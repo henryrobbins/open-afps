@@ -29,6 +29,7 @@ from open_atp.config import (
     standard_prover,
     standard_provers,
 )
+from open_atp.datasets import DATASETS, Dataset, download_dataset
 from open_atp.images import DEFAULT_IMAGE, Image
 from open_atp.lean import LeanProject, ProofTask, create_project
 from open_atp.provers.base import AutomatedProver, ProofResult
@@ -38,6 +39,8 @@ __all__ = [
     "AutomatedProver",
     "BenchmarkResult",
     "BenchmarkRun",
+    "DATASETS",
+    "Dataset",
     "DEFAULT_IMAGE",
     "Image",
     "ProofResult",
@@ -50,6 +53,7 @@ __all__ = [
     "build_backend",
     "build_harness",
     "create_project",
+    "download_dataset",
     "run_benchmark",
     "tasks_from_dir",
 ]
