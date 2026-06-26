@@ -1,6 +1,10 @@
 (prover-codex)=
 # Codex
 
+```{include} _meta_codex.md
+:parser: myst
+```
+
 The Codex prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on the
 {class}`~open_atp.harness.codex.CodexHarness` — OpenAI's
 [Codex](https://chatgpt.com/codex) CLI driving the `sorry`s in a sandbox with the

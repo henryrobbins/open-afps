@@ -1,6 +1,10 @@
 (prover-opencode)=
 # OpenCode
 
+```{include} _meta_opencode.md
+:parser: myst
+```
+
 The OpenCode prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on the
 {class}`~open_atp.harness.opencode.OpenCodeHarness` — the
 [OpenCode](https://opencode.ai/) CLI driving the `sorry`s in a sandbox with the

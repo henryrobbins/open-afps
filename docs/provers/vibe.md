@@ -1,6 +1,10 @@
 (prover-vibe)=
 # Vibe / Leanstral
 
+```{include} _meta_vibe.md
+:parser: myst
+```
+
 The Vibe prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on the
 {class}`~open_atp.harness.vibe.VibeHarness` — it drives Mistral
 [Vibe](https://docs.mistral.ai/mistral-vibe/)'s builtin `lean` agent in a sandbox.

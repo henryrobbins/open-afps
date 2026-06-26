@@ -5,19 +5,13 @@ A prover is a *candidate generator*: it takes a
 {class}`~open_atp.provers.base.AutomatedProver` owns the shared lifecycle — generate,
 then verify in the sandbox — so every prover gets the same final check for free.
 
-| Prover | Spec | Generation | Credential |
-| --- | --- | --- | --- |
-| [Claude Code](claude_code.md) | `agent:claude` | AgentProver on the Claude Code CLI | `CLAUDE_CODE_OAUTH_TOKEN` |
-| [Codex](codex.md) | `agent:codex` | AgentProver on the Codex CLI (OpenAI) | `~/.codex` (OAuth) |
-| [OpenCode](opencode.md) | `agent:opencode` | AgentProver on the OpenCode CLI (any provider) | `<PROVIDER>_API_KEY` |
-| [AxProver](axprover.md) | `agent:axprover` | AgentProver driving ax-prover-base | `ANTHROPIC` / `OPENAI` / `GOOGLE_API_KEY` |
-| [Vibe / Leanstral](vibe.md) | `agent:vibe` | AgentProver on Mistral Vibe's `lean` agent | `MISTRAL_API_KEY` |
-| [NuminaProver](numina.md) | `numina` | AgentProver (Claude) + Numina assets + round loop | harness + helper API keys |
-| [AristotleProver](aristotle.md) | `aristotle` | Harmonic's hosted Aristotle API | `ARISTOTLE_API_KEY` |
+```{include} _table.md
+:parser: myst
+```
 
 The Claude Code, Codex, OpenCode, AxProver, and Vibe provers are all the same
 {class}`~open_atp.provers.agent_prover.AgentProver` composed with a different
-{class}`~open_atp.harness.base.Harness`; `Spec` is the
+{class}`~open_atp.harness.base.Harness`; `ID` is the
 {func}`~open_atp.config.standard_prover` catalog name. Every prover subclasses
 {class}`~open_atp.provers.base.AutomatedProver` and funnels its output through the
 shared {class}`~open_atp.verify.Verifier`.
@@ -41,6 +35,7 @@ compile / sorry / axiom check. Configuration fields are documented under
 
 ```{toctree}
 :maxdepth: 1
+:hidden:
 
 claude_code
 codex
@@ -49,4 +44,76 @@ axprover
 vibe
 numina
 aristotle
+```
+
+## References
+
+Several of the provers implement published methods. If you use one of them,
+please cite the corresponding paper.
+
+```bibtex
+@inproceedings{requena2026a,
+  title = {A Minimal Agent for Automated Theorem Proving},
+  author = {Borja Requena and Austin Letson and Krystian Nowakowski and Izan Beltran Ferreiro and Leopoldo Sarra},
+  booktitle = {ICLR 2026 Workshop: VerifAI-2: The Second Workshop on AI Verification in the Wild},
+  year = {2026},
+  url = {https://openreview.net/forum?id=E30g7bO7rU}
+}
+
+@article{achim2025aristotle,
+  title = {Aristotle: IMO-level Automated Theorem Proving},
+  author = {Achim, Tudor and Best, Alex and Bietti, Alberto and Der, Kevin and F{\'e}d{\'e}rico, Math{\"\i}s and Gukov, Sergei and Halpern-Leistner, Daniel and Henningsgard, Kirsten and Kudryashov, Yury and Meiburg, Alexander and others},
+  journal = {arXiv preprint arXiv:2510.01346},
+  year = {2025}
+}
+
+@article{liu2026numina,
+  title = {Numina-Lean-Agent: An Open and General Agentic Reasoning System for Formal Mathematics},
+  author = {Liu, Junqi and Zhou, Zihao and Zhu, Zekai and Santos, Marco Dos and He, Weikun and Liu, Jiawei and Wang, Ran and Xie, Yunzhou and Zhao, Junqiao and Wang, Qiufeng and others},
+  journal = {arXiv preprint arXiv:2601.14027},
+  year = {2026}
+}
+```
+
+The agent harnesses share the [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp)
+server (all except ax-prover, which ships its own Lean tooling) and bundle vendored
+Lean skills (see `vendor/`):
+
+```bibtex
+@software{lean-lsp-mcp,
+  author = {Oliver Dressler},
+  title = {{Lean LSP MCP: Tools for agentic interaction with the Lean theorem prover}},
+  url = {https://github.com/oOo0oOo/lean-lsp-mcp},
+  month = {3},
+  year = {2025}
+}
+
+@software{leanprover-skills,
+  author = {{Lean FRO}},
+  title = {Official Agent {Skills} for developing with {Lean} 4},
+  url = {https://github.com/leanprover/skills},
+  year = {2025}
+}
+
+@software{lean4-skills,
+  author = {Cameron Freer},
+  title = {Lean 4 {Skills}: Theorem proving skill and workflow pack for {AI} coding agents},
+  url = {https://github.com/cameronfreer/lean4-skills},
+  month = oct,
+  year = {2025}
+}
+```
+
+## Citing OpenATP
+
+If you use `OpenATP` itself, please cite the project:
+
+```bibtex
+@software{openatp,
+  title = {OpenATP: Open Automated Theorem Proving},
+  author = {Henry Robbins},
+  year = {2026},
+  publisher = {GitHub},
+  url = {https://github.com/henryrobbins/open-atp}
+}
 ```

@@ -251,6 +251,24 @@ Practical rules:
 - `make docs` builds with `-W` (warnings are errors) — a broken xref or duplicate
   fails the build.
 
+## Docs: prover comparison table
+
+The prover table in both `README.md` and `docs/provers/index.md` is generated from
+a single source of truth, `docs/provers.yaml` (company / paper / source / skills
+metadata). **Edit the YAML, never the tables by hand.**
+
+- `docs/_ext/provers_table.py` renders both tables. As a Sphinx extension
+  (`provers_table` in `conf.py`) its `builder-inited` hook writes the gitignored
+  `docs/provers/_table.md`, which `index.md` pulls in via `{include}`.
+- It also writes a gitignored per-prover metadata field list,
+  `docs/provers/_meta_<page>.md` (id / skills / MCP / company / paper / source),
+  which each `docs/provers/<page>.md` includes right under its title. `company` is
+  shown here even though it's no longer a table column — keep it in the YAML.
+- The README table is materialized between `<!-- BEGIN/END PROVER TABLE -->`
+  markers (GitHub can't run Sphinx). Run `make gen-provers` after editing the YAML
+  and commit the README change.
+- `make check-provers` (wired into `make check`) fails if the README table is stale.
+
 ## Conventions
 
 - Commit directly to `main` unless told otherwise; warn before committing work that

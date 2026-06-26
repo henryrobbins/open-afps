@@ -1,6 +1,6 @@
 # Common dev commands for the open-atp package.
 
-.PHONY: help install test test-docker test-modal test-aristotle test-agent cov cov-open cov-clean lint format typecheck check build build-image docs docs-serve docs-clean clean
+.PHONY: help install test test-docker test-modal test-aristotle test-agent cov cov-open cov-clean lint format typecheck check gen-provers check-provers build build-image docs docs-serve docs-clean clean
 
 help:
 	@echo "Targets:"
@@ -16,7 +16,9 @@ help:
 	@echo "  lint            Run ruff check"
 	@echo "  format          Run ruff format + ruff check --fix"
 	@echo "  typecheck       Run mypy"
-	@echo "  check           Run lint + typecheck + test"
+	@echo "  check           Run lint + typecheck + check-provers + test"
+	@echo "  gen-provers     Regenerate the prover table in README from docs/provers.yaml"
+	@echo "  check-provers   Fail if README's prover table is stale"
 	@echo "  build           Build the sdist + wheel into dist/"
 	@echo "  build-image     Build the open-atp:latest Docker image"
 	@echo "  docs            Build the Sphinx docs once"
@@ -65,7 +67,13 @@ format:
 typecheck:
 	uv run mypy
 
-check: lint typecheck test
+check: lint typecheck check-provers test
+
+gen-provers:
+	uv run python docs/_ext/provers_table.py
+
+check-provers:
+	uv run python docs/_ext/provers_table.py --check
 
 build:
 	uv build
@@ -77,7 +85,8 @@ docs:
 	uv run --extra docs sphinx-build -W -b html docs docs/_build/html
 
 docs-serve:
-	uv run --extra docs sphinx-autobuild --watch src docs docs/_build/html
+	uv run --extra docs sphinx-autobuild --watch src \
+		--ignore '*/provers/_table.md' docs docs/_build/html
 
 docs-clean:
 	rm -rf docs/_build

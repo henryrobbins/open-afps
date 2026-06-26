@@ -1,9 +1,15 @@
 import inspect
+import sys
 from importlib.metadata import version as _pkg_version
+from pathlib import Path
 
 from docutils import nodes
 from sphinx.application import Sphinx
 from sphinx.environment import BuildEnvironment
+
+# Local extensions (docs/_ext): provers_table generates the prover comparison
+# table from docs/provers.yaml.
+sys.path.insert(0, str(Path(__file__).parent / "_ext"))
 
 project = "OpenATP"
 author = "Henry Robbins"
@@ -18,6 +24,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx_design",
     "numpydoc",
+    "provers_table",
 ]
 
 extlinks = {

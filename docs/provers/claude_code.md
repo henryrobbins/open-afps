@@ -1,6 +1,10 @@
 (prover-claude-code)=
 # Claude Code
 
+```{include} _meta_claude_code.md
+:parser: myst
+```
+
 The Claude Code prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on
 the {class}`~open_atp.harness.claude_code.ClaudeCodeHarness` — Anthropic's
 [Claude Code](https://claude.com/claude-code) CLI driving the `sorry`s in a sandbox

@@ -61,24 +61,45 @@ print(result.success)
 
 ## Available provers
 
-Each name is accepted by the `--provers` CLI flag and the prover registry. The
-agentic provers run a coding-agent *harness* (staged into the sandbox) sharing
+The `ID` is the `standard_prover` catalog name; the `--provers` CLI flag also
+accepts the short prover names (`agent`, `codex`, `aristotle`, ...). The agentic
+provers run a coding-agent *harness* (staged into the sandbox) sharing
 [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp); the shared `Verifier`
 does the final check regardless of which tool generated the proof.
 
-| Prover | Backing tool | Source / website |
-| --- | --- | --- |
-| `aristotle` | Harmonic Aristotle (hosted) | [harmonic.fun](https://www.harmonic.fun) · [aristotlelib](https://pypi.org/project/aristotlelib/) |
-| `agent` | Claude Code (default) | [anthropics/claude-code](https://github.com/anthropics/claude-code) |
-| `codex` | OpenAI Codex CLI | [openai/codex](https://github.com/openai/codex) |
-| `opencode` | opencode | [sst/opencode](https://github.com/sst/opencode) |
-| `axprover` | ax-prover (LangGraph Lean agent) | [Axiomatic-AI/ax-prover-base](https://github.com/Axiomatic-AI/ax-prover-base) ([fork](https://github.com/henryrobbins/ax-prover-base)) |
-| `numina` | Numina skills/prompts on Claude Code | [vendor/numina/VENDOR.md](vendor/numina/VENDOR.md) |
-| `vibe` | Mistral Vibe `lean` scaffold | [mistralai/mistral-vibe](https://github.com/mistralai/mistral-vibe) |
+<!-- BEGIN PROVER TABLE (generated from docs/provers.yaml) -->
+| Prover | ID | Skills | MCP | Paper | Source |
+| --- | --- | --- | --- | --- | --- |
+| [Claude Code](docs/provers/claude_code.md) | `agent:claude` | [leanprover](https://github.com/leanprover/skills), [lean4](https://github.com/cameronfreer/lean4-skills) | ✓ | — | — |
+| [Codex](docs/provers/codex.md) | `agent:codex` | [leanprover](https://github.com/leanprover/skills) | ✓ | — | [GitHub](https://github.com/openai/codex) |
+| [OpenCode](docs/provers/opencode.md) | `agent:opencode` | [leanprover](https://github.com/leanprover/skills) | ✓ | — | [GitHub](https://github.com/sst/opencode) |
+| [AxProver](docs/provers/axprover.md) | `agent:axprover` | — | ✗ | [Requena et al. 2026](https://openreview.net/forum?id=E30g7bO7rU) | [GitHub](https://github.com/Axiomatic-AI/ax-prover-base) |
+| [Vibe / Leanstral](docs/provers/vibe.md) | `agent:vibe` | [leanprover](https://github.com/leanprover/skills) | ✓ | [Leanstral (blog)](https://mistral.ai/news/leanstral) | [HuggingFace](https://huggingface.co/mistralai/Leanstral-2603) |
+| [NuminaProver](docs/provers/numina.md) | `numina` | — | ✓ | [Liu et al. 2026](https://arxiv.org/abs/2601.14027) | [GitHub](https://github.com/project-numina/numina-lean-agent) |
+| [AristotleProver](docs/provers/aristotle.md) | `aristotle` | — | ✗ | [Achim et al. 2025](https://arxiv.org/abs/2510.01346) | — |
+<!-- END PROVER TABLE -->
 
 Both `DockerBackend` and `ModalBackend` run the provers and the shared
 `Verifier` end-to-end against the Mathlib image; pick one with `--backend`, or
 split generation from the cheap verify with `--agent-backend`.
+
+## Citing
+
+If you use `OpenATP` in your work, please cite it:
+
+```bibtex
+@software{openatp,
+  title = {OpenATP: Open Automated Theorem Proving},
+  author = {Henry Robbins},
+  year = {2026},
+  publisher = {GitHub},
+  url = {https://github.com/henryrobbins/open-atp}
+}
+```
+
+Several of the bundled provers have associated papers — see the
+[provers documentation](https://open-atp.readthedocs.io/en/latest/provers/)
+for the methods to cite when you use them.
 
 ## Development
 

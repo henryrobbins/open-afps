@@ -1,6 +1,10 @@
 (prover-aristotle)=
 # AristotleProver
 
+```{include} _meta_aristotle.md
+:parser: myst
+```
+
 The {class}`~open_atp.provers.aristotle.AristotleProver` wraps Harmonic's hosted
 [Aristotle](https://www.harmonic.fun/) API. No agentic sandbox is needed for
 generation — the lake project is handed to the hosted agent via `aristotlelib`

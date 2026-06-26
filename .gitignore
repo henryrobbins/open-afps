@@ -6,6 +6,9 @@ tests/.runs/
 
 # Sphinx docs build
 docs/_build/
+# Generated from docs/provers.yaml at build time (see docs/_ext/provers_table.py)
+docs/provers/_table.md
+docs/provers/_meta_*.md
 
 # Python
 __pycache__/

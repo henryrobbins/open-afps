@@ -1,6 +1,10 @@
 (prover-axprover)=
 # AxProver
 
+```{include} _meta_axprover.md
+:parser: myst
+```
+
 The AxProver prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on the
 {class}`~open_atp.harness.axprover.AxProverHarness` — it drives
 [ax-prover-base](https://github.com/henryrobbins/ax-prover-base), a self-contained

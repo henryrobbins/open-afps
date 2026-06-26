@@ -1,6 +1,10 @@
 (prover-numina)=
 # NuminaProver
 
+```{include} _meta_numina.md
+:parser: myst
+```
+
 The {class}`~open_atp.provers.numina.NuminaProver` is a configured variant of the
 {class}`~open_atp.provers.agent_prover.AgentProver`. Structurally, Numina is
 "Claude Code + a specific skills/prompts/search toolkit, run in a multi-round loop in

@@ -34,7 +34,15 @@ Repository = "https://github.com/henryrobbins/open-atp"
 Issues = "https://github.com/henryrobbins/open-atp/issues"
 
 [project.optional-dependencies]
-dev = ["mypy", "pytest", "pytest-cov", "pytest-xdist>=3.5", "ruff", "python-dotenv"]
+dev = [
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "pytest-xdist>=3.5",
+    "ruff",
+    "python-dotenv",
+    "pyyaml",  # docs/_ext/provers_table.py (make gen-provers / check-provers)
+]
 docs = [
     "sphinx>=7",
     "myst-parser>=3",
@@ -43,6 +51,7 @@ docs = [
     "sphinx-autobuild",
     "sphinx-design",
     "numpydoc",
+    "pyyaml",  # provers_table extension reads docs/provers.yaml
 ]
 
 [project.scripts]
