@@ -37,7 +37,6 @@ API reference.
 installation
 user_guide/index
 provers/index
-compute_backend/index
 examples
 development/index
 cli

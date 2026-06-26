@@ -61,7 +61,7 @@ report = docker_verifier().verify(LeanProject("path/to/lake/project"))
 
 Provers take a verification backend explicitly. Construct a
 {class}`~open_atp.backends.docker.DockerBackend` and pass it in (see
-{doc}`../user_guide/run_provers`).
+{doc}`run_provers`).
 
 ## Docker resources
 

@@ -6,6 +6,8 @@ installed `open-atp` (see {doc}`../installation`).
 ```{toctree}
 :maxdepth: 1
 
+docker
+modal
 run_provers
 benchmark
 ```

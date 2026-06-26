@@ -10,7 +10,7 @@ via the shared {class}`~open_atp.verify.Verifier`.
 ## Prerequisites
 
 - Docker running and the `open-atp:latest` image built (see
-  {doc}`../compute_backend/docker`).
+  {doc}`docker`).
 - A credential for the prover you choose:
   - **AristotleProver** — `ARISTOTLE_API_KEY`.
   - **AgentProver / NuminaProver** — a harness credential (see the per-harness prover
