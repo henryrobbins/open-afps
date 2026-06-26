@@ -83,6 +83,20 @@ Both `DockerBackend` and `ModalBackend` run the provers and the shared
 `Verifier` end-to-end against the Mathlib image; pick one with `--backend`, or
 split generation from the cheap verify with `--agent-backend`.
 
+## Included benchmarks
+
+`download_dataset(DATASET.<member>, dest)` sparse-clones a public benchmark's task
+directory, ready for `tasks_from_dir` + `run_benchmark` (see the
+[benchmarking guide](docs/user_guide/benchmark.md)). Please cite the authors when you
+run these.
+
+| Benchmark | `DATASET` | Toolchain | Paper | Source |
+| --- | --- | --- | --- | --- |
+| PutnamBench | `PUTNAM` | `v4.27.0` | [Tsoukalas et al. 2024](https://arxiv.org/abs/2407.11214) | [trishullab/PutnamBench](https://github.com/trishullab/PutnamBench) |
+| FATE-H (hard) | `FATE_H` | `v4.28.0` | [Jiang et al. 2025](https://arxiv.org/abs/2511.02872) | [frenzymath/FATE-H](https://github.com/frenzymath/FATE-H) |
+| FATE-M (medium) | `FATE_M` | `v4.28.0` | [Jiang et al. 2025](https://arxiv.org/abs/2511.02872) | [frenzymath/FATE-M](https://github.com/frenzymath/FATE-M) |
+| FATE-X (extra) | `FATE_X` | `v4.28.0` | [Jiang et al. 2025](https://arxiv.org/abs/2511.02872) | [frenzymath/FATE-X](https://github.com/frenzymath/FATE-X) |
+
 ## Citing
 
 If you use `OpenATP` in your work, please cite it:
