@@ -1,3 +1,7 @@
+---
+tocdepth: 3
+---
+
 # `benchmark`
 
 Run a set of provers across a set of named {class}`~open_atp.lean.ProofTask`s and
