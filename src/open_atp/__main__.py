@@ -351,9 +351,8 @@ def _build_modal_image(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
-    _load_dotenv()
-    _configure_logging()
+def build_parser() -> argparse.ArgumentParser:
+    """The ``open-atp`` argument parser (also consumed by the docs CLI reference)."""
     parser = argparse.ArgumentParser(prog="open-atp")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -494,6 +493,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Force a rebuild even if Modal has cached layers.",
     )
 
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    _load_dotenv()
+    _configure_logging()
+    parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "prove":
         return _prove(args)

@@ -23,6 +23,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "sphinx_design",
+    "sphinxarg.ext",
     "numpydoc",
     "provers_table",
 ]

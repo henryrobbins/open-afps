@@ -52,6 +52,7 @@ docs = [
     "sphinx-autodoc-typehints",
     "sphinx-autobuild",
     "sphinx-design",
+    "sphinx-argparse",
     "numpydoc",
 ]
 
