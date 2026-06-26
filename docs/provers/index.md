@@ -16,23 +16,6 @@ The Claude Code, Codex, OpenCode, AxProver, and Vibe provers are all the same
 {class}`~open_atp.provers.base.AutomatedProver` and funnels its output through the
 shared {class}`~open_atp.verify.Verifier`.
 
-## How the agent provers work
-
-An {class}`~open_atp.provers.agent_prover.AgentProver` composes two concerns:
-
-- a {class}`~open_atp.harness.base.Harness` — the *agent* concern: launch script,
-  credential forwarding, and output parsing (one per harness page below); and
-- a {class}`~open_atp.backends.base.ComputeBackend` — the *compute* concern: where
-  the agent runs, with Lean+Mathlib and the
-  [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp) server.
-
-`prove` stages the project into the workdir, lets the agent fill the `sorry`s in
-place, then diffs the `.lean` files against the staged originals to report what
-changed. The shared {class}`~open_atp.verify.Verifier` does the final
-compile / sorry / axiom check. Configuration fields are documented under
-{class}`~open_atp.provers.agent_prover.AgentProver` in the
-{doc}`../api/provers` reference.
-
 ```{toctree}
 :maxdepth: 1
 :hidden:
@@ -47,6 +30,8 @@ aristotle
 ```
 
 ## References
+
+### Methods
 
 Several of the provers implement published methods. If you use one of them,
 please cite the corresponding paper.
@@ -75,6 +60,8 @@ please cite the corresponding paper.
 }
 ```
 
+### Software
+
 The agent harnesses share the [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp)
 server (all except ax-prover, which ships its own Lean tooling) and bundle vendored
 Lean skills (see `vendor/`):
@@ -101,19 +88,5 @@ Lean skills (see `vendor/`):
   url = {https://github.com/cameronfreer/lean4-skills},
   month = oct,
   year = {2025}
-}
-```
-
-## Citing OpenATP
-
-If you use `OpenATP` itself, please cite the project:
-
-```bibtex
-@software{openatp,
-  title = {OpenATP: Open Automated Theorem Proving},
-  author = {Henry Robbins},
-  year = {2026},
-  publisher = {GitHub},
-  url = {https://github.com/henryrobbins/open-atp}
 }
 ```

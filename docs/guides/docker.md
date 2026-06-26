@@ -1,4 +1,4 @@
-# Docker
+# Running Locally with Docker
 
 `open-atp` uses Docker to isolate agent working directories and to provide a
 [Lean](https://lean-lang.org/) + [Mathlib](https://leanprover-community.github.io/)
@@ -47,21 +47,26 @@ the `Dockerfile` below.
 ```
 :::
 
-## Using the Docker backend
+## Testing Docker
 
-The {func}`~open_atp.verify.docker_verifier` helper wires up a verifier
-against a local Docker sandbox running `open-atp:latest`:
+To confirm the image is wired up correctly, prove one of the bundled
+{doc}`example formulations <../examples>` with the `agent:claude` prover against a
+{class}`~open_atp.backends.docker.DockerBackend`. This exercises the whole pipeline
+(stage → generate → verify) end to end:
 
 ```python
-from open_atp.lean import LeanProject
-from open_atp.verify import docker_verifier
+from open_atp import standard_prover
+from open_atp.backends.docker import DockerBackend
+from open_atp.examples import EXAMPLE, example_task
 
-report = docker_verifier().verify(LeanProject("path/to/lake/project"))
+prover = standard_prover("agent:claude", backend=DockerBackend())
+result = prover.prove(example_task(EXAMPLE.MUL_REORDER), "runs/docker_test")
+print("success:", result.success)
 ```
 
-Provers take a verification backend explicitly. Construct a
-{class}`~open_atp.backends.docker.DockerBackend` and pass it in (see
-{doc}`run_provers`).
+This needs a Claude Code credential (see {doc}`../provers/claude_code`). For the full
+prover lifecycle and how to read the {class}`~open_atp.provers.base.ProofResult`, see
+{doc}`run_provers`.
 
 ## Docker resources
 

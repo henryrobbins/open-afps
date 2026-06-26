@@ -37,7 +37,7 @@ prover = AristotleProver(backend=backend)
 
 The remote interaction is isolated in
 `AristotleProver._submit_and_download`, so tests can stand in a fake result without
-touching the network or an API key. See {doc}`../user_guide/run_provers` for an
+touching the network or an API key. See {doc}`../guides/run_provers` for an
 end-to-end run and {class}`~open_atp.provers.aristotle.AristotleProver` in the
 {doc}`../api/provers` reference for configuration.
 
@@ -55,7 +55,9 @@ instead):
 ```
 :::
 
-:::{note}
-Aristotle runs are billed by Harmonic against your `ARISTOTLE_API_KEY`. Verification
-still happens locally in your own Docker sandbox.
-:::
+## Cost tracking
+
+Aristotle is currently available for **free** — runs against your
+`ARISTOTLE_API_KEY` are not billed by Harmonic, and the hosted API returns no
+per-run cost, so the prover reports `cost_usd` as `None`. Verification still happens
+locally in your own Docker sandbox.

@@ -13,6 +13,35 @@ default harness: the bare `agent` registry spec selects it, and the shared
 {class}`~open_atp.verify.Verifier` does the final compile / sorry / axiom
 check. See {doc}`index` for the staging/diff lifecycle every agent harness shares.
 
+## Authentication
+
+Claude Code is included with every paid Claude plan — compare plans at
+[Choose a Claude plan](https://support.claude.com/en/articles/11049762-choose-a-claude-plan)
+and monitor consumption at [Usage](https://claude.ai/settings/usage). Generate a
+long-lived OAuth token once on the host:
+
+```bash
+claude setup-token
+```
+
+Pass the token to the harness explicitly:
+
+```python
+ClaudeCodeHarness(oauth_token="sk-ant-oat01-...")
+```
+
+or leave `oauth_token` unset (the default) to read it from the host
+`CLAUDE_CODE_OAUTH_TOKEN` environment variable — for example from a `.env` file in
+your project:
+
+```
+CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+```
+
+Either way the harness forwards `CLAUDE_CODE_OAUTH_TOKEN` into the sandbox at run
+time, billing against your Claude plan rather than the API; resolution fails if
+neither is supplied.
+
 ## Usage
 
 ```python
@@ -76,35 +105,6 @@ stream goes to stdout.
 :end-before: END PROVER_PROMPT
 ```
 :::
-
-## Authentication
-
-Claude Code is included with every paid Claude plan — compare plans at
-[Choose a Claude plan](https://support.claude.com/en/articles/11049762-choose-a-claude-plan)
-and monitor consumption at [Usage](https://claude.ai/settings/usage). Generate a
-long-lived OAuth token once on the host:
-
-```bash
-claude setup-token
-```
-
-Pass the token to the harness explicitly:
-
-```python
-ClaudeCodeHarness(oauth_token="sk-ant-oat01-...")
-```
-
-or leave `oauth_token` unset (the default) to read it from the host
-`CLAUDE_CODE_OAUTH_TOKEN` environment variable — for example from a `.env` file in
-your project:
-
-```
-CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
-```
-
-Either way the harness forwards `CLAUDE_CODE_OAUTH_TOKEN` into the sandbox at run
-time, billing against your Claude plan rather than the API; resolution fails if
-neither is supplied.
 
 ## Cost tracking
 

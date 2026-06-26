@@ -1,4 +1,4 @@
-# Modal
+# Running Remotely with Modal
 
 `open-atp` can run commands in [Modal](https://modal.com/) Sandboxes instead of
 local Docker containers. Each run gets its own cloud Sandbox, which avoids duplicate
@@ -7,8 +7,9 @@ without consuming local resources.
 
 ## Install Modal
 
-Modal ships as a dependency of `open-atp`. Authenticate the `modal` CLI against your
-Modal workspace (this writes a token to `~/.modal.toml`):
+Modal ships as a dependency of `open-atp`. You'll need a Modal account — sign up at
+[modal.com](https://modal.com/signup) if you don't have one. Then authenticate the
+`modal` CLI against your Modal workspace (this writes a token to `~/.modal.toml`):
 
 ```bash
 modal setup
@@ -37,32 +38,29 @@ to publish under a different name and `--force` to rebuild even when Modal has c
 layers. As with Docker, the first build pre-builds Mathlib and is expected to take a
 while.
 
-## Using the Modal backend
+## Testing Modal
 
 A {class}`~open_atp.backends.modal.ModalBackend` is a drop-in
 {class}`~open_atp.backends.base.ComputeBackend` — substitute it for the
-`DockerBackend` anywhere a compute backend is expected:
+`DockerBackend` anywhere a compute backend is expected. To confirm the published
+image is wired up correctly, prove one of the bundled
+{doc}`example formulations <../examples>` with the `agent:claude` prover against a
+`ModalBackend`. This exercises the whole pipeline (stage → generate → verify) end to
+end:
 
 ```python
+from open_atp import standard_prover
 from open_atp.backends.modal import ModalBackend
-from open_atp.images import DEFAULT_IMAGE
+from open_atp.examples import EXAMPLE, example_task
 
-backend = ModalBackend(image=DEFAULT_IMAGE, cpu=4.0, memory_mib=4096)
+prover = standard_prover("agent:claude", backend=ModalBackend(cpu=4.0, memory_mib=4096))
+result = prover.prove(example_task(EXAMPLE.MUL_REORDER), "runs/modal_test")
+print("success:", result.success)
 ```
 
 `cpu` is a guaranteed floor of cores (the Sandbox may burst higher) and `memory_mib`
-is in MiB. See the {doc}`/api/backends` reference for the full set of options.
-
-For the common case of verifying against the published image, the
-{func}`~open_atp.verify.modal_verifier` helper wires up a
-{class}`~open_atp.verify.Verifier` for you — the Modal counterpart of
-{func}`~open_atp.verify.docker_verifier`:
-
-```python
-from open_atp.verify import modal_verifier
-
-verifier = modal_verifier()
-```
+is in MiB. See the {doc}`/api/backends` reference for the full set of options. This
+also needs a Claude Code credential (see {doc}`../provers/claude_code`).
 
 :::{note}
 Running on Modal incurs cloud compute charges billed by your Modal workspace. See

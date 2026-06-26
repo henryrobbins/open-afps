@@ -1,4 +1,4 @@
-# User Guides
+# Guides
 
 We provide user guides for common workflows. Each guide assumes you have already
 installed `open-atp` (see {doc}`../installation`).
@@ -13,5 +13,5 @@ benchmark
 ```
 
 :::{note}
-For development information, see the {github}`README </blob/main/README.md>`.
+For development information, see the {github}`AGENTS.md </blob/main/AGENTS.md>`.
 :::

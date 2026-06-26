@@ -14,6 +14,31 @@ DeepSeek, billed directly against that provider's API. The shared
 {class}`~open_atp.verify.Verifier` does the final compile / sorry / axiom
 check. See {doc}`index` for the staging/diff lifecycle every agent harness shares.
 
+## Authentication
+
+OpenCode bills directly against an API provider rather than a flat-rate subscription.
+Sign up for an API account with your chosen provider, fund it, and monitor consumption
+from that provider's usage dashboard — see
+[OpenCode providers](https://opencode.ai/docs/providers/) for the full list. Pass the
+key matching your chosen provider to the harness explicitly:
+
+```python
+OpenCodeHarness(model="claude-opus-4-8", provider_api_key="sk-...")
+```
+
+or leave `provider_api_key` unset (the default) to read it from the host environment,
+for example:
+
+```bash
+export DEEPSEEK_API_KEY=...
+```
+
+The provider is inferred from the model prefix unless you pass `provider`
+explicitly. Either way the harness forwards the selected provider's key into the
+sandbox under its canonical env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`GOOGLE_API_KEY`, or `DEEPSEEK_API_KEY`); resolution fails if neither the explicit
+key nor the host env var is set.
+
 ## Usage
 
 ```python
@@ -70,31 +95,6 @@ The `--format json` event stream goes to stdout.
 :end-before: END PROVER_PROMPT
 ```
 :::
-
-## Authentication
-
-OpenCode bills directly against an API provider rather than a flat-rate subscription.
-Sign up for an API account with your chosen provider, fund it, and monitor consumption
-from that provider's usage dashboard — see
-[OpenCode providers](https://opencode.ai/docs/providers/) for the full list. Pass the
-key matching your chosen provider to the harness explicitly:
-
-```python
-OpenCodeHarness(model="claude-opus-4-8", provider_api_key="sk-...")
-```
-
-or leave `provider_api_key` unset (the default) to read it from the host environment,
-for example:
-
-```bash
-export DEEPSEEK_API_KEY=...
-```
-
-The provider is inferred from the model prefix unless you pass `provider`
-explicitly. Either way the harness forwards the selected provider's key into the
-sandbox under its canonical env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-`GOOGLE_API_KEY`, or `DEEPSEEK_API_KEY`); resolution fails if neither the explicit
-key nor the host env var is set.
 
 ## Cost tracking
 

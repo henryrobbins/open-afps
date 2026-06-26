@@ -12,6 +12,29 @@ The Codex prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on t
 {class}`~open_atp.verify.Verifier` does the final compile / sorry / axiom
 check. See {doc}`index` for the staging/diff lifecycle every agent harness shares.
 
+## Authentication
+
+Codex is available on paid ChatGPT plans — compare plans at
+[ChatGPT pricing](https://chatgpt.com/pricing/) and monitor consumption at
+[Analytics](https://chatgpt.com/codex/cloud/settings/analytics). Authenticate the
+Codex CLI once on the host:
+
+```bash
+codex login
+```
+
+This writes credentials to `~/.codex/auth.json`. Pass that file to the harness
+explicitly:
+
+```python
+CodexHarness(auth_file=Path("~/.codex/auth.json").expanduser())
+```
+
+or leave `auth_file` unset (the default) to use `~/.codex/auth.json`. Either way the
+harness mounts just that credential inside the sandbox at run time so Codex can
+refresh its access token mid-session, billing against your ChatGPT subscription;
+resolution fails if the file is absent.
+
 ## Usage
 
 ```python
@@ -67,29 +90,6 @@ stream goes to stdout.
 :end-before: END PROVER_PROMPT
 ```
 :::
-
-## Authentication
-
-Codex is available on paid ChatGPT plans — compare plans at
-[ChatGPT pricing](https://chatgpt.com/pricing/) and monitor consumption at
-[Analytics](https://chatgpt.com/codex/cloud/settings/analytics). Authenticate the
-Codex CLI once on the host:
-
-```bash
-codex login
-```
-
-This writes credentials to `~/.codex/auth.json`. Pass that file to the harness
-explicitly:
-
-```python
-CodexHarness(auth_file=Path("~/.codex/auth.json").expanduser())
-```
-
-or leave `auth_file` unset (the default) to use `~/.codex/auth.json`. Either way the
-harness mounts just that credential inside the sandbox at run time so Codex can
-refresh its access token mid-session, billing against your ChatGPT subscription;
-resolution fails if the file is absent.
 
 ## Cost tracking
 

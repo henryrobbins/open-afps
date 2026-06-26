@@ -11,46 +11,25 @@ via the shared {class}`~open_atp.verify.Verifier`.
 
 - Docker running and the `open-atp:latest` image built (see
   {doc}`docker`).
-- A credential for the prover you choose:
-  - **AristotleProver** — `ARISTOTLE_API_KEY`.
-  - **AgentProver / NuminaProver** — a harness credential (see the per-harness prover
-    pages under {doc}`../provers/index`).
+- A credential for the prover you choose — each prover's page under
+  {doc}`../provers/index` lists the environment variable(s) it needs.
 
-## Verifying without a prover
+## Filling sorrys with a prover
 
-If your project already contains candidate proofs, you can skip generation and run
-the shared verifier directly:
-
-```python
-from open_atp.lean import LeanProject
-from open_atp.verify import docker_verifier
-
-report = docker_verifier().verify(LeanProject("path/to/lake/project"))
-print("verified:", report.verified)
-print("sorry_free:", report.sorry_free)
-print("axioms:", report.axioms)
-```
-
-## Filling sorrys with the AgentProver
-
-The {class}`~open_atp.provers.agent_prover.AgentProver` runs a coding agent
-(Claude Code, Codex, or OpenCode) with the [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp)
-server inside the sandbox, then diffs the `.lean` files it changed:
+{func}`~open_atp.config.standard_prover` builds any of the catalog provers against a
+backend with its baked-in defaults — pick a name from
+{func}`~open_atp.config.standard_provers` and run it:
 
 ```python
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend
-from open_atp.lean import LeanProject, ProofTask
+from open_atp.config import standard_prover
 from open_atp.images import DEFAULT_IMAGE
-from open_atp.harness import ClaudeCodeHarness
-from open_atp.provers import AgentProver
+from open_atp.lean import LeanProject, ProofTask
 
 backend = DockerBackend(image=DEFAULT_IMAGE)
-prover = AgentProver(
-    harness=ClaudeCodeHarness(model="claude-opus-4-8", effort="high"),
-    backend=backend,
-)
+prover = standard_prover("agent:claude", backend=backend)
 
 task = ProofTask(project=LeanProject("path/to/lake/project"))
 result = prover.prove(task, output_dir=Path("runs/demo"))
@@ -63,32 +42,34 @@ print("duration_s:", result.duration_s)
 `prove` populates `output_dir/{wd,logs}/`: `wd` is the completed lake project and
 `logs` holds the run record (`stdout.txt`, `stderr.txt`, `result.json`).
 
-Each agent CLI has its own {class}`~open_atp.harness.Harness`
-(`CodexHarness`, `OpenCodeHarness`, `VibeHarness`,
-`AxProverHarness`) carrying that harness's knobs — set `AgentProver`'s
-`harness` to any of them to switch CLI. See the per-harness prover pages under
-{doc}`../provers/index`.
+Swap `"agent:claude"` for any catalog name (`"agent:codex"`, `"agent:opencode"`,
+`"agent:vibe"`, `"agent:axprover"`, `"numina"`, `"aristotle"`) to switch prover. Each
+needs its own credential — see the per-prover pages under {doc}`../provers/index`. To
+customize a knob (model, effort, skills, ...), use
+{func}`~open_atp.config.build_prover` with a full config dict instead.
 
-## Filling sorrys with Aristotle
+## From the command line
 
-The {class}`~open_atp.provers.aristotle.AristotleProver` hands the whole lake
-project to Harmonic's hosted Aristotle agent (submit → wait → download), unpacks the
-result over the workdir, and runs the same shared verifier locally:
+The `open-atp prove` command is a thin shell over the same API: pick a prover, point
+at the work, and choose where the `{wd,logs}` output lands. It runs on the local
+Docker backend with the default image (see {doc}`docker`).
 
-```python
-from pathlib import Path
+The work can be a lake project directory **or** a single bare `.lean` file — a bare
+file is staged into the pinned Mathlib skeleton for you:
 
-from open_atp.backends.docker import DockerBackend
-from open_atp.lean import LeanProject, ProofTask
-from open_atp.images import DEFAULT_IMAGE
-from open_atp.provers.aristotle import AristotleProver
-
-backend = DockerBackend(image=DEFAULT_IMAGE)
-prover = AristotleProver(backend=backend)
-
-task = ProofTask(project=LeanProject("path/to/lake/project"))
-result = prover.prove(task, output_dir=Path("runs/aristotle_demo"))
+```console
+$ open-atp prove agent:claude MyFile.lean runs/demo
+agent             ✓ verified                   cost=$0.0123  time=42s
+output: runs/demo
 ```
+
+The completed file lands in `runs/demo/wd/`. Add `--json` to emit the full
+{class}`~open_atp.provers.base.ProofResult` as JSON. The prover argument is any
+catalog name; `--help` lists them. See {doc}`../cli` for the full reference.
+
+A bare file only works for the skeleton's pinned toolchain and Mathlib revision; a
+file needing a different revision or extra dependencies must arrive as a full lake
+project directory instead.
 
 ## Inspecting the result
 

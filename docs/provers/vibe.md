@@ -13,15 +13,34 @@ Vibe's `lean` agent *is* Leanstral (`vibe -p ... --agent lean` pins the model to
 {class}`~open_atp.verify.Verifier` does the final compile / sorry / axiom
 check. See {doc}`index` for the lifecycle every agent harness shares.
 
+## Authentication
+
+Pass the Mistral La Plateforme key to the harness explicitly:
+
+```python
+VibeHarness(mistral_api_key="msk-...")
+```
+
+or leave `mistral_api_key` unset (the default) to read it from the host environment.
+Either way the harness forwards it into the sandbox as `MISTRAL_API_KEY`, where the
+lean agent's provider reads it from the process env. Resolution fails if neither the
+explicit key nor the host env var is set.
+
 ## The Leanstral stand-in
 
-The bare `lean` profile is Labs-gated: the real model `labs-leanstral-2603` returns a
-`403` until a Mistral org admin enables Labs. Until then, the harness runs the same
-Lean scaffold on a non-Labs **reasoning** model any La Plateforme key can reach
-(default Magistral) through a vendored `lean-standin` agent profile. Since Vibe has no
-`--model` flag, the harness templates the configured model into the stand-in profile
-(`<<MODEL>>`) at `stage` time — so the model is an ordinary knob. Repoint
-`agent` to `lean` (and the model to `labs-leanstral-2603`) once Labs is enabled.
+```{warning}
+[Leanstral](https://docs.mistral.ai/models/model-cards/leanstral-26-03) is
+deprecated as of **2026-05-22** and is only reachable as a Labs model, which
+requires Lab Model access from a Mistral org admin. The bare `lean` profile
+therefore returns a `403` for keys without Labs access.
+```
+
+Because the `lean` profile is Labs-gated, the harness instead runs the same Lean
+scaffold on a non-Labs **reasoning** model any La Plateforme key can reach (default
+`magistral-medium-latest`) through a vendored `lean-standin` agent profile. Since Vibe
+has no `--model` flag, the harness templates the configured model into the stand-in
+profile (`<<MODEL>>`) at `stage` time — so the model is an ordinary knob. Repoint
+`agent` to `lean` once Labs access is enabled.
 
 ## Usage
 
@@ -95,19 +114,6 @@ NDJSON message stream (one message per line) goes to stdout.
 :end-before: END PROVER_PROMPT
 ```
 :::
-
-## Authentication
-
-Pass the Mistral La Plateforme key to the harness explicitly:
-
-```python
-VibeHarness(mistral_api_key="msk-...")
-```
-
-or leave `mistral_api_key` unset (the default) to read it from the host environment.
-Either way the harness forwards it into the sandbox as `MISTRAL_API_KEY`, where the
-lean agent's provider reads it from the process env. Resolution fails if neither the
-explicit key nor the host env var is set.
 
 ## Cost tracking
 

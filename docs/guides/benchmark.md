@@ -50,10 +50,43 @@ The `open-atp ex-benchmark` CLI command runs exactly this sweep over all
 
 ## Tasks from a directory
 
-To benchmark a directory of `.lean` files (each a `sorry`'d task),
-{func}`~open_atp.benchmark.tasks_from_dir` builds the `tasks` mapping: each loose
-`.lean` file becomes a task named by its stem, and each subdirectory becomes one
-multi-file task.
+To benchmark a directory of tasks, {func}`~open_atp.benchmark.tasks_from_dir` builds
+the `tasks` mapping. Each entry directly under the directory becomes one task:
+
+- A loose `.lean` file becomes a task named by its stem, staged into the skeleton.
+- A subdirectory becomes a task named by the subdirectory. If it is *already* a
+  complete lake project (it carries its own `lean-toolchain` and lakefile) it is used
+  as-is; otherwise its `.lean` files (which may be several) are staged into the
+  skeleton.
+
+Entries beginning with `.` and subdirectories with no `.lean` files are skipped, so a
+mix of all three styles in one directory is fine:
+
+```
+benchmark/
+├── easy_lemma.lean              # bare file → task "easy_lemma"
+├── another.lean                 # bare file → task "another"
+├── multi_file/                  # staged subdir → task "multi_file"
+│   ├── Defs.lean
+│   └── Problem.lean             # several .lean files, staged together
+└── full_project/                # complete lake project → task "full_project"
+    ├── lean-toolchain
+    ├── lakefile.toml
+    ├── lake-manifest.json
+    └── FullProject/
+        └── Problem.lean
+```
+
+A directory may also be entirely one style — all bare files, or all per-task
+subdirectories, as the public benchmarks ship:
+
+```
+fate-m/FATEM/                    putnam/                     loose/
+├── algebra_001/                 ├── putnam_1962_a1/         ├── thm_1.lean
+│   └── problem.lean             │   └── putnam_1962_a1.lean ├── thm_2.lean
+└── algebra_002/                 └── putnam_1963_a1/         └── thm_3.lean
+    └── problem.lean                 └── putnam_1963_a1.lean
+```
 
 ## Downloading a dataset
 
@@ -68,17 +101,9 @@ src = download_dataset(DATASET.FATE_M, "datasets")  # datasets/fate-m/FATEM
 result = run_benchmark(tasks_from_dir(src), provers, Path("runs/fate-m"))
 ```
 
-Each {class}`~open_atp.benchmark.DATASET` member:
-
-| Benchmark | `DATASET` | Toolchain | Paper | Source |
-| --- | --- | --- | --- | --- |
-| PutnamBench | `PUTNAM` | `v4.27.0` | [Tsoukalas et al. 2024](https://arxiv.org/abs/2407.11214) | [trishullab/PutnamBench](https://github.com/trishullab/PutnamBench) |
-| FATE-H (hard) | `FATE_H` | `v4.28.0` | [Jiang et al. 2025](https://arxiv.org/abs/2511.02872) | [frenzymath/FATE-H](https://github.com/frenzymath/FATE-H) |
-| FATE-M (medium) | `FATE_M` | `v4.28.0` | [Jiang et al. 2025](https://arxiv.org/abs/2511.02872) | [frenzymath/FATE-M](https://github.com/frenzymath/FATE-M) |
-| FATE-X (extra) | `FATE_X` | `v4.28.0` | [Jiang et al. 2025](https://arxiv.org/abs/2511.02872) | [frenzymath/FATE-X](https://github.com/frenzymath/FATE-X) |
-
-PutnamBench pins an older Lean than the default skeleton, so stage it against a
-matching skeleton (`tasks_from_dir(src, skeleton=...)`).
+See {doc}`../datasets` for the bundled {class}`~open_atp.benchmark.DATASET` members
+and their toolchains. PutnamBench pins an older Lean than the default skeleton, so
+stage it against a matching skeleton (`tasks_from_dir(src, skeleton=...)`).
 
 ## From the command line
 
@@ -114,25 +139,3 @@ JSON.
 
 The CLI loads credentials from a `.env` in the working directory (or a parent), so
 provers like Aristotle find their API keys without exporting them by hand.
-
-## Citing the benchmarks
-
-If you run these benchmarks, please cite their authors:
-
-```bibtex
-@article{jiang2025fate,
-  title={Fate: A formal benchmark series for frontier algebra of multiple difficulty levels},
-  author={Jiang, Jiedong and He, Wanyi and Wang, Yuefeng and Gao, Guoxiong and Hu, Yongle and Wang, Jingting and Guan, Nailin and Wu, Peihao and Dai, Chunbo and Xiao, Liang and others},
-  journal={arXiv preprint arXiv:2511.02872},
-  year={2025}
-}
-
-@article{tsoukalas2024putnambench,
-  title={Putnambench: Evaluating neural theorem-provers on the putnam mathematical competition},
-  author={Tsoukalas, George and Lee, Jasper and Jennings, John and Xin, Jimmy and Ding, Michelle and Jennings, Michael and Thakur, Amitayush and Chaudhuri, Swarat},
-  journal={Advances in Neural Information Processing Systems},
-  volume={37},
-  pages={11545--11569},
-  year={2024}
-}
-```

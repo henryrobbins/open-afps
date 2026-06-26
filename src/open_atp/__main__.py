@@ -4,9 +4,10 @@
 
 The core stays a plain Python API (:func:`open_atp.standard_prover` ->
 :meth:`~open_atp.provers.base.AutomatedProver.prove`); this is just the terminal
-front door, deliberately minimal: pick a registered prover, point at a lake project,
-and choose where the ``{wd,logs}`` output lands. Generation + verification run on the
-local Docker backend with the default image/toolchain.
+front door, deliberately minimal: pick a registered prover, point at a lake project
+(or a single bare ``.lean`` file, staged into the pinned skeleton), and choose where
+the ``{wd,logs}`` output lands. Generation + verification run on the local Docker
+backend with the default image/toolchain.
 """
 
 from __future__ import annotations
@@ -41,7 +42,7 @@ from open_atp.config import (
 )
 from open_atp.examples import EXAMPLE, example_task
 from open_atp.images import DEFAULT_IMAGE
-from open_atp.lean import LeanProject, ProofTask
+from open_atp.lean import LeanProject, ProofTask, create_project
 from open_atp.provers.base import AutomatedProver
 
 #: ax-prover baked into the Modal image (mirrors the images/Dockerfile ARG). Pinned
@@ -108,7 +109,13 @@ def _load_dotenv() -> None:
 
 
 def _prove(args: argparse.Namespace) -> int:
-    project = LeanProject(Path(args.lean_dir))
+    src = Path(args.lean_dir)
+    if src.is_file() and src.suffix == ".lean":
+        # A bare .lean file: stage it into the pinned skeleton so prove sees a
+        # complete lake project. The completed file still lands in <output>/wd.
+        project = create_project([src], Path(args.output_dir) / "project")
+    else:
+        project = LeanProject(src)
     task = ProofTask(project)
 
     backend = DockerBackend(image=DEFAULT_IMAGE)
@@ -365,7 +372,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=standard_provers(),
         help="Which prover to run.",
     )
-    prove.add_argument("lean_dir", help="The lake project directory to complete.")
+    prove.add_argument(
+        "lean_dir",
+        help="A lake project directory, or a single bare .lean file to stage into "
+        "the pinned skeleton.",
+    )
     prove.add_argument("output_dir", help="Where to write the run's {wd,logs} output.")
     prove.add_argument(
         "-j", "--json", action="store_true", help="Emit the ProofResult as JSON."
@@ -391,35 +402,34 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument(
         "-p",
         "--provers",
-        help="YAML provers config (default: <directory>/provers.yaml if present, "
-        "else all standard provers).",
+        help="YAML provers config; falls back to <directory>/provers.yaml if "
+        "present, else all standard provers.",
     )
     benchmark.add_argument(
         "-t",
         "--tasks",
-        help="Comma-separated task names to run (default: every task in the "
-        "directory).",
+        help="Comma-separated task names to run; without this, every task in "
+        "the directory runs.",
     )
     benchmark.add_argument(
         "-c",
         "--compute",
         choices=sorted(_BACKENDS),
         default="docker",
-        help="Compute backend to run the sweep on (default: docker).",
+        help="Compute backend to run the sweep on.",
     )
     benchmark.add_argument(
         "-o",
         "--output-dir",
         default="runs/benchmark",
-        help="Where to write the sweep's <task>/<prover>/ artifacts "
-        "(default: runs/benchmark).",
+        help="Where to write the sweep's <task>/<prover>/ artifacts.",
     )
     benchmark.add_argument(
         "-n",
         "--max-workers",
         type=int,
         default=None,
-        help="Max (task, prover) pairs in flight at once (default: auto; 1 = serial). "
+        help="Max (task, prover) pairs in flight at once (auto; 1 = serial). "
         "Any single prover is still capped at 5 concurrent runs.",
     )
     benchmark.add_argument(
@@ -435,21 +445,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--compute",
         choices=sorted(_BACKENDS),
         default="docker",
-        help="Compute backend to run the sweep on (default: docker).",
+        help="Compute backend to run the sweep on.",
     )
     ex_benchmark.add_argument(
         "-o",
         "--output-dir",
         default="runs/ex-benchmark",
-        help="Where to write the sweep's <task>/<prover>/ artifacts "
-        "(default: runs/ex-benchmark).",
+        help="Where to write the sweep's <task>/<prover>/ artifacts.",
     )
     ex_benchmark.add_argument(
         "-n",
         "--max-workers",
         type=int,
         default=None,
-        help="Max (task, prover) pairs in flight at once (default: auto; 1 = serial). "
+        help="Max (task, prover) pairs in flight at once (auto; 1 = serial). "
         "Any single prover is still capped at 5 concurrent runs.",
     )
 
@@ -460,7 +469,7 @@ def build_parser() -> argparse.ArgumentParser:
         "-t",
         "--tag",
         default=DEFAULT_IMAGE.name,
-        help=f"Image tag (default: {DEFAULT_IMAGE.name}).",
+        help="Image tag.",
     )
     build.add_argument(
         "-C",
@@ -477,14 +486,14 @@ def build_parser() -> argparse.ArgumentParser:
         "-n",
         "--name",
         default="open-atp",
-        help="Name to publish the Modal image under (default: open-atp). "
+        help="Name to publish the Modal image under. "
         "ModalBackend's image (sans :tag) must match this.",
     )
     build_modal.add_argument(
         "-a",
         "--app",
         default="open-atp",
-        help="Modal app to associate the image build with (default: open-atp).",
+        help="Modal app to associate the image build with.",
     )
     build_modal.add_argument(
         "-f",

@@ -11,7 +11,7 @@ The reference mirrors the package layout under `src/open_atp/`:
 - {doc}`examples` — `open_atp.examples`: bundled `sorry`'d example tasks ({func}`~open_atp.examples.example_task`, {class}`~open_atp.examples.EXAMPLE`).
 
 ```{toctree}
-:maxdepth: 2
+:hidden:
 
 provers
 harness

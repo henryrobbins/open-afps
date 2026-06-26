@@ -18,4 +18,5 @@ uv sync
 
 adding_a_prover
 adding_a_dataset
+testing
 ```

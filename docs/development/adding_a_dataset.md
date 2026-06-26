@@ -45,12 +45,12 @@ users know.
 
 ## 4. Document it
 
-- Add a row to the dataset table in `docs/user_guide/benchmark.md` (benchmark, `DATASET`
+- Add a row to the dataset table in `docs/guides/benchmark.md` (benchmark, `DATASET`
   member, toolchain, paper, source).
 - The {class}`~open_atp.benchmark.DATASET` autodoc in `docs/api/benchmark.md` renders
   member docstrings automatically — no edit needed beyond the `#:` comment in step 1.
 - Add the dataset's citation bibtex under *Citing the benchmarks* in
-  `docs/user_guide/benchmark.md`.
+  `docs/guides/benchmark.md`.
 
 ## 5. Test it
 
