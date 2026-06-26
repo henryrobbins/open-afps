@@ -47,6 +47,7 @@ src/open_atp/
   images/           image name + toolchain pins (DEFAULT_IMAGE, DEFAULT_TOOLCHAIN)
   lean.py           LeanProject, ProofTask, create_project (the Lean input contract)
   verify.py         VerificationReport, Verifier (the shared final check)
+  benchmark.py      run_benchmark: run named provers x named tasks, tabulate results
   backends/         base.py  docker.py  modal.py            (ComputeBackend impls)
   provers/          agent_prover.py  numina.py  numina_tracker.py  aristotle.py
   harness/          coding-agent CLIs staged into the sandbox:

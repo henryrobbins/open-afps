@@ -7,6 +7,7 @@ installed `open-atp` (see {doc}`../installation`).
 :maxdepth: 1
 
 run_provers
+benchmark
 ```
 
 :::{note}

@@ -1,0 +1,393 @@
+"""Run a set of provers across a set of named proof tasks and tabulate the results.
+
+:func:`run_benchmark` is the matrix runner: given a name -> task mapping and a
+name -> prover mapping, it runs every ``(task, prover)`` pair and lays the artifacts
+out under ``output_dir`` as::
+
+    output_dir/<task>/<prover>/{wd,logs,results.json}
+
+``wd`` and ``logs`` are exactly what
+:meth:`~open_atp.provers.base.AutomatedProver.prove` writes; ``results.json`` is the
+:class:`~open_atp.provers.base.ProofResult` for that cell. A prover that raises is
+recorded as a failed result (its ``error`` captured) so one bad run never aborts the
+sweep.
+
+The returned :class:`BenchmarkResult` collects every cell and renders a terminal table
+(:meth:`BenchmarkResult.table`) for quick comparison.
+
+:func:`tasks_from_dir` builds the ``tasks`` mapping from a directory laid out like the
+public Lean benchmarks (`PutnamBench
+<https://github.com/trishullab/PutnamBench/tree/main/lean4/src>`_, `FATE
+<https://github.com/frenzymath/FATE>`_): a flat directory of standalone ``.lean``
+files, optionally with subdirectories grouping several files into one task.
+:func:`download_dataset` fetches one of those benchmarks (a :class:`DATASET` member)
+straight to such a directory.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import tempfile
+import threading
+from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
+
+import structlog
+from tqdm import tqdm
+
+from open_atp.images import SKELETON_DIR
+from open_atp.lean import LeanProject, ProofTask, create_project
+from open_atp.provers.base import AutomatedProver, ProofResult
+
+log = structlog.get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class BenchmarkRun:
+    """One ``(task, prover)`` cell of a benchmark sweep.
+
+    Attributes
+    ----------
+    task : str
+        The task's key in the benchmark's ``tasks`` mapping.
+    prover : str
+        The prover's key in the benchmark's ``provers`` mapping (which may differ
+        from :attr:`~open_atp.provers.base.ProofResult.prover`, e.g. ``"agent:claude"``
+        vs the prover class's ``"agent"``).
+    result : ~open_atp.provers.base.ProofResult
+        The run's result. On an exception its
+        :attr:`~open_atp.provers.base.ProofResult.error` is set and
+        :attr:`~open_atp.provers.base.ProofResult.verification` is ``None``.
+    """
+
+    task: str
+    prover: str
+    result: ProofResult
+
+
+@dataclass(frozen=True)
+class BenchmarkResult:
+    """The collected cells of a benchmark sweep, with a table view.
+
+    Attributes
+    ----------
+    output_dir : pathlib.Path
+        The benchmark's output root, laid out as ``output_dir/<task>/<prover>/``.
+    runs : list[BenchmarkRun]
+        One :class:`BenchmarkRun` per ``(task, prover)`` pair, in run order.
+    """
+
+    output_dir: Path
+    runs: list[BenchmarkRun]
+
+    def table(self) -> str:
+        """A monospace table, one row per ``(task, prover)``: status, cost, time."""
+        header = ("task", "prover", "status", "cost", "time")
+        rows = [header]
+        for run in self.runs:
+            r = run.result
+            if r.success:
+                status = "✓"
+            elif r.error is not None:
+                status = "ERR"
+            else:
+                status = "✗"
+            cost = f"${r.cost_usd:.4f}" if r.cost_usd is not None else "—"
+            time = f"{r.duration_s:.0f}s" if r.duration_s is not None else "—"
+            rows.append((run.task, run.prover, status, cost, time))
+
+        widths = [max(len(row[i]) for row in rows) for i in range(len(header))]
+        lines = []
+        for n, row in enumerate(rows):
+            lines.append("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)))
+            if n == 0:
+                lines.append("  ".join("-" * w for w in widths))
+        return "\n".join(lines)
+
+    def to_dict(self) -> dict[str, object]:
+        """JSON-ready view: the output root plus each cell's task, prover, result."""
+        return {
+            "output_dir": str(self.output_dir),
+            "runs": [
+                {
+                    "task": run.task,
+                    "prover": run.prover,
+                    "result": run.result.to_dict(),
+                }
+                for run in self.runs
+            ],
+        }
+
+
+def run_benchmark(
+    tasks: Mapping[str, ProofTask],
+    provers: Mapping[str, AutomatedProver],
+    output_dir: Path | str,
+    *,
+    only: Sequence[str] | None = None,
+    max_workers: int | None = None,
+    max_per_prover: int = 5,
+    progress: bool = True,
+) -> BenchmarkResult:
+    """Run every prover over every task, writing artifacts under ``output_dir``.
+
+    Each ``(task, prover)`` pair runs in its own ``output_dir/<task>/<prover>/``
+    directory, which receives the prover's ``wd``/``logs`` and a ``results.json``
+    dump of the :class:`~open_atp.provers.base.ProofResult`. A prover that raises is
+    recorded as a failed result (its ``error`` captured) and the sweep continues.
+
+    Pairs run concurrently on a thread pool (``prove`` is I/O-bound on the sandbox and
+    the prover's API). Two independent limits bound the concurrency: ``max_workers``
+    caps the total in-flight pairs, and ``max_per_prover`` caps how many of those may
+    belong to any one prover -- so a rate-limited prover (e.g. a hosted model) never
+    has more than ``max_per_prover`` calls in flight even when other provers fill the
+    pool. The returned ``runs`` keep task-major, prover-minor order regardless of
+    completion order.
+
+    Parameters
+    ----------
+    tasks : Mapping[str, ~open_atp.lean.ProofTask]
+        Tasks keyed by name; the name becomes the task's output subdirectory.
+    provers : Mapping[str, ~open_atp.provers.base.AutomatedProver]
+        Provers keyed by name; the name becomes the per-task output subdirectory.
+        A mapping (not a list) so several provers sharing a class ``name`` (every
+        ``agent:*`` is ``"agent"``) stay distinct on disk and in the table.
+    output_dir : pathlib.Path or str
+        Output root for the sweep, laid out as ``output_dir/<task>/<prover>/``.
+    only : Sequence[str], optional
+        Restrict the sweep to these task names (a subset of ``tasks``), in the given
+        order. ``None`` (default) runs every task. An unknown name raises
+        :class:`ValueError`.
+    max_workers : int, optional
+        Total ``prove`` calls in flight at once. ``None`` (default) lets the thread
+        pool pick a default; ``1`` runs the sweep serially.
+    max_per_prover : int
+        Most concurrent ``prove`` calls for any single prover. Default ``5``, to stay
+        under rate limits.
+    progress : bool
+        Show a :mod:`tqdm` progress bar over the ``(task, prover)`` pairs. Default
+        ``True``. Each completed pair is logged (task, prover, status, duration, cost)
+        via :mod:`structlog` regardless.
+
+    Returns
+    -------
+    BenchmarkResult
+        Every ``(task, prover)`` cell, with a :meth:`~BenchmarkResult.table` view.
+    """
+    output_dir = Path(output_dir)
+    if only is not None:
+        missing = [name for name in only if name not in tasks]
+        if missing:
+            raise ValueError(f"unknown task(s) {missing}; available: {sorted(tasks)}")
+        tasks = {name: tasks[name] for name in only}
+    gates = {name: threading.Semaphore(max_per_prover) for name in provers}
+
+    def run_pair(
+        task_name: str, task: ProofTask, prover_name: str, prover: AutomatedProver
+    ) -> BenchmarkRun:
+        run_dir = output_dir / task_name / prover_name
+        run_dir.mkdir(parents=True, exist_ok=True)
+        with gates[prover_name]:
+            try:
+                result = prover.prove(task, run_dir)
+            except Exception as exc:
+                result = ProofResult(
+                    prover=prover.name,
+                    verification=None,
+                    output_dir=run_dir,
+                    error=str(exc),
+                )
+        (run_dir / "results.json").write_text(
+            json.dumps(result.to_dict(), indent=2, default=str)
+        )
+        return BenchmarkRun(task=task_name, prover=prover_name, result=result)
+
+    jobs = [
+        (task_name, task, prover_name, prover)
+        for task_name, task in tasks.items()
+        for prover_name, prover in provers.items()
+    ]
+    slots: list[BenchmarkRun | None] = [None] * len(jobs)
+    bar = tqdm(total=len(jobs), disable=not progress, unit="run")
+
+    def record(index: int, run: BenchmarkRun) -> None:
+        slots[index] = run
+        r = run.result
+        status = "✓" if r.success else ("error" if r.error else "✗")
+        log.info(
+            "run complete",
+            task=run.task,
+            prover=run.prover,
+            status=status,
+            duration_s=round(r.duration_s, 1) if r.duration_s is not None else None,
+            cost_usd=r.cost_usd,
+        )
+        bar.update(1)
+
+    try:
+        if max_workers == 1:
+            for i, job in enumerate(jobs):
+                record(i, run_pair(*job))
+        else:
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                futures = {pool.submit(run_pair, *job): i for i, job in enumerate(jobs)}
+                for future in as_completed(futures):
+                    record(futures[future], future.result())
+    finally:
+        bar.close()
+
+    runs = [run for run in slots if run is not None]
+    return BenchmarkResult(output_dir=output_dir, runs=runs)
+
+
+def tasks_from_dir(
+    directory: Path | str,
+    *,
+    skeleton: Path = SKELETON_DIR,
+) -> dict[str, ProofTask]:
+    """Build a benchmark's ``tasks`` mapping from a directory of Lean files.
+
+    Mirrors the layout the public Lean benchmarks ship (PutnamBench, FATE):
+
+    - Each ``.lean`` file directly under ``directory`` becomes one task named by its
+      filename stem, staged into ``skeleton`` (a bare file carries no lake project).
+    - Each subdirectory becomes one task named by the subdirectory name. A subdirectory
+      that is *already* a complete lake project (carries its own ``lean-toolchain`` and
+      lakefile) is used as-is; otherwise its ``.lean`` files are staged into
+      ``skeleton``.
+
+    In both staged cases :func:`~open_atp.lean.create_project` supplies the skeleton.
+    Subdirectories with no ``.lean`` files (and entries whose name starts with ``.``)
+    are skipped. The result is ready to hand to :func:`run_benchmark`.
+
+    Parameters
+    ----------
+    directory : pathlib.Path or str
+        The benchmark directory: ``.lean`` files and/or per-task subdirectories.
+    skeleton : pathlib.Path
+        Project skeleton staged around bare files (see
+        :func:`~open_atp.lean.create_project`). Default
+        :data:`~open_atp.images.SKELETON_DIR` -- the baked image's pinned Mathlib
+        skeleton, only present in a source checkout. Pass a checkout of a benchmark's
+        own toolchain to stage against a non-default Lean/Mathlib pin.
+
+    Returns
+    -------
+    dict[str, ~open_atp.lean.ProofTask]
+        Tasks keyed by file stem (loose files) or subdirectory name.
+    """
+    directory = Path(directory)
+    tasks: dict[str, ProofTask] = {}
+    for entry in sorted(directory.iterdir()):
+        if entry.name.startswith("."):
+            continue
+        if entry.is_file() and entry.suffix == ".lean":
+            dest = Path(tempfile.mkdtemp()) / entry.stem
+            project = create_project([entry], dest, skeleton=skeleton)
+            tasks[entry.stem] = ProofTask(project)
+        elif entry.is_dir():
+            subdir_project = _subdir_project(entry, skeleton)
+            if subdir_project is not None:
+                tasks[entry.name] = ProofTask(subdir_project)
+    return tasks
+
+
+def _subdir_project(subdir: Path, skeleton: Path) -> LeanProject | None:
+    """The subdirectory as a project: itself if a lake project, else staged.
+
+    Returns ``None`` when the subdirectory is not a lake project and holds no ``.lean``
+    files (nothing to run).
+    """
+    try:
+        return LeanProject(subdir)
+    except FileNotFoundError:
+        pass
+    lean_files = [p for p in sorted(subdir.rglob("*.lean")) if ".lake" not in p.parts]
+    if not lean_files:
+        return None
+    dest = Path(tempfile.mkdtemp()) / subdir.name
+    return create_project(lean_files, dest, skeleton=skeleton)
+
+
+class DATASET(Enum):
+    """The public Lean benchmark datasets accepted by :func:`download_dataset`.
+
+    Each member's value is the directory name the dataset is cloned into. PutnamBench
+    pins an older Lean (``v4.27.0``) than the default skeleton, so stage it with a
+    matching ``skeleton`` (see :func:`tasks_from_dir`); the FATE datasets are on the
+    default ``v4.28.0``.
+    """
+
+    #: `PutnamBench <https://github.com/trishullab/PutnamBench>`_ (Lean 4).
+    PUTNAM = "putnam"
+    #: `FATE-H <https://github.com/frenzymath/FATE-H>`_ (hard).
+    FATE_H = "fate-h"
+    #: `FATE-M <https://github.com/frenzymath/FATE-M>`_ (medium).
+    FATE_M = "fate-m"
+    #: `FATE-X <https://github.com/frenzymath/FATE-X>`_ (extra).
+    FATE_X = "fate-x"
+
+
+#: Each dataset's GitHub ``owner/name`` and the subdirectory holding its ``.lean``
+#: task files. Package-internal: :func:`download_dataset` clones from it.
+_DATASETS: dict[DATASET, tuple[str, str]] = {
+    DATASET.PUTNAM: ("trishullab/PutnamBench", "lean4/src"),
+    DATASET.FATE_H: ("frenzymath/FATE-H", "FATEH"),
+    DATASET.FATE_M: ("frenzymath/FATE-M", "FATEM"),
+    DATASET.FATE_X: ("frenzymath/FATE-X", "FATEX"),
+}
+
+
+def download_dataset(
+    dataset: DATASET,
+    dest: Path | str,
+    *,
+    ref: str | None = None,
+) -> Path:
+    """Download a benchmark dataset's task directory under ``dest``.
+
+    Sparse-clones only the dataset's task subdirectory (shallow + blobless) into
+    ``dest/<dataset>`` and returns the path to that subdirectory -- a directory of
+    ``.lean`` files ready for :func:`tasks_from_dir`. An already-present download is
+    reused as-is (the clone is skipped), so repeated calls are cheap.
+
+    Parameters
+    ----------
+    dataset : DATASET
+        Which benchmark to fetch.
+    dest : pathlib.Path or str
+        Directory to clone into; the repo lands at ``dest/<dataset>``. Created if
+        missing.
+    ref : str, optional
+        Branch or tag to check out. Default ``None`` -- the repo's default branch.
+
+    Returns
+    -------
+    pathlib.Path
+        The dataset's task directory (``dest/<dataset>/<subdir>``).
+    """
+    repo, subdir = _DATASETS[dataset]
+    dest = Path(dest)
+    repo_dir = dest / dataset.value
+    task_dir = repo_dir / subdir
+    if task_dir.is_dir():
+        return task_dir
+
+    dest.mkdir(parents=True, exist_ok=True)
+    url = f"https://github.com/{repo}.git"
+    clone = ["git", "clone", "--depth", "1", "--filter=blob:none", "--sparse"]
+    if ref is not None:
+        clone += ["--branch", ref]
+    clone += [url, str(repo_dir)]
+    subprocess.run(clone, check=True)
+    subprocess.run(
+        ["git", "-C", str(repo_dir), "sparse-checkout", "set", subdir], check=True
+    )
+
+    if not task_dir.is_dir():
+        raise FileNotFoundError(f"{repo} has no {subdir!r} at ref {ref or 'default'}")
+    return task_dir

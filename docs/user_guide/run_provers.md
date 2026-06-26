@@ -111,3 +111,6 @@ sub-checks behind `success`: whether the project `compiles`, whether it is
 `sorry_free`, and which `axioms` the proofs depend on (anything outside
 {data}`~open_atp.verify.STANDARD_AXIOMS` means the proof is not actually
 complete).
+
+To run several provers across several tasks and compare them, see
+{doc}`benchmark`.

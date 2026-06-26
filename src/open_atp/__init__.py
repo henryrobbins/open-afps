@@ -16,6 +16,14 @@ Everything else is a candidate generator
 are then funnelled through the shared verifier.
 """
 
+from open_atp.benchmark import (
+    DATASET,
+    BenchmarkResult,
+    BenchmarkRun,
+    download_dataset,
+    run_benchmark,
+    tasks_from_dir,
+)
 from open_atp.config import (
     build_backend,
     build_harness,
@@ -30,6 +38,9 @@ from open_atp.verify import VerificationReport
 
 __all__ = [
     "AutomatedProver",
+    "BenchmarkResult",
+    "BenchmarkRun",
+    "DATASET",
     "DEFAULT_IMAGE",
     "Image",
     "ProofResult",
@@ -42,4 +53,7 @@ __all__ = [
     "build_backend",
     "build_harness",
     "create_project",
+    "download_dataset",
+    "run_benchmark",
+    "tasks_from_dir",
 ]
