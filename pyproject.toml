@@ -54,6 +54,7 @@ docs = [
     "sphinx-design",
     "sphinx-argparse",
     "numpydoc",
+    "sphinxcontrib-bibtex",
 ]
 
 [project.scripts]

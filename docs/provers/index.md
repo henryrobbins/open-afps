@@ -16,6 +16,25 @@ The Claude Code, Codex, OpenCode, AxProver, and Vibe provers are all the same
 {class}`~open_atp.provers.base.AutomatedProver` and funnels its output through the
 shared {class}`~open_atp.verify.Verifier`.
 
+## Skills and tooling
+
+The agentic harnesses are augmented with two shared resources; each prover's page
+records exactly which it uses.
+
+**lean-lsp-mcp** {cite:p}`lean_lsp_mcp` is an MCP server that exposes the Lean
+language server — goal state, diagnostics, and search — as tools the agent can call
+while it iterates on a proof. Every agentic harness runs it (Claude Code, Codex,
+OpenCode, Vibe, and the Numina round loop, which is built on the Claude Code
+harness). AxProver is the exception: it ships its own Lean tooling instead, and the
+hosted AristotleProver has no local generation sandbox.
+
+**Agent skills** are bundled prompt-and-workflow packs that teach the agent
+Lean-specific tactics and conventions (see `vendor/`). Two are vendored: the
+official Lean FRO skills {cite:p}`leanprover_skills`, used by Claude Code, Codex,
+OpenCode, and Vibe; and Cameron Freer's `lean4` pack {cite:p}`lean4_skills`, which
+Claude Code additionally loads. NuminaProver instead uses its own vendored scaffold,
+and AxProver and AristotleProver use none.
+
 ```{toctree}
 :maxdepth: 1
 :hidden:
@@ -27,66 +46,4 @@ axprover
 vibe
 numina
 aristotle
-```
-
-## References
-
-### Methods
-
-Several of the provers implement published methods. If you use one of them,
-please cite the corresponding paper.
-
-```bibtex
-@inproceedings{requena2026a,
-  title = {A Minimal Agent for Automated Theorem Proving},
-  author = {Borja Requena and Austin Letson and Krystian Nowakowski and Izan Beltran Ferreiro and Leopoldo Sarra},
-  booktitle = {ICLR 2026 Workshop: VerifAI-2: The Second Workshop on AI Verification in the Wild},
-  year = {2026},
-  url = {https://openreview.net/forum?id=E30g7bO7rU}
-}
-
-@article{achim2025aristotle,
-  title = {Aristotle: IMO-level Automated Theorem Proving},
-  author = {Achim, Tudor and Best, Alex and Bietti, Alberto and Der, Kevin and F{\'e}d{\'e}rico, Math{\"\i}s and Gukov, Sergei and Halpern-Leistner, Daniel and Henningsgard, Kirsten and Kudryashov, Yury and Meiburg, Alexander and others},
-  journal = {arXiv preprint arXiv:2510.01346},
-  year = {2025}
-}
-
-@article{liu2026numina,
-  title = {Numina-Lean-Agent: An Open and General Agentic Reasoning System for Formal Mathematics},
-  author = {Liu, Junqi and Zhou, Zihao and Zhu, Zekai and Santos, Marco Dos and He, Weikun and Liu, Jiawei and Wang, Ran and Xie, Yunzhou and Zhao, Junqiao and Wang, Qiufeng and others},
-  journal = {arXiv preprint arXiv:2601.14027},
-  year = {2026}
-}
-```
-
-### Software
-
-The agent harnesses share the [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp)
-server (all except ax-prover, which ships its own Lean tooling) and bundle vendored
-Lean skills (see `vendor/`):
-
-```bibtex
-@software{lean-lsp-mcp,
-  author = {Oliver Dressler},
-  title = {{Lean LSP MCP: Tools for agentic interaction with the Lean theorem prover}},
-  url = {https://github.com/oOo0oOo/lean-lsp-mcp},
-  month = {3},
-  year = {2025}
-}
-
-@software{leanprover-skills,
-  author = {{Lean FRO}},
-  title = {Official Agent {Skills} for developing with {Lean} 4},
-  url = {https://github.com/leanprover/skills},
-  year = {2025}
-}
-
-@software{lean4-skills,
-  author = {Cameron Freer},
-  title = {Lean 4 {Skills}: Theorem proving skill and workflow pack for {AI} coding agents},
-  url = {https://github.com/cameronfreer/lean4-skills},
-  month = oct,
-  year = {2025}
-}
 ```

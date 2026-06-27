@@ -58,9 +58,24 @@ def _skills_cell(keys: list[str], skill_urls: dict[str, str]) -> str:
     return ", ".join(f"[{k}]({skill_urls[k]})" for k in keys)
 
 
-def _render_table(data: dict, page_prefix: str) -> str:
+def _paper_cell(prover: dict, *, cite: bool) -> str:
+    """Render the Paper cell.
+
+    In the docs (``cite=True``) a prover's ``cite`` BibTeX key becomes an
+    author-year ``{cite:t}`` role resolved against ``docs/citations.md``; the
+    README (``cite=False``) and any prover without a key fall back to the plain
+    ``paper`` link.
+    """
+    if cite and prover.get("cite"):
+        return f"{{cite:t}}`{prover['cite']}`"
+    return _link(prover.get("paper"))
+
+
+def _render_table(data: dict, page_prefix: str, *, cite: bool) -> str:
     """Render the Markdown table. ``page_prefix`` prefixes prover doc links so
-    the README (repo root) and the docs page (``docs/provers/``) resolve them."""
+    the README (repo root) and the docs page (``docs/provers/``) resolve them.
+    ``cite`` renders the Paper cell as an author-year ``{cite:t}`` role (docs)
+    rather than a plain link (README)."""
     skill_urls = data["skills"]
     header = "| " + " | ".join(COLUMNS) + " |"
     sep = "| " + " | ".join("---" for _ in COLUMNS) + " |"
@@ -72,7 +87,7 @@ def _render_table(data: dict, page_prefix: str) -> str:
             f"`{p['id']}`",
             _skills_cell(p.get("skills") or [], skill_urls),
             CHECK if p.get("mcp") else CROSS,
-            _link(p.get("paper")),
+            _paper_cell(p, cite=cite),
             _link(p.get("source")),
         ]
         rows.append("| " + " | ".join(cells) + " |")
@@ -86,12 +101,12 @@ def load() -> dict:
 
 def render_docs_table(data: dict) -> str:
     # index.md lives in docs/provers/, so doc links are bare ``<page>.md``.
-    return _render_table(data, page_prefix="")
+    return _render_table(data, page_prefix="", cite=True)
 
 
 def render_readme_table(data: dict) -> str:
     # README.md lives at the repo root, so doc links are ``docs/provers/<page>.md``.
-    return _render_table(data, page_prefix="docs/provers/")
+    return _render_table(data, page_prefix="docs/provers/", cite=False)
 
 
 def render_meta(prover: dict, skill_urls: dict[str, str]) -> str:
@@ -99,7 +114,8 @@ def render_meta(prover: dict, skill_urls: dict[str, str]) -> str:
 
     A field list wastes vertical space (each value drops to its own line), so we
     emit a single ``label value · label value`` paragraph. Empty fields (—) are
-    dropped; ``Spec`` and ``MCP`` are always shown.
+    dropped; ``Spec`` and ``MCP`` are always shown. The Paper field renders its
+    ``{cite:t}`` citation in the docs (``cite=True``).
     """
     mcp = CHECK if prover.get("mcp") else CROSS
     parts = [f"**ID** `{prover['id']}`", f"**MCP** {mcp}"]
@@ -107,8 +123,8 @@ def render_meta(prover: dict, skill_urls: dict[str, str]) -> str:
         parts.append(f"**Skills** {_skills_cell(prover['skills'], skill_urls)}")
     if prover.get("company"):
         parts.append(f"**Company** {_link(prover['company'])}")
-    if prover.get("paper"):
-        parts.append(f"**Paper** {_link(prover['paper'])}")
+    if prover.get("cite") or prover.get("paper"):
+        parts.append(f"**Paper** {_paper_cell(prover, cite=True)}")
     if prover.get("source"):
         parts.append(f"**Source** {_link(prover['source'])}")
     return " · ".join(parts) + "\n"

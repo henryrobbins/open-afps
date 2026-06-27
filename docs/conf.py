@@ -25,8 +25,12 @@ extensions = [
     "sphinx_design",
     "sphinxarg.ext",
     "numpydoc",
+    "sphinxcontrib.bibtex",
     "provers_table",
 ]
+
+bibtex_bibfiles = ["ref.bib"]
+bibtex_default_style = "plain"
 
 extlinks = {
     "claude": ("https://code.claude.com/docs/en%s", "Claude Code Docs%.0s"),

@@ -5,6 +5,12 @@
 #
 # Cell conventions: any field left null renders as an em dash (—). `skills` is a
 # list of keys into the `skills` map below; an empty list renders as —.
+#
+# `paper` ({label, url}) is the plain Markdown link used in the README and as the
+# docs fallback. `cite` is a BibTeX key in docs/ref.bib: when set, the docs table
+# renders an author-year `{cite:t}` citation (resolved against docs/citations.md)
+# instead of the `paper` link. The README always uses `paper` (GitHub can't run
+# Sphinx). Keep both in sync.
 
 skills:
   leanprover: https://github.com/leanprover/skills
@@ -18,6 +24,7 @@ provers:
     mcp: true               # lean-lsp-mcp via mcp.json
     company: { label: Anthropic, url: https://www.anthropic.com }
     paper: null
+    cite: null
     source: null            # Claude Code is not open source
 
   - name: Codex
@@ -27,6 +34,7 @@ provers:
     mcp: true               # lean-lsp-mcp via -c overrides
     company: { label: OpenAI, url: https://openai.com }
     paper: null
+    cite: null
     source: { label: GitHub, url: https://github.com/openai/codex }
 
   - name: OpenCode
@@ -36,6 +44,7 @@ provers:
     mcp: true
     company: null
     paper: null
+    cite: null
     source: { label: GitHub, url: https://github.com/sst/opencode }
 
   - name: AxProver
@@ -45,6 +54,7 @@ provers:
     mcp: false              # uses its own Lean tools, not lean-lsp-mcp
     company: { label: Axiomatic AI, url: https://axiomatic-ai.com }
     paper: { label: "Requena et al. 2026", url: "https://openreview.net/forum?id=E30g7bO7rU" }
+    cite: requena2026a
     source: { label: GitHub, url: https://github.com/Axiomatic-AI/ax-prover-base }
 
   - name: Vibe / Leanstral
@@ -54,6 +64,7 @@ provers:
     mcp: true
     company: { label: Mistral AI, url: https://mistral.ai }
     paper: { label: "Leanstral (blog)", url: "https://mistral.ai/news/leanstral" }
+    cite: null
     source: { label: HuggingFace, url: https://huggingface.co/mistralai/Leanstral-2603 }
 
   - name: NuminaProver
@@ -63,6 +74,7 @@ provers:
     mcp: true               # runs on the Claude Code harness
     company: { label: Project Numina, url: https://projectnumina.ai }
     paper: { label: "Liu et al. 2026", url: "https://arxiv.org/abs/2601.14027" }
+    cite: liu2026numina
     source: { label: GitHub, url: https://github.com/project-numina/numina-lean-agent }
 
   - name: AristotleProver
@@ -72,4 +84,5 @@ provers:
     mcp: false              # hosted; no local generation sandbox
     company: { label: Harmonic, url: https://www.harmonic.fun }
     paper: { label: "Achim et al. 2025", url: "https://arxiv.org/abs/2510.01346" }
+    cite: achim2025aristotle
     source: null            # hosted, closed source
