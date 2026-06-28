@@ -6,8 +6,8 @@ The core stays a plain Python API (:func:`open_atp.standard_prover` ->
 :meth:`~open_atp.provers.base.AutomatedProver.prove`); this is just the terminal
 front door, deliberately minimal: pick a registered prover, point at a lake project
 (or a single bare ``.lean`` file, staged into the pinned skeleton), and choose where
-the ``{wd,logs}`` output lands. Generation + verification run on the local Docker
-backend with the default image/toolchain.
+the ``{wd,logs}`` output lands. Generation + verification run on the chosen compute
+backend (``--compute docker``/``modal``) with the default image/toolchain.
 """
 
 from __future__ import annotations
@@ -26,7 +26,6 @@ from tqdm import tqdm
 
 from open_atp.backends import _BACKENDS
 from open_atp.backends.base import ComputeBackend
-from open_atp.backends.docker import DockerBackend
 from open_atp.benchmark import (
     DATASET,
     BenchmarkResult,
@@ -118,7 +117,7 @@ def _prove(args: argparse.Namespace) -> int:
         project = LeanProject(src)
     task = ProofTask(project)
 
-    backend = DockerBackend(image=DEFAULT_IMAGE)
+    backend = build_backend({"type": args.compute})
     prover = standard_prover(args.prover, backend=backend)
     result = prover.prove(task, Path(args.output_dir))
 
@@ -378,6 +377,13 @@ def build_parser() -> argparse.ArgumentParser:
         "the pinned skeleton.",
     )
     prove.add_argument("output_dir", help="Where to write the run's {wd,logs} output.")
+    prove.add_argument(
+        "-c",
+        "--compute",
+        choices=sorted(_BACKENDS),
+        default="docker",
+        help="Compute backend to run generation + verification on.",
+    )
     prove.add_argument(
         "-j", "--json", action="store_true", help="Emit the ProofResult as JSON."
     )
