@@ -37,3 +37,9 @@ dist/
 
 # Claude Code transient state
 .claude/scheduled_tasks.lock
+
+# Datasets
+datasets/
+
+# Prover runs
+runs/
