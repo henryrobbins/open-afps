@@ -1,9 +1,10 @@
 # Datasets
 
 `open-atp` bundles several public Lean proof-synthesis benchmarks.
-{func}`~open_atp.benchmark.download_dataset` fetches one — a sparse clone of just the
-task subdirectory — into a directory ready for
-{func}`~open_atp.benchmark.tasks_from_dir` (see {doc}`guides/benchmark`). The
+{func}`~open_atp.benchmark.download_dataset` fetches one — sparse-cloning just the
+task subdirectory and lifting its `.lean` files into `dest/<dataset>`, a flat
+directory ready for {func}`~open_atp.benchmark.tasks_from_dir` (see
+{doc}`guides/benchmark`). The
 ``EXAMPLES`` entry is the package's bundled {class}`~open_atp.examples.EXAMPLE` set,
 copied from the wheel rather than cloned.
 

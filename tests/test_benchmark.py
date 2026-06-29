@@ -290,14 +290,19 @@ def test_sparse_clones_the_subdir(
     def fake_run(cmd: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
         calls.append(cmd)
         if "clone" in cmd:  # emulate the clone materializing repo + subdir
-            (Path(cmd[-1]) / "lean4" / "src").mkdir(parents=True)
+            src = Path(cmd[-1]) / "lean4" / "src"
+            src.mkdir(parents=True)
+            (src / "1.lean").write_text("theorem t : True := sorry")
         return subprocess.CompletedProcess(cmd, 0)
 
     monkeypatch.setattr(benchmark.subprocess, "run", fake_run)
 
     path = download_dataset(DATASET.PUTNAM, tmp_path)
 
-    assert path == tmp_path / "putnam" / "lean4" / "src"
+    # The task subdir is lifted to dest/<dataset>, leaving no surrounding repo.
+    assert path == tmp_path / "putnam"
+    assert (path / "1.lean").is_file()
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["putnam"]
     clone = next(c for c in calls if "clone" in c)
     assert "--sparse" in clone and "--depth" in clone
     assert clone[-2] == "https://github.com/trishullab/PutnamBench.git"
@@ -308,14 +313,14 @@ def test_sparse_clones_the_subdir(
 def test_existing_download_is_reused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    (tmp_path / "fate-m" / "FATEM").mkdir(parents=True)
+    (tmp_path / "fate-m").mkdir(parents=True)
 
     def boom(*_: object, **__: object) -> object:
         raise AssertionError("should not clone a cached dataset")
 
     monkeypatch.setattr(benchmark.subprocess, "run", boom)
 
-    assert download_dataset(DATASET.FATE_M, tmp_path) == tmp_path / "fate-m" / "FATEM"
+    assert download_dataset(DATASET.FATE_M, tmp_path) == tmp_path / "fate-m"
 
 
 def test_examples_copies_bundled_assets_without_cloning(

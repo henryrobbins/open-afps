@@ -328,12 +328,12 @@ def download_dataset(
     *,
     ref: str | None = None,
 ) -> Path:
-    """Download a benchmark dataset's task directory under ``dest``.
+    """Download a benchmark dataset's task directory to ``dest/<dataset>``.
 
-    Sparse-clones only the dataset's task subdirectory (shallow + blobless) into
-    ``dest/<dataset>`` and returns the path to that subdirectory -- a directory of
-    ``.lean`` files ready for :func:`tasks_from_dir`. An already-present download is
-    reused as-is (the clone is skipped), so repeated calls are cheap.
+    Sparse-clones only the dataset's task subdirectory (shallow + blobless), then
+    lifts its ``.lean`` files to ``dest/<dataset>`` -- a flat directory ready for
+    :func:`tasks_from_dir`, with no surrounding git repo. An already-present download
+    is reused as-is (the clone is skipped), so repeated calls are cheap.
     :attr:`DATASET.EXAMPLES` instead copies the package's bundled example assets into
     ``dest/examples`` (no clone, ``ref`` ignored).
 
@@ -342,8 +342,7 @@ def download_dataset(
     dataset : DATASET
         Which benchmark to fetch.
     dest : pathlib.Path or str
-        Directory to clone into; the dataset lands at ``dest/<dataset>``. Created if
-        missing.
+        Parent directory; the dataset lands at ``dest/<dataset>``. Created if missing.
     ref : str, optional
         Branch or tag to check out. Default ``None`` -- the repo's default branch.
         Ignored for :attr:`DATASET.EXAMPLES`.
@@ -351,32 +350,36 @@ def download_dataset(
     Returns
     -------
     pathlib.Path
-        The dataset's task directory (``dest/<dataset>/<subdir>``; ``dest/examples``
-        for :attr:`DATASET.EXAMPLES`).
+        The dataset's task directory (``dest/<dataset>``).
     """
     dest = Path(dest)
+    task_dir = dest / dataset.value
     if dataset is DATASET.EXAMPLES:
-        return _copy_examples(dest / dataset.value)
-
-    repo, subdir = _DATASETS[dataset]
-    repo_dir = dest / dataset.value
-    task_dir = repo_dir / subdir
+        return _copy_examples(task_dir)
     if task_dir.is_dir():
         return task_dir
 
-    dest.mkdir(parents=True, exist_ok=True)
+    repo, subdir = _DATASETS[dataset]
     url = f"https://github.com/{repo}.git"
     clone = ["git", "clone", "--depth", "1", "--filter=blob:none", "--sparse"]
     if ref is not None:
         clone += ["--branch", ref]
-    clone += [url, str(repo_dir)]
-    subprocess.run(clone, check=True)
-    subprocess.run(
-        ["git", "-C", str(repo_dir), "sparse-checkout", "set", subdir], check=True
-    )
 
-    if not task_dir.is_dir():
-        raise FileNotFoundError(f"{repo} has no {subdir!r} at ref {ref or 'default'}")
+    dest.mkdir(parents=True, exist_ok=True)
+    # Clone into a temp dir on the same filesystem as task_dir, then move just the
+    # task subdirectory into place so the git repo and other repo files don't linger.
+    with tempfile.TemporaryDirectory(dir=dest) as tmp:
+        repo_dir = Path(tmp) / "repo"
+        subprocess.run(clone + [url, str(repo_dir)], check=True)
+        subprocess.run(
+            ["git", "-C", str(repo_dir), "sparse-checkout", "set", subdir], check=True
+        )
+        src = repo_dir / subdir
+        if not src.is_dir():
+            raise FileNotFoundError(
+                f"{repo} has no {subdir!r} at ref {ref or 'default'}"
+            )
+        shutil.move(str(src), str(task_dir))
     return task_dir
 
 

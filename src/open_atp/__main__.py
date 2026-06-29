@@ -482,7 +482,9 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[d.value for d in DATASET],
         help="Which dataset to download.",
     )
-    download.add_argument("output", help="Directory to clone the dataset into.")
+    download.add_argument(
+        "output", help="Parent directory; the dataset lands at <output>/<dataset>."
+    )
 
     build = sub.add_parser(
         "build-docker-image",

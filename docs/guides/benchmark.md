@@ -99,13 +99,13 @@ fate-m/FATEM/                    putnam/                     loose/
 ## Downloading a dataset
 
 {func}`~open_atp.benchmark.download_dataset` fetches one of the included public
-benchmarks — a sparse clone of just the task subdirectory — straight into a directory
-ready for {func}`~open_atp.benchmark.tasks_from_dir`:
+benchmarks — sparse-cloning just the task subdirectory into a flat `dest/<dataset>`
+directory ready for {func}`~open_atp.benchmark.tasks_from_dir`:
 
 ```python
 from open_atp.benchmark import DATASET, download_dataset, run_benchmark, tasks_from_dir
 
-src = download_dataset(DATASET.FATE_M, "datasets")  # datasets/fate-m/FATEM
+src = download_dataset(DATASET.FATE_M, "datasets")  # datasets/fate-m
 result = run_benchmark(tasks_from_dir(src), provers, Path("runs/fate-m"))
 ```
 
@@ -119,8 +119,8 @@ Download a dataset, then benchmark it — the `benchmark` command runs
 {func}`~open_atp.benchmark.tasks_from_dir` over the directory and prints the table:
 
 ```bash
-open-atp download fate-m datasets            # -> datasets/fate-m/FATEM
-open-atp benchmark datasets/fate-m/FATEM runs/fate-m --compute docker
+open-atp download fate-m datasets            # -> datasets/fate-m
+open-atp benchmark datasets/fate-m runs/fate-m --compute docker
 ```
 
 `benchmark` runs every standard prover by default. To choose provers, pass a YAML

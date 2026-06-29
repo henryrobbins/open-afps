@@ -3,7 +3,7 @@
 A *dataset* is one of the public Lean benchmarks {func}`~open_atp.benchmark.download_dataset`
 can fetch — a {class}`~open_atp.benchmark.DATASET` member that maps to a GitHub repo and
 the subdirectory holding its `.lean` task files. `download_dataset` sparse-clones just
-that subdirectory into a task directory, ready for
+that subdirectory and lifts its `.lean` files into `dest/<dataset>`, ready for
 {func}`~open_atp.benchmark.tasks_from_dir`. Adding one is two small edits in
 `src/open_atp/benchmark.py` plus docs.
 
@@ -67,6 +67,6 @@ make docs        # -W: a broken xref or stale table fails the build
 End-to-end, the new dataset now works from the CLI:
 
 ```bash
-open-atp download mybench datasets         # -> datasets/mybench/<subdir>
-open-atp benchmark datasets/mybench/<subdir> --compute docker
+open-atp download mybench datasets         # -> datasets/mybench
+open-atp benchmark datasets/mybench --compute docker
 ```
