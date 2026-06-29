@@ -200,28 +200,35 @@ def _all_standard_provers(backend: ComputeBackend) -> dict[str, AutomatedProver]
     return {name: standard_prover(name, backend=backend) for name in standard_provers()}
 
 
-def _load_provers(
-    directory: Path, provers_path: str | None, backend: ComputeBackend
-) -> dict[str, AutomatedProver]:
-    """Build the prover mapping from a YAML config, or all standard provers by default.
+def _load_config(config_path: str | None) -> dict[str, object]:
+    """Parse the ``--config`` YAML into a benchmark-settings mapping (``{}`` if none).
 
-    Looks at ``--provers`` if given, else ``<directory>/provers.yaml`` (or ``.yml``).
-    The YAML is a single string (a standard prover name) or a list whose entries are
-    each either a standard prover name or a prover-config mapping (an optional ``name``
-    keys the result; otherwise it is derived from the prover/harness type). When no
-    config is found, every standard prover is used.
+    Recognized keys are ``provers``, ``tasks``, ``compute``, and ``workers``; CLI flags
+    override whatever the config supplies.
     """
-    path: Path | None = Path(provers_path) if provers_path else None
-    if path is None:
-        candidates = (directory / n for n in ("provers.yaml", "provers.yml"))
-        path = next((p for p in candidates if p.is_file()), None)
-    spec = yaml.safe_load(path.read_text()) if path is not None else None
-    if spec is None:
-        return _all_standard_provers(backend)
+    if config_path is None:
+        return {}
+    spec = yaml.safe_load(Path(config_path).read_text())
+    if not isinstance(spec, dict):
+        raise SystemExit("config must be a YAML mapping")
+    return spec
 
-    entries = [spec] if isinstance(spec, str) else spec
+
+def _build_registry(
+    provers_spec: object, backend: ComputeBackend
+) -> dict[str, AutomatedProver]:
+    """Build the named-prover registry from a config ``provers`` value (``{}`` if none).
+
+    The value is a single string (a standard prover name) or a list whose entries are
+    each either a standard prover name or a prover-config mapping (an optional ``name``
+    keys the result; otherwise it is derived from the prover/harness type). These are
+    the custom provers and standard-prover overrides that ``--provers`` can reference.
+    """
+    if provers_spec is None:
+        return {}
+    entries = [provers_spec] if isinstance(provers_spec, str) else provers_spec
     if not isinstance(entries, list):
-        raise SystemExit("provers config must be a string or a list")
+        raise SystemExit("config 'provers' must be a string or a list")
 
     provers: dict[str, AutomatedProver] = {}
     for i, entry in enumerate(entries):
@@ -234,6 +241,28 @@ def _load_provers(
         if name in provers:
             name = f"{name}-{i}"
         provers[name] = prover
+    return provers
+
+
+def _select_provers(
+    registry: dict[str, AutomatedProver],
+    provers_arg: str | None,
+    backend: ComputeBackend,
+) -> dict[str, AutomatedProver]:
+    """Resolve which provers to run from a registry and an optional ``--provers`` list.
+
+    ``--provers`` is a comma-separated list of names: each resolves to a custom prover
+    or override from the config registry, else to a standard prover built by name.
+    Without it, every prover in the registry is run; with an empty registry too, every
+    standard prover is run.
+    """
+    if provers_arg is None:
+        return registry or _all_standard_provers(backend)
+
+    names = [n.strip() for n in provers_arg.split(",") if n.strip()]
+    provers: dict[str, AutomatedProver] = {}
+    for name in names:
+        provers[name] = registry.get(name) or standard_prover(name, backend=backend)
     return provers
 
 
@@ -255,21 +284,41 @@ def _named_prover(
     return str(name), _build_prover(spec, backend)
 
 
+def _task_filter(value: object) -> list[str] | None:
+    """Normalize a ``tasks`` setting (comma string or list) to a list of names."""
+    if value is None:
+        return None
+    items = value.split(",") if isinstance(value, str) else value
+    if not isinstance(items, list):
+        raise SystemExit("config 'tasks' must be a string or a list")
+    return [str(t).strip() for t in items if str(t).strip()] or None
+
+
 def _benchmark(args: argparse.Namespace) -> int:
-    """Run the configured provers over a directory of tasks and print a table."""
+    """Run the configured provers over a directory of tasks and print a table.
+
+    Settings come from the ``--config`` mapping; each CLI flag overrides its key.
+    """
+    config = _load_config(args.config)
     directory = Path(args.dataset)
-    backend = build_backend({"type": args.compute})
-    provers = _load_provers(directory, args.provers, backend)
-    tasks = tasks_from_dir(directory)
-    only = (
-        [t.strip() for t in args.tasks.split(",") if t.strip()] if args.tasks else None
-    )
+
+    compute = args.compute or config.get("compute", "docker")
+    backend = build_backend({"type": compute})
+    registry = _build_registry(config.get("provers"), backend)
+    provers = _select_provers(registry, args.provers, backend)
+    tasks = args.tasks if args.tasks is not None else config.get("tasks")
+    only = _task_filter(tasks)
+
+    workers = args.workers if args.workers is not None else config.get("workers", 1)
+    if not isinstance(workers, int):
+        raise SystemExit("config 'workers' must be an integer")
+
     result = run_benchmark(
-        tasks,
+        tasks_from_dir(directory),
         provers,
         Path(args.output),
         only=only,
-        max_workers=args.workers,
+        max_workers=workers,
     )
     return _report(result, args.json)
 
@@ -445,9 +494,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Where to write each run's logs and agent working directory.",
     )
     benchmark.add_argument(
+        "--config",
+        help=(
+            "Path to YAML configuration for provers, tasks, compute, and workers; "
+            "CLI flags override config values."
+        ),
+    )
+    benchmark.add_argument(
         "-p",
         "--provers",
-        help="YAML provers config; use all standard provers by default.",
+        help=(
+            "Comma-separated prover names (standard provers, or names from ``--config``); "  # noqa: E501
+            "run every config prover, else all standard provers, by default."
+        ),
     )
     benchmark.add_argument(
         "-t",
@@ -458,14 +517,12 @@ def build_parser() -> argparse.ArgumentParser:
         "-c",
         "--compute",
         choices=sorted(_BACKENDS),
-        default="docker",
-        help="Compute backend to run the sweep on.",
+        help="Compute backend to run the sweep on (default: docker).",
     )
     benchmark.add_argument(
         "-w",
         "--workers",
         type=int,
-        default=1,
         help="Number of workers; each worker runs a single prover on a task.",
     )
     benchmark.add_argument(
