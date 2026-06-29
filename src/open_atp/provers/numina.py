@@ -123,6 +123,9 @@ class NuminaProver(AgentProver):
     max_consecutive_limits : int
         Reset (start a fresh session) after this many consecutive LIMIT rounds.
         Default ``2``.
+    oauth_token : str, optional
+        The ``CLAUDE_CODE_OAUTH_TOKEN`` to forward into the sandbox; ``None``
+        (default) reads it from the host env var.
     helper_env_keys : tuple[str, ...]
         Helper-skill credentials forwarded into the sandbox when present in the host
         env; skills degrade/skip when their key is absent. Default
@@ -187,6 +190,7 @@ class NuminaProver(AgentProver):
         skills: list[str] | None = None,
         max_rounds: int = 20,
         max_consecutive_limits: int = 2,
+        oauth_token: str | None = None,
         helper_env_keys: tuple[str, ...] = _DEFAULT_HELPER_ENV_KEYS,
         guard_statements: bool = True,
         on_statement_change: Literal["error", "warn"] = "error",
@@ -199,7 +203,9 @@ class NuminaProver(AgentProver):
         # are empty -- the coordinator skill is staged from the vendored scaffold.
         super().__init__(
             backend=backend,
-            harness=NuminaHarness(helper_env_keys=helper_env_keys, env=env),
+            harness=NuminaHarness(
+                oauth_token=oauth_token, helper_env_keys=helper_env_keys, env=env
+            ),
             skills=skills if skills is not None else [],
             timeout_s=timeout_s,
         )
