@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/_static/logo_light.svg" alt="OpenATP" width="420">
+  <img src="docs/_static/logo_light.svg" alt="OpenATP" width="360">
 </p>
 
 [![PyPI](https://img.shields.io/pypi/v/open-atp.svg)](https://pypi.org/project/open-atp/)
@@ -10,17 +10,12 @@
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Docs](https://readthedocs.org/projects/open-atp/badge/?version=latest)](https://open-atp.readthedocs.io/en/latest/)
 
-<p align="center">
-  <img src="banner/banner.svg" alt="OpenATP banner">
-</p>
+**OpenATP** is an open-source Python package providing a common interface for **Automated Theorem Proving (ATP)**. OpenATP focuses on recent **agentic ATP methods** that prove formal statements in [Lean4](https://lean-lang.org/). Each method runs in an isolated sandbox, either locally with Docker or remotely with [Modal](https://modal.com/). OpenATP also provides benchmarking utilities to run methods on **common datasets**.
 
-`OpenATP` (Open Automated Theorem Proving) runs Lean files containing `sorry`
-through leading proof-synthesis backends and returns **verified** completed
-proofs with metadata (verification status, cost, duration). Every prover —
-including hosted ones like Aristotle — funnels its output through one shared
-`Verifier` that compiles the candidate in a Lean+Mathlib sandbox and checks that
-it compiles, is sorry-free, and is axiom-clean. See the
-[documentation](https://open-atp.readthedocs.io) for details.
+<div align="center">
+  <img src="banner/banner.png" alt="OpenATP banner" width="80%">
+</div>
+
 
 ## Installation
 
