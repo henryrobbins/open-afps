@@ -10,6 +10,10 @@
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Docs](https://readthedocs.org/projects/open-atp/badge/?version=latest)](https://open-atp.readthedocs.io/en/latest/)
 
+<p align="center">
+  <img src="banner/banner.svg" alt="OpenATP banner">
+</p>
+
 `OpenATP` (Open Automated Theorem Proving) runs Lean files containing `sorry`
 through leading proof-synthesis backends and returns **verified** completed
 proofs with metadata (verification status, cost, duration). Every prover —
