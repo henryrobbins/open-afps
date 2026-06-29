@@ -24,7 +24,7 @@ from open_atp.config import standard_prover
 from open_atp.examples import EXAMPLE, example_task
 
 task = example_task(EXAMPLE.MUL_REORDER)
-prover = standard_prover("agent:claude", backend=DockerBackend())
+prover = standard_prover("claude", backend=DockerBackend())
 result = prover.prove(task, output_dir=Path("demo"))
 
 assert result.success
@@ -147,7 +147,7 @@ from open_atp.lean import ProofTask, create_project
 project = create_project(["MyFile.lean"], dest="demo/project")
 task = ProofTask(project=project)
 
-prover = standard_prover("agent:claude", backend=DockerBackend())
+prover = standard_prover("claude", backend=DockerBackend())
 result = prover.prove(task, output_dir=Path("demo/run"))
 ```
 
@@ -167,7 +167,7 @@ from open_atp.lean import LeanProject, ProofTask
 project = LeanProject("path/to/lake/project")
 task = ProofTask(project=project)
 
-prover = standard_prover("agent:claude", backend=DockerBackend())
+prover = standard_prover("claude", backend=DockerBackend())
 result = prover.prove(task, output_dir=Path("demo/run"))
 ```
 
@@ -182,10 +182,10 @@ The `open-atp prove` command is a thin shell over the same API. Provide a path t
 Run a single file:
 
 ```console
-$ open-atp prove Example.lean demo agent:claude
+$ open-atp prove Example.lean demo claude
 ╭────────────┬──────────────╮
 │ status     │ ✓ verified   │
-│ prover     │ agent:claude │
+│ prover     │ agent        │
 │ cost       │ $0.5123      │
 │ time       │ 42s          │
 │ output     │ demo         │
@@ -198,10 +198,10 @@ $ open-atp prove Example.lean demo agent:claude
 Run a full lake project:
 
 ```console
-$ open-atp prove path/to/lake/project demo agent:claude
+$ open-atp prove path/to/lake/project demo claude
 ╭────────────┬──────────────╮
 │ status     │ ✓ verified   │
-│ prover     │ agent:claude │
+│ prover     │ agent        │
 │ cost       │ $0.5123      │
 │ time       │ 42s          │
 │ output     │ demo         │

@@ -52,8 +52,8 @@ image/toolchain from the backend; a caller then drives it directly via
 run generation in a live session over that backend and verify in the same hot sandbox.
 This is the top-level surface re-exported from `open_atp` itself.
 
-Names are the `agent:<cli>` agent provers (`"agent:claude"`, `"agent:codex"`,
-`"agent:opencode"`, `"agent:vibe"`, `"agent:axprover"`) and the standalone provers
+Names are the agentic provers (`"claude"`, `"codex"`,
+`"opencode"`, `"vibe"`, `"axprover"`) and the standalone provers
 (`"numina"`, `"aristotle"`); {func}`~open_atp.config.standard_provers` lists them all.
 Each builds its class's baked-in defaults — to customize any knob, use
 {func}`~open_atp.config.build_prover` with a full config dict instead.

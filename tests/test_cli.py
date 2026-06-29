@@ -74,15 +74,15 @@ def test_config_overrides_standard_prover_name(tmp_path: Path) -> None:
 
 def test_list_of_names_and_config_mappings(tmp_path: Path) -> None:
     spec = [
-        "agent:claude",
+        "claude",
         {"type": "agent", "harness": {"type": "codex", "model": "gpt-5.5"}},
         {"name": "my-numina", "type": "numina"},
     ]
 
     provers = _select(spec, None)
 
-    assert sorted(provers) == ["agent:claude", "agent:codex", "my-numina"]
-    assert provers["agent:codex"].harness.model == "gpt-5.5"  # type: ignore[attr-defined]
+    assert sorted(provers) == ["claude", "codex", "my-numina"]
+    assert provers["codex"].harness.model == "gpt-5.5"  # type: ignore[attr-defined]
 
 
 def test_duplicate_derived_names_are_suffixed(tmp_path: Path) -> None:

@@ -67,7 +67,7 @@ Vibe-specific `agent`, `max_turns`, and `max_price` knobs (which live only on th
 harness, not the shared base).
 
 Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
-`agent:vibe` (defaults: `agent="lean-standin"`,
+`vibe` (defaults: `agent="lean-standin"`,
 `model="magistral-medium-latest"`). `standard_prover`
 returns this default prover only; to swap the model, construct
 `VibeHarness(model="devstral-medium-latest")` and pass it to `AgentProver`

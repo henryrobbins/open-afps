@@ -13,7 +13,7 @@ from open_atp.backends.docker import DockerBackend
 from open_atp.examples import EXAMPLE, example_task
 from open_atp import standard_prover
 
-prover = standard_prover("agent:claude", backend=DockerBackend())
+prover = standard_prover("claude", backend=DockerBackend())
 result = prover.prove(example_task(EXAMPLE.MUL_REORDER), tempfile.mkdtemp())
 print("success:", result.success)
 ```

@@ -51,7 +51,7 @@ from open_atp import standard_prover
 from open_atp.backends import DockerBackend
 from open_atp.examples import EXAMPLE, example_task
 
-prover = standard_prover("agent:claude", backend=DockerBackend())
+prover = standard_prover("claude", backend=DockerBackend())
 task = example_task(EXAMPLE.MUL_REORDER)
 
 result = prover.prove(task, tempfile.mkdtemp())
@@ -60,8 +60,8 @@ print(result.success)
 
 ## Available provers
 
-The `ID` is the `standard_prover` catalog name; the `--provers` CLI flag also
-accepts the short prover names (`agent`, `codex`, `aristotle`, ...). The agentic
+The `ID` is the `standard_prover` catalog name, which the `--provers` CLI flag
+also accepts. The agentic
 provers run a coding-agent *harness* (staged into the sandbox) sharing
 [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp); the shared `Verifier`
 does the final check regardless of which tool generated the proof.
@@ -69,11 +69,11 @@ does the final check regardless of which tool generated the proof.
 <!-- BEGIN PROVER TABLE (generated from docs/provers.yaml) -->
 | Prover | ID | Skills | MCP | Paper | Source |
 | --- | --- | --- | --- | --- | --- |
-| [Claude Code](docs/provers/claude_code.md) | `agent:claude` | [leanprover](https://github.com/leanprover/skills), [lean4](https://github.com/cameronfreer/lean4-skills) | ✓ | — | — |
-| [Codex](docs/provers/codex.md) | `agent:codex` | [leanprover](https://github.com/leanprover/skills) | ✓ | — | [GitHub](https://github.com/openai/codex) |
-| [OpenCode](docs/provers/opencode.md) | `agent:opencode` | [leanprover](https://github.com/leanprover/skills) | ✓ | — | [GitHub](https://github.com/sst/opencode) |
-| [AxProver](docs/provers/axprover.md) | `agent:axprover` | — | ✗ | [Requena et al. 2026](https://openreview.net/forum?id=E30g7bO7rU) | [GitHub](https://github.com/Axiomatic-AI/ax-prover-base) |
-| [Vibe / Leanstral](docs/provers/vibe.md) | `agent:vibe` | [leanprover](https://github.com/leanprover/skills) | ✓ | [Leanstral (blog)](https://mistral.ai/news/leanstral) | [HuggingFace](https://huggingface.co/mistralai/Leanstral-2603) |
+| [Claude Code](docs/provers/claude_code.md) | `claude` | [leanprover](https://github.com/leanprover/skills), [lean4](https://github.com/cameronfreer/lean4-skills) | ✓ | — | — |
+| [Codex](docs/provers/codex.md) | `codex` | [leanprover](https://github.com/leanprover/skills) | ✓ | — | [GitHub](https://github.com/openai/codex) |
+| [OpenCode](docs/provers/opencode.md) | `opencode` | [leanprover](https://github.com/leanprover/skills) | ✓ | — | [GitHub](https://github.com/sst/opencode) |
+| [AxProver](docs/provers/axprover.md) | `axprover` | — | ✗ | [Requena et al. 2026](https://openreview.net/forum?id=E30g7bO7rU) | [GitHub](https://github.com/Axiomatic-AI/ax-prover-base) |
+| [Vibe / Leanstral](docs/provers/vibe.md) | `vibe` | [leanprover](https://github.com/leanprover/skills) | ✓ | [Leanstral (blog)](https://mistral.ai/news/leanstral) | [HuggingFace](https://huggingface.co/mistralai/Leanstral-2603) |
 | [NuminaProver](docs/provers/numina.md) | `numina` | — | ✓ | [Liu et al. 2026](https://arxiv.org/abs/2601.14027) | [GitHub](https://github.com/project-numina/numina-lean-agent) |
 | [AristotleProver](docs/provers/aristotle.md) | `aristotle` | — | ✗ | [Achim et al. 2025](https://arxiv.org/abs/2510.01346) | — |
 <!-- END PROVER TABLE -->

@@ -278,7 +278,7 @@ def _named_prover(
         if isinstance(harness, dict):
             kind = harness.get("type")
         if spec.get("type") == "agent" and kind:
-            name = f"agent:{kind}"
+            name = str(kind)
         else:
             name = str(spec.get("type", f"prover{index}"))
     return str(name), _build_prover(spec, backend)

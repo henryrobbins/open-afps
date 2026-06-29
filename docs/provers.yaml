@@ -19,7 +19,7 @@ skills:
 provers:
   - name: Claude Code
     page: claude_code
-    id:   agent:claude
+    id:   claude
     skills: [leanprover, lean4]
     mcp: true               # lean-lsp-mcp via mcp.json
     company: { label: Anthropic, url: https://www.anthropic.com }
@@ -29,7 +29,7 @@ provers:
 
   - name: Codex
     page: codex
-    id:   agent:codex
+    id:   codex
     skills: [leanprover]
     mcp: true               # lean-lsp-mcp via -c overrides
     company: { label: OpenAI, url: https://openai.com }
@@ -39,7 +39,7 @@ provers:
 
   - name: OpenCode
     page: opencode
-    id:   agent:opencode
+    id:   opencode
     skills: [leanprover]
     mcp: true
     company: null
@@ -49,7 +49,7 @@ provers:
 
   - name: AxProver
     page: axprover
-    id:   agent:axprover
+    id:   axprover
     skills: []              # ships its own Lean tooling
     mcp: false              # uses its own Lean tools, not lean-lsp-mcp
     company: { label: Axiomatic AI, url: https://axiomatic-ai.com }
@@ -59,7 +59,7 @@ provers:
 
   - name: Vibe / Leanstral
     page: vibe
-    id:   agent:vibe
+    id:   vibe
     skills: [leanprover]
     mcp: true
     company: { label: Mistral AI, url: https://mistral.ai }

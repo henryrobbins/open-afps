@@ -53,7 +53,7 @@ carries the AxProver-specific `max_iterations` knob (which lives only on this ha
 not the shared base).
 
 Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
-`agent:axprover` (defaults: `claude-opus-4-8`, `effort="high"`). The
+`axprover` (defaults: `claude-opus-4-8`, `effort="high"`). The
 `max_iterations` field caps ax-prover's proposer → builder → reviewer loop.
 
 ## Harness details

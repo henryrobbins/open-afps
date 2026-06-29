@@ -79,7 +79,7 @@ def _need_modal() -> str | None:
 
 # --- the parametrization: backends x provers ----------------------------------
 #
-# ``agent:vibe`` covers the vibe harness on its non-Labs Magistral default (the real
+# ``vibe`` covers the vibe harness on its non-Labs Magistral default (the real
 # ``labs-leanstral-2603`` model is Mistral-Labs-gated and not runnable today). Keep
 # this set in sync with the catalog -- ``test_catalog_is_fully_covered`` enforces it.
 
@@ -96,25 +96,25 @@ PROVER_SPECS = [
         id="aristotle",
     ),
     pytest.param(
-        "agent:claude",
+        "claude",
         _need_env("CLAUDE_CODE_OAUTH_TOKEN"),
         marks=pytest.mark.agent_api,
         id="agent-claude",
     ),
     pytest.param(
-        "agent:codex",
+        "codex",
         _need_codex,
         marks=pytest.mark.agent_api,
         id="agent-codex",
     ),
     pytest.param(
-        "agent:opencode",
+        "opencode",
         _need_env("ANTHROPIC_API_KEY"),
         marks=pytest.mark.agent_api,
         id="agent-opencode",
     ),
     pytest.param(
-        "agent:axprover",
+        "axprover",
         _need_env("ANTHROPIC_API_KEY"),
         marks=pytest.mark.agent_api,
         id="agent-axprover",
@@ -126,7 +126,7 @@ PROVER_SPECS = [
         id="numina",
     ),
     pytest.param(
-        "agent:vibe",
+        "vibe",
         _need_env("MISTRAL_API_KEY"),
         marks=pytest.mark.agent_api,
         id="agent-vibe",

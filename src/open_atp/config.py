@@ -25,7 +25,7 @@ ignored.
 
 For the common case of "give me a sensible default prover by name", the
 :data:`STANDARD_PROVERS` catalog names each ready-to-run default
-(``"agent:claude"``, ``"numina"``, ...) as a canonical prover spec, and
+(``"claude"``, ``"numina"``, ...) as a canonical prover spec, and
 :func:`standard_prover` builds one against a backend.
 """
 
@@ -117,16 +117,16 @@ def build_prover(config: Mapping[str, object]) -> AutomatedProver:
 
 
 #: The standard catalog: a friendly name -> the canonical ``prover`` spec for that
-#: ready-to-run default. The ``agent:<cli>`` entries are all the shared
-#: :class:`~open_atp.provers.agent_prover.AgentProver` on a different harness;
+#: ready-to-run default. The agentic entries (``claude``, ``codex``, ...) are all the
+#: shared :class:`~open_atp.provers.agent_prover.AgentProver` on a different harness;
 #: ``numina`` and ``aristotle`` are the standalone provers. Build one with
 #: :func:`standard_prover`.
 STANDARD_PROVERS: dict[str, dict[str, object]] = {
-    "agent:claude": {"type": "agent", "harness": {"type": "claude_code"}},
-    "agent:codex": {"type": "agent", "harness": {"type": "codex"}},
-    "agent:opencode": {"type": "agent", "harness": {"type": "opencode"}},
-    "agent:vibe": {"type": "agent", "harness": {"type": "vibe"}},
-    "agent:axprover": {"type": "agent", "harness": {"type": "axprover"}},
+    "claude": {"type": "agent", "harness": {"type": "claude_code"}},
+    "codex": {"type": "agent", "harness": {"type": "codex"}},
+    "opencode": {"type": "agent", "harness": {"type": "opencode"}},
+    "vibe": {"type": "agent", "harness": {"type": "vibe"}},
+    "axprover": {"type": "agent", "harness": {"type": "axprover"}},
     "numina": {"type": "numina"},
     "aristotle": {"type": "aristotle"},
 }
@@ -135,9 +135,9 @@ STANDARD_PROVERS: dict[str, dict[str, object]] = {
 def standard_prover(name: str, *, backend: ComputeBackend) -> AutomatedProver:
     """Construct a standard default prover ``name`` against ``backend``.
 
-    ``name`` is a :data:`STANDARD_PROVERS` key -- an ``agent:<cli>`` default
-    (``"agent:claude"``, ``"agent:codex"``, ``"agent:opencode"``, ``"agent:vibe"``,
-    ``"agent:axprover"``) or a standalone prover (``"numina"``, ``"aristotle"``). The
+    ``name`` is a :data:`STANDARD_PROVERS` key -- an agentic default
+    (``"claude"``, ``"codex"``, ``"opencode"``, ``"vibe"``,
+    ``"axprover"``) or a standalone prover (``"numina"``, ``"aristotle"``). The
     prover is built with its class's baked-in defaults; to customize any knob (model,
     effort, skills, ...), use :func:`build_prover` with a full config dict instead.
 
@@ -148,7 +148,7 @@ def standard_prover(name: str, *, backend: ComputeBackend) -> AutomatedProver:
     --------
 
     >>> from open_atp.backends.docker import DockerBackend
-    >>> prover = standard_prover("agent:claude", backend=DockerBackend())
+    >>> prover = standard_prover("claude", backend=DockerBackend())
     >>> prover.harness.model
     'claude-opus-4-8'
     """

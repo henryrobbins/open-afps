@@ -148,7 +148,7 @@ class AgentProver(AutomatedProver):
     baked-in defaults (see :func:`~open_atp.config.standard_prover`):
 
     >>> from open_atp import standard_prover
-    >>> prover = standard_prover("agent:codex", backend=DockerBackend())
+    >>> prover = standard_prover("codex", backend=DockerBackend())
     >>> prover.name, prover.harness.name
     ('agent', 'codex')
 

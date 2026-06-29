@@ -28,7 +28,7 @@ from open_atp.config import standard_prover
 from open_atp.examples import EXAMPLE, example_task
 
 task = example_task(EXAMPLE.MUL_REORDER)
-prover = standard_prover("agent:claude", backend=DockerBackend())
+prover = standard_prover("claude", backend=DockerBackend())
 result = prover.prove(task, output_dir=Path("demo"))
 ```
 

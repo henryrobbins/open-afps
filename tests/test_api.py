@@ -110,16 +110,16 @@ def test_standard_prover_constructs_each_catalog_prover() -> None:
     # The toolchain contract rides on the verify backend's image, not the prover.
     assert aristotle.verifier.image.lean_toolchain == DEFAULT_IMAGE.lean_toolchain
 
-    agent = build("agent:claude")
+    agent = build("claude")
     assert isinstance(agent, AgentProver) and not isinstance(agent, NuminaProver)
     assert isinstance(agent.harness, ClaudeCodeHarness)
 
-    codex = build("agent:codex")
+    codex = build("codex")
     assert isinstance(codex, AgentProver)
     assert isinstance(codex.harness, CodexHarness)
     assert codex.harness.model == "gpt-5.5"
 
-    opencode = build("agent:opencode")
+    opencode = build("opencode")
     assert isinstance(opencode.harness, OpenCodeHarness)
 
     numina = build("numina")
@@ -129,7 +129,7 @@ def test_standard_prover_constructs_each_catalog_prover() -> None:
 def test_standard_prover_uses_one_backend_for_generation_and_verify() -> None:
     backend = DockerBackend(image=DEFAULT_IMAGE)
 
-    agent = standard_prover("agent:claude", backend=backend)
+    agent = standard_prover("claude", backend=backend)
 
     assert isinstance(agent, AgentProver)
     # The catalog builds the name's defaults; there is no override surface.
@@ -143,7 +143,7 @@ def test_standard_prover_rejects_unknown_name() -> None:
     backend = DockerBackend(image=DEFAULT_IMAGE)
     with pytest.raises(ValueError, match="unknown prover"):
         standard_prover("nope", backend=backend)
-    assert {"aristotle", "agent:claude", "numina"} <= set(standard_provers())
+    assert {"aristotle", "claude", "numina"} <= set(standard_provers())
 
 
 # --- prove: lifecycle ------------------------------------------------------

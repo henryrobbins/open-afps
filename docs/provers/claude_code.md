@@ -64,7 +64,7 @@ carries its `model`/`effort`. Swap in any other harness to change CLI. Claude
 Code is the default, so a bare `AgentProver(backend=...)` already uses it.
 
 Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
-`agent:claude`.
+`claude`.
 
 ## Harness details
 

@@ -101,7 +101,7 @@ tasks = tasks_from_dir("datasets/fate-m")
 backend = DockerBackend()
 provers = {
     name: standard_prover(name, backend=backend)
-    for name in ("agent:claude", "agent:codex", "agent:opencode")
+    for name in ("claude", "codex", "opencode")
 }
 
 # Run the benchmark
@@ -130,23 +130,23 @@ We can reproduce the above Python API example with the following CLI command. We
 
 ```console
 $ open-atp benchmark datasets/fate-m runs/fate-m \
-    --provers agent:claude,agent:codex,agent:opencode \
+    --provers claude,codex,opencode \
     --compute docker \
     --tasks 1,2,3 \
     --workers 10
-╭──────┬───────────────────┬────────┬─────────┬──────╮
-│ task │ prover            │ status │    cost │ time │
-├──────┼───────────────────┼────────┼─────────┼──────┤
-│ 1    │ agent:claude_code │   ✓    │ $0.4703 │ 150s │
-│ 1    │ agent:codex       │   ✓    │ $0.6480 │ 140s │
-│ 1    │ agent:opencode    │   ✓    │ $0.2257 │ 129s │
-│ 2    │ agent:claude_code │   ✓    │ $0.5292 │ 141s │
-│ 2    │ agent:codex       │   ✓    │ $0.7480 │ 139s │
-│ 2    │ agent:opencode    │   ✓    │ $0.1336 │ 135s │
-│ 3    │ agent:claude_code │   ✓    │ $0.2901 │ 153s │
-│ 3    │ agent:codex       │   ✓    │ $0.4865 │ 147s │
-│ 3    │ agent:opencode    │   ✓    │ $0.2048 │ 139s │
-╰──────┴───────────────────┴────────┴─────────┴──────╯
+╭──────┬──────────┬────────┬─────────┬──────╮
+│ task │ prover   │ status │    cost │ time │
+├──────┼──────────┼────────┼─────────┼──────┤
+│ 1    │ claude   │   ✓    │ $0.4703 │ 150s │
+│ 1    │ codex    │   ✓    │ $0.6480 │ 140s │
+│ 1    │ opencode │   ✓    │ $0.2257 │ 129s │
+│ 2    │ claude   │   ✓    │ $0.5292 │ 141s │
+│ 2    │ codex    │   ✓    │ $0.7480 │ 139s │
+│ 2    │ opencode │   ✓    │ $0.1336 │ 135s │
+│ 3    │ claude   │   ✓    │ $0.2901 │ 153s │
+│ 3    │ codex    │   ✓    │ $0.4865 │ 147s │
+│ 3    │ opencode │   ✓    │ $0.2048 │ 139s │
+╰──────┴──────────┴────────┴─────────┴──────╯
 ```
 
 ### Using a YAML config
@@ -169,7 +169,7 @@ provers:
       type: codex
       model: gpt-5.5
       effort: medium
-  - agent:opencode
+  - opencode
 ```
 
 Supply the config to the benchmark with `--config`:

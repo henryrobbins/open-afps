@@ -58,7 +58,7 @@ prover = AgentProver(
 `provider` is inferred from the model prefix unless set explicitly.
 
 Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
-`agent:opencode`. The provider is inferred from the model prefix (`claude-*` →
+`opencode`. The provider is inferred from the model prefix (`claude-*` →
 `anthropic`, `gpt-*` → `openai`, and so on), so any provider's model is selected by
 name through the same `model` knob.
 

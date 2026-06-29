@@ -52,7 +52,7 @@ authenticates through ChatGPT/OpenAI it must run an OpenAI model, so its `model`
 defaults to `gpt-5.5` rather than the Anthropic base default.
 
 Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
-`agent:codex`.
+`codex`.
 
 ## Harness details
 
