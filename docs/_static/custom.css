@@ -16,21 +16,25 @@
 /* ---- Libertinus Math (headings / title only) --------------------------------
    Pulled from Google Fonts. If you prefer to vendor it, drop the .woff2 into
    _static/fonts/ and change the src url() to _static/fonts/<file>.woff2.       */
-@import url('https://fonts.googleapis.com/css2?family=Libertinus+Math&family=JetBrains+Mono:wght@400;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Libertinus+Math&family=JetBrains+Mono:wght@400;600&display=swap");
 
 /* =============================================================================
    1. LIGHT THEME TOKENS  (Furo reads these from :root / body)
    ============================================================================= */
 body {
   /* fonts */
-  --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-stack--monospace: "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --font-stack:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-stack--monospace:
+    "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace;
   /* custom token consumed by the heading rules in section 4 */
-  --font-heading: "Libertinus Math", "Libertinus Serif", Georgia, "Times New Roman", serif;
+  --font-heading:
+    "Libertinus Math", "Libertinus Serif", Georgia, "Times New Roman", serif;
 
   /* brand (Lean royal blue) */
-  --color-brand-primary: #3D6AC9;
-  --color-brand-content: #3D6AC9;
+  --color-brand-primary: #3d6ac9;
+  --color-brand-content: #3d6ac9;
   --color-brand-visited: #6a52c4;
 
   /* foreground */
@@ -60,7 +64,7 @@ body {
   --color-highlight-on-target: #fff6d6;
 
   /* admonitions */
-  --color-admonition-title--note: #3D6AC9;
+  --color-admonition-title--note: #3d6ac9;
   --color-admonition-title-background--note: #3d6ac918;
   --color-admonition-title--tip: #0f9d8f;
   --color-admonition-title-background--tip: #0f9d8f18;
@@ -143,10 +147,32 @@ body {
   font-family: var(--font-heading);
   letter-spacing: -0.005em;
 }
-.content h1 { font-size: 2.7rem;  line-height: 1.1; letter-spacing: -0.01em; }
-.content h2 { font-size: 1.92rem; }
-.content h3 { font-size: 1.4rem; }
-.sidebar-brand-text { font-size: 2.6em; }
+.content h1 {
+  font-size: 2.7rem;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.content h2 {
+  font-size: 1.92rem;
+}
+.content h3 {
+  font-size: 1.4rem;
+}
+.sidebar-brand-text {
+  font-size: 2.6em;
+}
+
+/* Wordmark used in place of the index page's H1 title. Light/dark variants are
+   toggled by Furo's .only-light / .only-dark classes. */
+.content h1:has(.hero-logo) {
+  line-height: 1rem;
+  margin-bottom: 1rem;
+}
+.content h1 .hero-logo {
+  height: 3rem;
+  width: auto;
+  vertical-align: middle;
+}
 
 /* Lead paragraph (use the `.lede` class, or `.. rst-class:: lede`) */
 .content .lede {
@@ -160,7 +186,9 @@ body {
    ============================================================================= */
 
 /* brand badge / logo bubble in the sidebar, if you use a text brand */
-.sidebar-brand { gap: 0.6em; }
+.sidebar-brand {
+  gap: 0.6em;
+}
 
 /* API signature blocks: Lean-blue left rule (Furo already boxes these) */
 dl.py > dt.sig,
@@ -170,9 +198,13 @@ dl.cpp > dt.sig {
 }
 
 /* Rounded code blocks to match the Lean site's soft cards */
-.highlight { border-radius: 9px; }
+.highlight {
+  border-radius: 9px;
+}
 div.highlight,
-pre { border-radius: 9px; }
+pre {
+  border-radius: 9px;
+}
 
 /* Inline code pill */
 code.literal,

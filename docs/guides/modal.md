@@ -1,68 +1,63 @@
 # Running Remotely with Modal
 
-`open-atp` can run commands in [Modal](https://modal.com/) Sandboxes instead of
-local Docker containers. Each run gets its own cloud Sandbox, which avoids duplicate
-[Lean](https://lean-lang.org/) environments and lets many runs proceed in parallel
-without consuming local resources.
+OpenATP supports running agentic provers remotely in [Modal](https://modal.com/) Sandboxes. Modal bills for compute per second -- see current [pricing](https://modal.com/pricing). In this guide, we will authenticate with the Modal CLI, build the OpenATP Modal image, and test everything by verifying a small theorem.
 
-## Install Modal
+## Authenticate with the Modal CLI
 
-Modal ships as a dependency of `open-atp`. You'll need a Modal account — sign up at
-[modal.com](https://modal.com/signup) if you don't have one. Then authenticate the
-`modal` CLI against your Modal workspace (this writes a token to `~/.modal.toml`):
+First, create a [Modal account](https://modal.com/signup) if you don't have one. The `open-atp` Python package ships with the `modal` dependency. Authenticate using the `modal` CLI (this writes a token to `~/.modal.toml`):
 
 ```bash
 modal setup
 ```
 
-Verify the credentials are working with:
-
-```bash
-modal app list
-```
-
 ## Build the Modal image
 
-Unlike Docker, Modal Sandboxes have an isolated filesystem and ignore a container
-`USER`, so the sandbox image is built and published programmatically (rather than
-from `images/Dockerfile`). It installs the Lean toolchain and agent CLIs globally as
-root and bakes the same warm Mathlib `olean` cache. Build and publish it with:
+Modal Sandbox containers are created from the same OpenATP default Docker image. Before running any prover, you must create the image on Modal. Build it with the `open-atp` CLI:
 
 ```bash
 open-atp build-modal-image
 ```
 
-This publishes a named Modal image (`open-atp` by default) that the backend looks
-up at run time. The name must match `ModalBackend`'s `image` (sans `:tag`); pass `--name`
-to publish under a different name and `--force` to rebuild even when Modal has cached
-layers. As with Docker, the first build pre-builds Mathlib and is expected to take a
-while.
+Use the Modal CLI to check the image was created successfully.
 
-## Testing Modal
-
-A {class}`~open_atp.backends.modal.ModalBackend` is a drop-in
-{class}`~open_atp.backends.base.ComputeBackend` — substitute it for the
-`DockerBackend` anywhere a compute backend is expected. To confirm the published
-image is wired up correctly, prove one of the bundled
-{doc}`example formulations <../examples>` with the `agent:claude` prover against a
-`ModalBackend`. This exercises the whole pipeline (stage → generate → verify) end to
-end:
-
-```python
-from open_atp import standard_prover
-from open_atp.backends.modal import ModalBackend
-from open_atp.examples import EXAMPLE, example_task
-
-prover = standard_prover("agent:claude", backend=ModalBackend(cpu=4.0, memory_mib=4096))
-result = prover.prove(example_task(EXAMPLE.MUL_REORDER), "runs/modal_test")
-print("success:", result.success)
+```bash
+$ modal image names list
+┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Tag                ┃ Image ID                  ┃ Updated at           ┃
+┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+│ open-atp:latest    │ im-9rcKV2cJKID4nhE4GQGbPm │ 2026-06-25 17:39 EDT │
+└────────────────────┴───────────────────────────┴──────────────────────┘
 ```
 
-`cpu` is a guaranteed floor of cores (the Sandbox may burst higher) and `memory_mib`
-is in MiB. See the {doc}`/api/backends` reference for the full set of options. This
-also needs a Claude Code credential (see {doc}`../provers/claude_code`).
+The Docker image for Modal is nearly identical to the `Dockerfile` used to build the local Docker image. It is built programmatically using the `modal` Python package for more effective caching.
 
-:::{note}
-Running on Modal incurs cloud compute charges billed by your Modal workspace. See
-[Modal's pricing](https://modal.com/pricing) for details.
+:::{dropdown} `_build_modal_image()`
+:icon: code
+```{literalinclude} ../../src/open_atp/__main__.py
+:language: python
+:pyobject: _build_modal_image
+```
 :::
+
+## Test the image
+
+To confirm the image was built correctly, use the test method below. It verifies a trivial proof inside the Modal Sandbox container. No prover is run and no agent credentials are needed.
+
+```python
+from open_atp.backends.modal import ModalBackend
+
+assert ModalBackend().test()
+```
+
+## Configure and monitor resources
+
+{class}`~open_atp.backends.modal.ModalBackend` accepts `cpu` (a guaranteed floor of cores; the Sandbox may burst higher) and `memory_mib` (in MiB). It is recommended to budget at least 2 CPUs and 4 GB of memory. This was found to achieve a good time/cost tradeoff.
+
+```python
+from open_atp.backends.modal import ModalBackend
+
+backend = ModalBackend(cpu=2.0, memory_mib=4096)
+```
+
+Live Sandboxes, their resource usage, and per-second cost are visible from the
+[Modal dashboard](https://modal.com/apps). You can also terminate runaway jobs from the dashboard.

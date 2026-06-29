@@ -1,8 +1,9 @@
 """CLI tests for the benchmark/download commands (no Docker, no network).
 
-Covers the YAML provers-config parsing (single string, list of names + config
-mappings, name derivation/collision, defaults to all standard provers) and that
-``download`` dispatches to :func:`~open_atp.benchmark.download_dataset` with the right
+Covers the ``--config`` mapping parsing, the prover registry/selection (names + config
+mappings, name derivation/collision, defaults to all standard provers), the task-filter
+normalization, and that ``download`` dispatches to
+:func:`~open_atp.benchmark.download_dataset` with the right
 :class:`~open_atp.benchmark.DATASET`. Building a prover constructs it but does not run
 it, so no backend is exercised.
 """
@@ -23,54 +24,105 @@ def _backend() -> object:
     return build_backend({"type": "docker"})  # constructed, never started
 
 
-def test_no_config_uses_all_standard_provers(tmp_path: Path) -> None:
-    provers = cli._load_provers(tmp_path, None, _backend())
-    assert sorted(provers) == sorted(standard_provers())
+def _select(provers_spec: object, provers_arg: str | None) -> dict[str, object]:
+    backend = _backend()
+    registry = cli._build_registry(provers_spec, backend)
+    return cli._select_provers(registry, provers_arg, backend)
 
 
-def test_single_string_is_one_standard_prover(tmp_path: Path) -> None:
-    cfg = tmp_path / "p.yaml"
-    cfg.write_text("numina\n")
-    assert sorted(cli._load_provers(tmp_path, str(cfg), _backend())) == ["numina"]
+def test_no_config_no_provers_uses_all_standard(tmp_path: Path) -> None:
+    assert sorted(_select(None, None)) == sorted(standard_provers())
+
+
+def test_provers_selects_standard_provers(tmp_path: Path) -> None:
+    assert sorted(_select(None, "numina,aristotle")) == ["aristotle", "numina"]
+
+
+def test_config_without_provers_runs_whole_config(tmp_path: Path) -> None:
+    assert sorted(_select("numina", None)) == ["numina"]
+
+
+def test_provers_reference_config_entries(tmp_path: Path) -> None:
+    spec = [
+        {"name": "my-numina", "type": "numina"},
+        {
+            "name": "my-codex",
+            "type": "agent",
+            "harness": {"type": "codex", "model": "gpt-5.5"},
+        },
+    ]
+
+    provers = _select(spec, "my-codex,aristotle")
+
+    assert sorted(provers) == ["aristotle", "my-codex"]
+    assert provers["my-codex"].harness.model == "gpt-5.5"  # type: ignore[attr-defined]
+
+
+def test_config_overrides_standard_prover_name(tmp_path: Path) -> None:
+    spec = [
+        {
+            "name": "agent",
+            "type": "agent",
+            "harness": {"type": "codex", "model": "gpt-5.5"},
+        }
+    ]
+
+    provers = _select(spec, "agent")
+
+    assert provers["agent"].harness.model == "gpt-5.5"  # type: ignore[attr-defined]
 
 
 def test_list_of_names_and_config_mappings(tmp_path: Path) -> None:
-    cfg = tmp_path / "p.yaml"
-    cfg.write_text(
-        "- agent:claude\n"
-        "- type: agent\n"
-        "  harness:\n"
-        "    type: codex\n"
-        "    model: gpt-5.5\n"
-        "- name: my-numina\n"
-        "  type: numina\n"
-    )
+    spec = [
+        "agent:claude",
+        {"type": "agent", "harness": {"type": "codex", "model": "gpt-5.5"}},
+        {"name": "my-numina", "type": "numina"},
+    ]
 
-    provers = cli._load_provers(tmp_path, str(cfg), _backend())
+    provers = _select(spec, None)
 
     assert sorted(provers) == ["agent:claude", "agent:codex", "my-numina"]
     assert provers["agent:codex"].harness.model == "gpt-5.5"  # type: ignore[attr-defined]
 
 
-def test_provers_yaml_autodetected_in_directory(tmp_path: Path) -> None:
-    (tmp_path / "provers.yaml").write_text("aristotle\n")
-    assert sorted(cli._load_provers(tmp_path, None, _backend())) == ["aristotle"]
-
-
 def test_duplicate_derived_names_are_suffixed(tmp_path: Path) -> None:
-    cfg = tmp_path / "p.yaml"
-    cfg.write_text("- numina\n- type: numina\n")
-
-    provers = cli._load_provers(tmp_path, str(cfg), _backend())
-
+    provers = _select(["numina", {"type": "numina"}], None)
     assert sorted(provers) == ["numina", "numina-1"]
 
 
 def test_invalid_entry_rejected(tmp_path: Path) -> None:
-    cfg = tmp_path / "p.yaml"
-    cfg.write_text("- 123\n")
     with pytest.raises(SystemExit):
-        cli._load_provers(tmp_path, str(cfg), _backend())
+        _select([123], None)
+
+
+def test_load_config_reads_mapping(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("compute: modal\nworkers: 3\ntasks: [a, b]\nprovers: numina\n")
+    config = cli._load_config(str(cfg))
+    assert config == {
+        "compute": "modal",
+        "workers": 3,
+        "tasks": ["a", "b"],
+        "provers": "numina",
+    }
+
+
+def test_load_config_none_is_empty() -> None:
+    assert cli._load_config(None) == {}
+
+
+def test_load_config_rejects_non_mapping(tmp_path: Path) -> None:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("- numina\n")
+    with pytest.raises(SystemExit):
+        cli._load_config(str(cfg))
+
+
+def test_task_filter_normalizes_string_and_list() -> None:
+    assert cli._task_filter("a, b ,") == ["a", "b"]
+    assert cli._task_filter(["a", " b "]) == ["a", "b"]
+    assert cli._task_filter(None) is None
+    assert cli._task_filter([]) is None
 
 
 def test_load_dotenv_seeds_missing_without_overriding(

@@ -20,6 +20,7 @@ print("success:", result.success)
 
 Pass any {class}`~open_atp.examples.EXAMPLE` member. The bundled exercises are:
 
+(MUL_REORDER)=
 ## `MUL_REORDER`
 
 C02 "Calculating" — reorder a product of reals.

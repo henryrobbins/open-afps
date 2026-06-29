@@ -26,26 +26,15 @@ generate, then verify in the sandbox) so subclasses only implement `_generate`.
 
 The concrete candidate generators.
 
-### AgentProver
-
 ```{eval-rst}
 .. autoclass:: open_atp.provers.agent_prover.AgentProver
    :show-inheritance:
 ```
 
-`AgentProver`'s `harness` is a {class}`~open_atp.harness.Harness` — pick the
-CLI and its knobs by composing one (e.g.
-`AgentProver(harness=VibeHarness(max_turns=8), backend=...)`). The per-harness classes
-are documented under {doc}`harness`.
-
-### NuminaProver
-
 ```{eval-rst}
 .. autoclass:: open_atp.provers.numina.NuminaProver
    :show-inheritance:
 ```
-
-### AristotleProver
 
 ```{eval-rst}
 .. autoclass:: open_atp.provers.aristotle.AristotleProver

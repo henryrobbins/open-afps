@@ -4,9 +4,7 @@ tocdepth: 3
 
 # CLI Reference
 
-The `open-atp` command-line interface is a thin shell over the prover API. The
-reference below is generated from the parser itself, so it always matches the
-installed version.
+The `open-atp` command-line interface is a thin shell over the Python API.
 
 ```{eval-rst}
 .. argparse::

@@ -1,82 +1,34 @@
-# Benchmarking provers
+# Benchmarking Provers
 
-To compare provers, {func}`~open_atp.benchmark.run_benchmark` runs every
-`(task, prover)` pair and writes each cell to
-`output_dir/<task>/<prover>/{wd,logs,results.json}`. Both tasks and provers are passed
-as **name → object** mappings (the names become the subdirectory names, so several
-provers sharing a class `name` — every `agent:*` is `"agent"` — stay distinct):
+A benchmark runs a set of provers across a set of proof tasks. This guide covers the dataset format, how to download datasets, and how to run a benchmark with both the Python API and the CLI.
 
-```python
-from pathlib import Path
+## Prerequisites
 
-from open_atp.backends.docker import DockerBackend
-from open_atp.benchmark import run_benchmark
-from open_atp.config import standard_prover
-from open_atp.examples import EXAMPLE, example_task
-from open_atp.images import DEFAULT_IMAGE
+- A compute backend configured: {doc}`Docker </guides/docker>` or
+  {doc}`Modal </guides/modal>`.
+- Credentials for whichever provers you run (see {doc}`/provers/index`).
 
-backend = DockerBackend(image=DEFAULT_IMAGE)
-tasks = {EXAMPLE.MUL_REORDER.value: example_task(EXAMPLE.MUL_REORDER)}
-provers = {
-    name: standard_prover(name, backend=backend)
-    for name in ("agent:claude", "numina")
-}
+## Dataset
 
-result = run_benchmark(tasks, provers, Path("runs/benchmark"))
-for run in result.runs:
-    print(run.task, run.prover, run.result.success)
-```
+A benchmark is just a directory of Lean tasks. OpenATP bundles several public proof-synthesis benchmarks (see {doc}`/datasets`). You can also create your own benchmarking datasets.
 
-The returned {class}`~open_atp.benchmark.BenchmarkResult` collects every cell in
-`result.runs`, one per `(task, prover)` (the `open-atp benchmark` CLI renders these as
-a table; `result.to_dict()` is the JSON view). A prover that raises is recorded as a
-failed {class}`~open_atp.provers.base.ProofResult` (its `error` captured) so one bad
-run never aborts the sweep.
+### Dataset structure
 
-Pairs run concurrently on a thread pool. `max_workers` caps the total in flight
-(`None` auto-sizes; `1` is serial), and `max_per_prover` (default `5`) caps how many
-runs any *single* prover may have in flight — so a rate-limited prover (e.g. a hosted
-model) stays under its limit even when other provers fill the pool. Pass `only=[...]`
-to run a subset of the tasks (by name, in the given order) instead of the whole set.
+A dataset is a directory containing proof tasks in one of three styles:
 
-A `tqdm` progress bar tracks the pairs (disable with `progress=False`), and each
-completion is logged via `structlog` with its task, prover, status, duration, and
-cost. Aristotle's live progress display is captured to its run's `logs/stdout.txt`
-rather than streamed to the terminal, so the sweep stays readable.
+- A single `.lean` file.
+- A subdirectory containing multiple `.lean` files (considered a single task).
+- A complete lake project (contains `lean-toolchain`, `lakefile.toml`, and `lake-manifest.json`).
 
-To run this sweep over the five bundled {class}`~open_atp.examples.EXAMPLE` tasks,
-download them like any other dataset and benchmark the resulting directory:
-
-```bash
-open-atp download examples datasets         # -> datasets/examples
-open-atp benchmark datasets/examples runs/examples --compute docker
-```
-
-`download examples` copies the bundled assets from the package (no clone); the
-directory is then an ordinary {func}`~open_atp.benchmark.tasks_from_dir` input, so
-all the `benchmark` options (`--provers`, `--compute {docker,modal}`, ...) apply.
-
-## Tasks from a directory
-
-To benchmark a directory of tasks, {func}`~open_atp.benchmark.tasks_from_dir` builds
-the `tasks` mapping. Each entry directly under the directory becomes one task:
-
-- A loose `.lean` file becomes a task named by its stem, staged into the skeleton.
-- A subdirectory becomes a task named by the subdirectory. If it is *already* a
-  complete lake project (it carries its own `lean-toolchain` and lakefile) it is used
-  as-is; otherwise its `.lean` files (which may be several) are staged into the
-  skeleton.
-
-Entries beginning with `.` and subdirectories with no `.lean` files are skipped, so a
-mix of all three styles in one directory is fine:
+A single dataset can contain a mix of these styles. The name of the task is derived from the file or subdirectory name. The example dataset below contains four tasks: `single_1`, `single_2`, `multi_file`, and `full_project`.
 
 ```
 benchmark/
-├── easy_lemma.lean              # bare file → task "easy_lemma"
-├── another.lean                 # bare file → task "another"
-├── multi_file/                  # staged subdir → task "multi_file"
+├── single_1.lean                # single file → task "single_1"
+├── single_2.lean                # single file → task "single_2"
+├── multi_file/                  # multiple files → task "multi_file"
 │   ├── Defs.lean
-│   └── Problem.lean             # several .lean files, staged together
+│   └── Problem.lean
 └── full_project/                # complete lake project → task "full_project"
     ├── lean-toolchain
     ├── lakefile.toml
@@ -85,65 +37,151 @@ benchmark/
         └── Problem.lean
 ```
 
-A directory may also be entirely one style — all bare files, or all per-task
-subdirectories, as the public benchmarks ship:
+### Loading a dataset
 
-```
-fate-m/FATEM/                    putnam/                     loose/
-├── algebra_001/                 ├── putnam_1962_a1/         ├── thm_1.lean
-│   └── problem.lean             │   └── putnam_1962_a1.lean ├── thm_2.lean
-└── algebra_002/                 └── putnam_1963_a1/         └── thm_3.lean
-    └── problem.lean                 └── putnam_1963_a1.lean
-```
-
-## Downloading a dataset
-
-{func}`~open_atp.benchmark.download_dataset` fetches one of the included public
-benchmarks — sparse-cloning just the task subdirectory into a flat `dest/<dataset>`
-directory ready for {func}`~open_atp.benchmark.tasks_from_dir`:
+Datasets are loaded with {func}`~open_atp.benchmark.tasks_from_dir`, which returns a mapping of task names to {class}`~open_atp.lean.ProofTask` objects. We can load the example dataset above with:
 
 ```python
-from open_atp.benchmark import DATASET, download_dataset, run_benchmark, tasks_from_dir
+from open_atp.benchmark import tasks_from_dir
 
-src = download_dataset(DATASET.FATE_M, "datasets")  # datasets/fate-m
-result = run_benchmark(tasks_from_dir(src), provers, Path("runs/fate-m"))
+tasks = tasks_from_dir("benchmark")
+list(tasks.keys())
+>>> ['single_1', 'single_2', 'multi_file', 'full_project']
 ```
 
-See {doc}`../datasets` for the bundled {class}`~open_atp.benchmark.DATASET` members
-and their toolchains. PutnamBench pins an older Lean than the default skeleton, so
-stage it against a matching skeleton (`tasks_from_dir(src, skeleton=...)`).
+:::{warning}
+Single and multi-file tasks are loaded with {meth}`~open_atp.lean.create_project` which uses a lake project skeleton pinned to `v4.28.0` of the Lean toolchain and Mathlib by default. If the dataset requires different versions, supply the `skeleton` argument to {func}`~open_atp.benchmark.tasks_from_dir` which forwards to {meth}`~open_atp.lean.create_project`.
+:::
 
-## From the command line
+### Downloading a dataset
 
-Download a dataset, then benchmark it — the `benchmark` command runs
-{func}`~open_atp.benchmark.tasks_from_dir` over the directory and prints the table:
+Common proof-synthesis benchmarks can be downloaded with {func}`~open_atp.benchmark.download_dataset`. The available datasets are listed in {doc}`/datasets`. The following example downloads the FATE-M {cite:p}`jiang2025fate` dataset into `datasets/fate-m`:
+
+```python
+from open_atp.benchmark import DATASET, download_dataset
+
+src = download_dataset(DATASET.FATE_M, "datasets")
+```
+
+You can also use the CLI:
 
 ```bash
-open-atp download fate-m datasets            # -> datasets/fate-m
-open-atp benchmark datasets/fate-m runs/fate-m --compute docker
+open-atp download fate-m datasets
 ```
 
-`benchmark` runs every standard prover by default. To choose provers, pass a YAML
-config with `--provers` (or drop a `provers.yaml` in the benchmarked directory). The
-config is either a single standard prover name, or a list whose entries are each a
-standard prover name **or** a prover-config mapping (an optional `name` keys the
-result; otherwise it is derived from the prover/harness type):
+The FATE-M dataset is a flat directory of single `.lean` files.
+
+```
+datasets/fate-m
+├── 1.lean
+├── 2.lean
+├── 3.lean
+├── ...
+└── 100.lean
+```
+
+## Benchmark with the Python API
+
+Use {func}`~open_atp.benchmark.run_benchmark` to run a set of provers across a set of tasks. It takes a mapping of task names to {class}`~open_atp.lean.ProofTask` objects, a mapping of prover names to {class}`~open_atp.provers.base.AutomatedProver` objects, and an output directory.
+
+This example runs the Claude Code, Codex, and OpenCode provers across the FATE-M dataset.
+
+```python
+from pathlib import Path
+
+from open_atp.backends.docker import DockerBackend
+from open_atp.benchmark import DATASET, download_dataset, run_benchmark, tasks_from_dir
+from open_atp.config import standard_prover
+
+# Download the FATE-M dataset and load the tasks
+src = download_dataset(DATASET.FATE_M, "datasets")
+tasks = tasks_from_dir("datasets/fate-m")
+
+# Define the provers to benchmark
+backend = DockerBackend()
+provers = {
+    name: standard_prover(name, backend=backend)
+    for name in ("agent:claude", "agent:codex", "agent:opencode")
+}
+
+# Run the benchmark
+result = run_benchmark(tasks, provers, Path("runs/fate-m"))
+```
+
+The returned {class}`~open_atp.benchmark.BenchmarkResult` collects a list of {class}`~open_atp.benchmark.BenchmarkRun` objects which combine each (task, prover) pair with its {class}`~open_atp.provers.base.ProofResult`. The output directory contains a subdirectory `<task>/<prover>` for each pair with the same structure as a single run (see {ref}`prover-output`).
+
+Use `only` to restrict to a subset of the tasks and `max_workers` to control concurrency. See the {doc}`/api/index` for the full signature of {func}`~open_atp.benchmark.run_benchmark`.
+
+```python
+result = run_benchmark(
+    tasks, provers, Path("runs/fate-m"),
+    only=["1", "2", "3"],
+    max_workers=10,
+)
+```
+
+## Benchmark with the CLI
+
+The `open-atp benchmark` command is a thin shell over the same API. Provide a path to the dataset, an output destination for the result, and optionally a list of provers to run.
+
+### Benchmark standard provers
+
+We can reproduce the above Python API example with the following CLI command. We provide a list of standard provers to `--provers`, set the compute backend to Docker with `--compute`, restrict to the first three tasks with `--tasks`, and finally set `--workers` to 10 to allow up to 10 concurrent runs.
+
+```console
+$ open-atp benchmark datasets/fate-m runs/fate-m \
+    --provers agent:claude,agent:codex,agent:opencode \
+    --compute docker \
+    --tasks 1,2,3 \
+    --workers 10
+╭──────┬───────────────────┬────────┬─────────┬──────╮
+│ task │ prover            │ status │    cost │ time │
+├──────┼───────────────────┼────────┼─────────┼──────┤
+│ 1    │ agent:claude_code │   ✓    │ $0.4703 │ 150s │
+│ 1    │ agent:codex       │   ✓    │ $0.6480 │ 140s │
+│ 1    │ agent:opencode    │   ✓    │ $0.2257 │ 129s │
+│ 2    │ agent:claude_code │   ✓    │ $0.5292 │ 141s │
+│ 2    │ agent:codex       │   ✓    │ $0.7480 │ 139s │
+│ 2    │ agent:opencode    │   ✓    │ $0.1336 │ 135s │
+│ 3    │ agent:claude_code │   ✓    │ $0.2901 │ 153s │
+│ 3    │ agent:codex       │   ✓    │ $0.4865 │ 147s │
+│ 3    │ agent:opencode    │   ✓    │ $0.2048 │ 139s │
+╰──────┴───────────────────┴────────┴─────────┴──────╯
+```
+
+### Using a YAML config
+
+It is often useful to configure a benchmark with a YAML file. The YAML configuration supports the same keys as the CLI flags: `provers`, `tasks`, `compute`, and `workers`. The `provers` key accepts a list of standard prover names *or* a custom prover configuration can be supplied. The below example uses the OpenCode standard prover and two custom agent provers that override the default model and effort level.
 
 ```yaml
-- agent:claude            # a standard prover name
-- type: agent             # a prover config (built against --compute)
-  harness:
-    type: codex
-    model: gpt-5.5
-- name: aristotle-hosted  # an explicit name for this entry
-  type: aristotle
+# config.yaml
+compute: docker
+workers: 10
+tasks: [1, 2, 3]
+provers:
+  - type: agent
+    harness:
+      type: claude_code
+      model: claude-opus-4-8
+      effort: medium
+  - type: agent
+    harness:
+      type: codex
+      model: gpt-5.5
+      effort: medium
+  - agent:opencode
 ```
 
-`--compute {docker,modal}` picks the backend (standard image, default `docker`),
-`-n/--max-workers` bounds total parallelism (each prover is still capped at 5
-concurrent runs), `--tasks t1,t2` runs only those tasks (default: all in the
-directory), and `--json` emits the {class}`~open_atp.benchmark.BenchmarkResult` as
-JSON.
+Supply the config to the benchmark with `--config`:
 
-The CLI loads credentials from a `.env` in the working directory (or a parent), so
-provers like Aristotle find their API keys without exporting them by hand.
+```bash
+open-atp benchmark datasets/fate-m runs/fate-m --config config.yaml
+```
+
+The YAML configuration can be overridden by CLI flags.
+
+```bash
+open-atp benchmark datasets/fate-m runs/fate-m --config config.yaml --compute modal
+```
+
+See {doc}`/cli` for the full reference.
