@@ -209,6 +209,31 @@ def _skip_non_methods(
     return None
 
 
+#: Prefix sphinx-argparse uses for an argument's choice list (sphinxarg.ext renders
+#: it as a flat ``Possible choices: a, b`` paragraph with no inline markup).
+_CHOICES_PREFIX = "Possible choices: "
+
+
+def _codeify_arg_choices(app: Sphinx, doctree: nodes.document) -> None:
+    """Wrap each value in a sphinx-argparse ``Possible choices:`` line in ``literal``.
+
+    sphinx-argparse emits the choices as a single plain-text paragraph; rebuild it so
+    each choice renders as inline code on the CLI reference page.
+    """
+    for para in list(doctree.findall(nodes.paragraph)):
+        text = para.astext()
+        if not text.startswith(_CHOICES_PREFIX):
+            continue
+        choices = [c.strip() for c in text[len(_CHOICES_PREFIX) :].split(",")]
+        children: list[nodes.Node] = [nodes.Text(_CHOICES_PREFIX)]
+        for i, choice in enumerate(choices):
+            if i:
+                children.append(nodes.Text(", "))
+            children.append(nodes.literal(text=choice))
+        para.children = children
+
+
 def setup(app: Sphinx) -> None:
     app.connect("missing-reference", _resolve_modal_xref)
     app.connect("autodoc-skip-member", _skip_non_methods)
+    app.connect("doctree-read", _codeify_arg_choices)

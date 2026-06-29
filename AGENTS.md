@@ -43,7 +43,7 @@ verifier **rejects** projects whose toolchain doesn't match the sandbox image's 
 ```
 src/open_atp/
   api.py            Platform + prover registry — the dispatch/orchestration layer
-  __main__.py       `open-atp solve | build-image | build-modal-image` CLI
+  __main__.py       `open-atp solve | build-docker-image | build-modal-image` CLI
   images/           image name + toolchain pins (DEFAULT_IMAGE, DEFAULT_TOOLCHAIN)
   lean.py           LeanProject, ProofTask, create_project (the Lean input contract)
   verify.py         VerificationReport, Verifier (the shared final check)
@@ -157,7 +157,7 @@ verify with `--agent-backend`.
 - **Docker** (`DockerBackend`) — bind-mounts the workdir; uses `images/Dockerfile`,
   runs as the `agent` user. Local; build the image first:
   ```bash
-  docker build -t open-atp:latest images/      # or: make build-image / open-atp build-image
+  docker build -t open-atp:latest images/      # or: make build-image / open-atp build-docker-image
   uv run pytest -m docker
   ```
 - **Modal** (`ModalBackend`) — pushes/pulls the workdir around an isolated Sandbox
@@ -190,7 +190,7 @@ open-atp solve <inputs...> [options]      # lake project dir, or bare .lean file
   --max-workers N
   --json                          emit SolveResult as JSON
 
-open-atp build-image       [--tag TAG] [--no-cache]
+open-atp build-docker-image       [--tag TAG] [--no-cache]
 open-atp build-modal-image [--name N] [--app A] [--force]
 ```
 

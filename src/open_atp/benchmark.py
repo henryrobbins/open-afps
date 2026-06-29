@@ -12,8 +12,8 @@ out under ``output_dir`` as::
 recorded as a failed result (its ``error`` captured) so one bad run never aborts the
 sweep.
 
-The returned :class:`BenchmarkResult` collects every cell and renders a terminal table
-(:meth:`BenchmarkResult.table`) for quick comparison.
+The returned :class:`BenchmarkResult` collects every cell; the ``open-atp benchmark``
+CLI renders it as a table, and :meth:`BenchmarkResult.to_dict` is the JSON view.
 
 :func:`tasks_from_dir` builds the ``tasks`` mapping from a directory laid out like the
 public Lean benchmarks (`PutnamBench
@@ -72,7 +72,7 @@ class BenchmarkRun:
 
 @dataclass(frozen=True)
 class BenchmarkResult:
-    """The collected cells of a benchmark sweep, with a table view.
+    """The collected cells of a benchmark sweep.
 
     Attributes
     ----------
@@ -84,30 +84,6 @@ class BenchmarkResult:
 
     output_dir: Path
     runs: list[BenchmarkRun]
-
-    def table(self) -> str:
-        """A monospace table, one row per ``(task, prover)``: status, cost, time."""
-        header = ("task", "prover", "status", "cost", "time")
-        rows = [header]
-        for run in self.runs:
-            r = run.result
-            if r.success:
-                status = "✓"
-            elif r.error is not None:
-                status = "ERR"
-            else:
-                status = "✗"
-            cost = f"${r.cost_usd:.4f}" if r.cost_usd is not None else "—"
-            time = f"{r.duration_s:.0f}s" if r.duration_s is not None else "—"
-            rows.append((run.task, run.prover, status, cost, time))
-
-        widths = [max(len(row[i]) for row in rows) for i in range(len(header))]
-        lines = []
-        for n, row in enumerate(rows):
-            lines.append("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)))
-            if n == 0:
-                lines.append("  ".join("-" * w for w in widths))
-        return "\n".join(lines)
 
     def to_dict(self) -> dict[str, object]:
         """JSON-ready view: the output root plus each cell's task, prover, result."""
@@ -177,7 +153,7 @@ def run_benchmark(
     Returns
     -------
     BenchmarkResult
-        Every ``(task, prover)`` cell, with a :meth:`~BenchmarkResult.table` view.
+        Every ``(task, prover)`` cell (see :meth:`~BenchmarkResult.to_dict`).
     """
     output_dir = Path(output_dir)
     if only is not None:

@@ -28,7 +28,7 @@ pip install open-atp
 Docker container. The image must be built before running any prover:
 
 ```bash
-open-atp build-image
+open-atp build-docker-image
 ```
 
 Each harness has its own authentication requirements, and the hosted provers

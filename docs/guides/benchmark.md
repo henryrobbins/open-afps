@@ -23,14 +23,15 @@ provers = {
 }
 
 result = run_benchmark(tasks, provers, Path("runs/benchmark"))
-print(result.table())
+for run in result.runs:
+    print(run.task, run.prover, run.result.success)
 ```
 
-The returned {class}`~open_atp.benchmark.BenchmarkResult` collects every cell
-(`result.runs`) and renders a terminal table with one row per `(task, prover)`. A
-prover that raises is recorded as a failed
-{class}`~open_atp.provers.base.ProofResult` (its `error` captured) so one bad run never
-aborts the sweep.
+The returned {class}`~open_atp.benchmark.BenchmarkResult` collects every cell in
+`result.runs`, one per `(task, prover)` (the `open-atp benchmark` CLI renders these as
+a table; `result.to_dict()` is the JSON view). A prover that raises is recorded as a
+failed {class}`~open_atp.provers.base.ProofResult` (its `error` captured) so one bad
+run never aborts the sweep.
 
 Pairs run concurrently on a thread pool. `max_workers` caps the total in flight
 (`None` auto-sizes; `1` is serial), and `max_per_prover` (default `5`) caps how many
@@ -119,7 +120,7 @@ Download a dataset, then benchmark it — the `benchmark` command runs
 
 ```bash
 open-atp download fate-m datasets            # -> datasets/fate-m/FATEM
-open-atp benchmark datasets/fate-m/FATEM --compute docker
+open-atp benchmark datasets/fate-m/FATEM runs/fate-m --compute docker
 ```
 
 `benchmark` runs every standard prover by default. To choose provers, pass a YAML

@@ -1,6 +1,6 @@
 """``open-atp`` CLI: a thin shell over the prover API.
 
-    open-atp prove <prover> <lean-dir> <output-dir>
+    open-atp prove <path> <output> <prover>
 
 The core stays a plain Python API (:func:`open_atp.standard_prover` ->
 :meth:`~open_atp.provers.base.AutomatedProver.prove`); this is just the terminal
@@ -22,6 +22,9 @@ from typing import TextIO, cast
 
 import structlog
 import yaml
+from rich.box import ROUNDED
+from rich.console import Console
+from rich.table import Table
 from tqdm import tqdm
 
 from open_atp.backends import _BACKENDS
@@ -39,10 +42,9 @@ from open_atp.config import (
     standard_prover,
     standard_provers,
 )
-from open_atp.examples import EXAMPLE, example_task
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.lean import LeanProject, ProofTask, create_project
-from open_atp.provers.base import AutomatedProver
+from open_atp.provers.base import AutomatedProver, ProofResult
 
 #: ax-prover baked into the Modal image (mirrors the images/Dockerfile ARG). Pinned
 #: to a commit on our fork (henryrobbins/ax-prover-base) rather than the 0.1.1 PyPI
@@ -107,29 +109,80 @@ def _load_dotenv() -> None:
         return
 
 
+def _check(ok: bool) -> str:
+    """A green ✓ / red ✗ rich markup cell for a boolean."""
+    return "[green]✓[/]" if ok else "[red]✗[/]"
+
+
+def _proof_table(result: ProofResult) -> Table:
+    """A two-column ``field``/``value`` table summarizing a :class:`ProofResult`."""
+    if result.success:
+        status = "[green]✓ verified[/]"
+    elif result.error is not None:
+        status = f"[red]{result.error}[/]"
+    else:
+        status = "[red]✗ unverified[/]"
+
+    table = Table(box=ROUNDED, show_header=False)
+    table.add_column("field", style="bold")
+    table.add_column("value")
+    table.add_row("status", status)
+    table.add_row("prover", result.prover)
+    cost = f"${result.cost_usd:.4f}" if result.cost_usd is not None else "—"
+    time = f"{result.duration_s:.0f}s" if result.duration_s is not None else "—"
+    table.add_row("cost", cost)
+    table.add_row("time", time)
+    table.add_row("output", str(result.output_dir))
+    if result.verification is not None:
+        v = result.verification
+        table.add_row("compiles", _check(v.compiles))
+        table.add_row("sorry-free", _check(v.sorry_free))
+        bad = v.non_standard_axioms
+        table.add_row("axioms", f"[red]✗ {', '.join(bad)}[/]" if bad else _check(True))
+    return table
+
+
+def _benchmark_table(result: BenchmarkResult) -> Table:
+    """A table with one ``(task, prover)`` row per cell: status, cost, time."""
+    table = Table(box=ROUNDED)
+    table.add_column("task")
+    table.add_column("prover")
+    table.add_column("status", justify="center")
+    table.add_column("cost", justify="right")
+    table.add_column("time", justify="right")
+    for run in result.runs:
+        r = run.result
+        if r.success:
+            status = "[green]✓[/]"
+        elif r.error is not None:
+            status = "[red]ERR[/]"
+        else:
+            status = "[red]✗[/]"
+        cost = f"${r.cost_usd:.4f}" if r.cost_usd is not None else "—"
+        time = f"{r.duration_s:.0f}s" if r.duration_s is not None else "—"
+        table.add_row(run.task, run.prover, status, cost, time)
+    return table
+
+
 def _prove(args: argparse.Namespace) -> int:
-    src = Path(args.lean_dir)
+    src = Path(args.path)
     if src.is_file() and src.suffix == ".lean":
         # A bare .lean file: stage it into the pinned skeleton so prove sees a
         # complete lake project. The completed file still lands in <output>/wd.
-        project = create_project([src], Path(args.output_dir) / "project")
+        project = create_project([src], Path(args.output) / "project")
     else:
         project = LeanProject(src)
     task = ProofTask(project)
 
     backend = build_backend({"type": args.compute})
     prover = standard_prover(args.prover, backend=backend)
-    result = prover.prove(task, Path(args.output_dir))
+    result = prover.prove(task, Path(args.output))
 
     if args.json:
         print(json.dumps(result.to_dict(), indent=2))
         return 0 if result.success else 1
 
-    status = "✓ verified" if result.success else (result.error or "✗ unverified")
-    cost = f"${result.cost_usd:.4f}" if result.cost_usd is not None else "—"
-    dur = f"{result.duration_s:.0f}s" if result.duration_s is not None else "—"
-    print(f"{result.prover:<16} {status:<28} cost={cost:<10} time={dur}")
-    print(f"output: {result.output_dir}")
+    Console().print(_proof_table(result))
     return 0 if result.success else 1
 
 
@@ -138,8 +191,8 @@ def _report(result: BenchmarkResult, as_json: bool) -> int:
     if as_json:
         print(json.dumps(result.to_dict(), indent=2, default=str))
     else:
-        print(result.table())
-        print(f"\nartifacts: {result.output_dir}")
+        Console().print(_benchmark_table(result))
+        print(f"artifacts: {result.output_dir}")
     return 0 if all(run.result.success for run in result.runs) else 1
 
 
@@ -204,7 +257,7 @@ def _named_prover(
 
 def _benchmark(args: argparse.Namespace) -> int:
     """Run the configured provers over a directory of tasks and print a table."""
-    directory = Path(args.directory)
+    directory = Path(args.dataset)
     backend = build_backend({"type": args.compute})
     provers = _load_provers(directory, args.provers, backend)
     tasks = tasks_from_dir(directory)
@@ -214,31 +267,18 @@ def _benchmark(args: argparse.Namespace) -> int:
     result = run_benchmark(
         tasks,
         provers,
-        Path(args.output_dir),
+        Path(args.output),
         only=only,
-        max_workers=args.max_workers,
+        max_workers=args.workers,
     )
     return _report(result, args.json)
 
 
 def _download(args: argparse.Namespace) -> int:
     """Download a benchmark dataset's task directory under ``dest``."""
-    path = download_dataset(DATASET(args.dataset), Path(args.dest))
+    path = download_dataset(DATASET(args.dataset), Path(args.output))
     print(path)
     return 0
-
-
-def _ex_benchmark(args: argparse.Namespace) -> int:
-    """Run every standard prover over the five bundled examples and print a table."""
-    backend = build_backend({"type": args.compute})
-    tasks = {member.value: example_task(member) for member in EXAMPLE}
-    result = run_benchmark(
-        tasks,
-        _all_standard_provers(backend),
-        Path(args.output_dir),
-        max_workers=args.max_workers,
-    )
-    return _report(result, as_json=False)
 
 
 def _build_image(args: argparse.Namespace) -> int:
@@ -364,28 +404,74 @@ def build_parser() -> argparse.ArgumentParser:
 
     prove = sub.add_parser(
         "prove",
-        help="Run one prover over a lake project and verify the result.",
+        help="Run a standard prover on a lake project or Lean file.",
+    )
+    prove.add_argument(
+        "path",
+        help="A lake project directory or a single .lean file.",
+    )
+    prove.add_argument(
+        "output",
+        help="Where to write the run's logs and agent working directory.",
     )
     prove.add_argument(
         "prover",
         choices=standard_provers(),
-        help="Which prover to run.",
+        help="Name of standard prover to run.",
     )
-    prove.add_argument(
-        "lean_dir",
-        help="A lake project directory, or a single bare .lean file to stage into "
-        "the pinned skeleton.",
-    )
-    prove.add_argument("output_dir", help="Where to write the run's {wd,logs} output.")
     prove.add_argument(
         "-c",
         "--compute",
         choices=sorted(_BACKENDS),
         default="docker",
-        help="Compute backend to run generation + verification on.",
+        help="Compute backend to run generation and verification on.",
     )
     prove.add_argument(
-        "-j", "--json", action="store_true", help="Emit the ProofResult as JSON."
+        "--json",
+        action="store_true",
+        help="Emit the result as JSON.",
+    )
+
+    benchmark = sub.add_parser(
+        "benchmark",
+        help="Run multiple provers over a dataset of proof tasks.",
+    )
+    benchmark.add_argument(
+        "dataset",
+        help="Directory of tasks to benchmark.",
+    )
+    benchmark.add_argument(
+        "output",
+        help="Where to write each run's logs and agent working directory.",
+    )
+    benchmark.add_argument(
+        "-p",
+        "--provers",
+        help="YAML provers config; use all standard provers by default.",
+    )
+    benchmark.add_argument(
+        "-t",
+        "--tasks",
+        help="Comma-separated task names to run; every task run by default.",
+    )
+    benchmark.add_argument(
+        "-c",
+        "--compute",
+        choices=sorted(_BACKENDS),
+        default="docker",
+        help="Compute backend to run the sweep on.",
+    )
+    benchmark.add_argument(
+        "-w",
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of workers; each worker runs a single prover on a task.",
+    )
+    benchmark.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the result as JSON.",
     )
 
     download = sub.add_parser(
@@ -396,80 +482,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[d.value for d in DATASET],
         help="Which dataset to download.",
     )
-    download.add_argument("dest", help="Directory to clone the dataset into.")
-
-    benchmark = sub.add_parser(
-        "benchmark",
-        help="Run provers over a directory of tasks (e.g. a dataset); print a table.",
-    )
-    benchmark.add_argument(
-        "directory", help="Directory of .lean tasks to benchmark (see tasks_from_dir)."
-    )
-    benchmark.add_argument(
-        "-p",
-        "--provers",
-        help="YAML provers config; falls back to <directory>/provers.yaml if "
-        "present, else all standard provers.",
-    )
-    benchmark.add_argument(
-        "-t",
-        "--tasks",
-        help="Comma-separated task names to run; without this, every task in "
-        "the directory runs.",
-    )
-    benchmark.add_argument(
-        "-c",
-        "--compute",
-        choices=sorted(_BACKENDS),
-        default="docker",
-        help="Compute backend to run the sweep on.",
-    )
-    benchmark.add_argument(
-        "-o",
-        "--output-dir",
-        default="runs/benchmark",
-        help="Where to write the sweep's <task>/<prover>/ artifacts.",
-    )
-    benchmark.add_argument(
-        "-n",
-        "--max-workers",
-        type=int,
-        default=None,
-        help="Max (task, prover) pairs in flight at once (auto; 1 = serial). "
-        "Any single prover is still capped at 5 concurrent runs.",
-    )
-    benchmark.add_argument(
-        "-j", "--json", action="store_true", help="Emit the BenchmarkResult as JSON."
-    )
-
-    ex_benchmark = sub.add_parser(
-        "ex-benchmark",
-        help="Run every standard prover over the 5 bundled examples; print a table.",
-    )
-    ex_benchmark.add_argument(
-        "-c",
-        "--compute",
-        choices=sorted(_BACKENDS),
-        default="docker",
-        help="Compute backend to run the sweep on.",
-    )
-    ex_benchmark.add_argument(
-        "-o",
-        "--output-dir",
-        default="runs/ex-benchmark",
-        help="Where to write the sweep's <task>/<prover>/ artifacts.",
-    )
-    ex_benchmark.add_argument(
-        "-n",
-        "--max-workers",
-        type=int,
-        default=None,
-        help="Max (task, prover) pairs in flight at once (auto; 1 = serial). "
-        "Any single prover is still capped at 5 concurrent runs.",
-    )
+    download.add_argument("output", help="Directory to clone the dataset into.")
 
     build = sub.add_parser(
-        "build-image", help="Build the sandbox Docker image from images/Dockerfile."
+        "build-docker-image",
+        help="Build the sandbox Docker image from images/Dockerfile.",
     )
     build.add_argument(
         "-t",
@@ -522,9 +539,7 @@ def main(argv: list[str] | None = None) -> int:
         return _download(args)
     if args.command == "benchmark":
         return _benchmark(args)
-    if args.command == "ex-benchmark":
-        return _ex_benchmark(args)
-    if args.command == "build-image":
+    if args.command == "build-docker-image":
         return _build_image(args)
     if args.command == "build-modal-image":
         return _build_modal_image(args)

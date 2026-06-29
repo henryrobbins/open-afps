@@ -101,7 +101,7 @@ def test_download_dispatches_to_download_dataset(
 
     monkeypatch.setattr(cli, "download_dataset", fake_download)
 
-    rc = cli._download(argparse.Namespace(dataset="fate-m", dest=str(tmp_path)))
+    rc = cli._download(argparse.Namespace(dataset="fate-m", output=str(tmp_path)))
 
     assert rc == 0
     assert seen["dataset"] is cli.DATASET.FATE_M

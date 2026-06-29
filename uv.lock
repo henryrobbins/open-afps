@@ -1650,6 +1650,7 @@ dependencies = [
     { name = "modal" },
     { name = "openai" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "structlog" },
     { name = "tqdm" },
 ]
@@ -1693,6 +1694,7 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5" },
     { name = "python-dotenv", marker = "extra == 'dev'" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7,<9" },
     { name = "sphinx-argparse", marker = "extra == 'docs'" },

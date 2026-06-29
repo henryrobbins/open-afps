@@ -8,6 +8,7 @@ the sweep, and renders a table with one row per ``(task, prover)`` pair.
 
 from __future__ import annotations
 
+import io
 import json
 import shutil
 import subprocess
@@ -16,6 +17,7 @@ import time
 from pathlib import Path
 
 import pytest
+from rich.console import Console
 
 from open_atp import benchmark
 from open_atp.benchmark import (
@@ -130,13 +132,27 @@ def test_raising_prover_recorded_not_aborted(tmp_path: Path) -> None:
 def test_table_has_a_row_per_pair(tmp_path: Path) -> None:
     provers = {"good": FakeProver("agent"), "bad": FakeProver("numina", verified=False)}
 
-    table = run_benchmark(_tasks(), provers, tmp_path).table()
+    from open_atp.__main__ import _benchmark_table
 
-    lines = table.splitlines()
-    assert lines[0].split()[:5] == ["task", "prover", "status", "cost", "time"]
-    # header + separator + 4 data rows
-    assert len(lines) == 6
-    assert "✓" in table and "✗" in table
+    result = run_benchmark(_tasks(), provers, tmp_path)
+    table = _benchmark_table(result)
+
+    assert [c.header for c in table.columns] == [
+        "task",
+        "prover",
+        "status",
+        "cost",
+        "time",
+    ]
+    assert table.row_count == 4  # 2 tasks x 2 provers
+
+    # Render through a plain (non-tty) console: markup collapses to bare glyphs.
+    console = Console(
+        file=io.StringIO(), width=200, force_terminal=False, color_system=None
+    )
+    console.print(table)
+    rendered = console.file.getvalue()
+    assert "✓" in rendered and "✗" in rendered
 
 
 def test_only_restricts_and_orders_tasks(tmp_path: Path) -> None:
