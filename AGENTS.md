@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Developer guide for **open-atp** (Open Automated Formal Proof Synthesis). Read this
+Developer guide for **open-atp** (Open Automated Theorem Proving). Read this
 before making changes. The user-facing overview lives in [README.md](README.md);
 this file is the engineering reference.
 
@@ -42,17 +42,17 @@ verifier **rejects** projects whose toolchain doesn't match the sandbox image's 
 
 ```
 src/open_atp/
-  api.py            Platform + prover registry — the dispatch/orchestration layer
-  __main__.py       `open-atp solve | build-docker-image | build-modal-image` CLI
+  config.py         standard_prover + STANDARD_PROVERS registry (build provers by name)
+  __main__.py       `open-atp prove | benchmark | download | build-docker-image | build-modal-image` CLI
   images/           image name + toolchain pins (DEFAULT_IMAGE, DEFAULT_TOOLCHAIN)
   lean.py           LeanProject, ProofTask, create_project (the Lean input contract)
   verify.py         VerificationReport, Verifier (the shared final check)
   benchmark.py      run_benchmark: run named provers x named tasks, tabulate results
   backends/         base.py  docker.py  modal.py            (ComputeBackend impls)
-  provers/          agent_prover.py  numina.py  numina_tracker.py  aristotle.py
+  provers/          base.py  agent_prover.py  numina.py  numina_tracker.py  aristotle.py
   harness/          coding-agent CLIs staged into the sandbox:
                       base.py  claude_code.py  codex.py  opencode.py
-                      axprover_base.py  vibe.py  bundles.py  cost.py  _paths.py
+                      axproverbase.py  vibe.py  cost.py  _catalog.py  _numina.py  _paths.py
                     assets/  scripts/*.sh  configs/mcp.json  vibe/lean-standin.toml
 
 images/             Dockerfile (Mathlib base image) + lean/ skeleton (toolchain, lakefile)
@@ -77,12 +77,13 @@ vendored code**, and keep its upstream style. It ships in the wheel via
 
 ## Provers
 
-Names accepted by `--provers` and the `Platform` registry (`api.py`):
+Names accepted by the `prove` positional `prover`, the `benchmark --provers` flag,
+and the `STANDARD_PROVERS` registry (`config.py`):
 
 | Name | Backing tool | Notes |
 | --- | --- | --- |
 | `aristotle` | Harmonic Aristotle (hosted) | remote API via `aristotlelib`, no local gen sandbox |
-| `agent` | Claude Code (`claude_code` harness) | default; coding agent + lean-lsp-mcp |
+| `claude` | Claude Code (`claude_code` harness) | default; coding agent + lean-lsp-mcp |
 | `codex` | OpenAI Codex CLI | model `gpt-5.5` |
 | `opencode` | opencode | |
 | `axproverbase` | ax-prover (LangGraph) | proposer→builder→reviewer loop; default model `claude-opus-4-8`, effort `high` |
@@ -151,8 +152,7 @@ Integration artifacts (agent logs, workdirs) land in `tests/.runs/` (gitignored)
 ## Compute setup: Docker vs. Modal
 
 Both backends run the shared `Verifier` **and** the agentic provers end-to-end against
-the Mathlib image. Pick a backend with `--backend`, or split generation from the cheap
-verify with `--agent-backend`.
+the Mathlib image. Pick a backend with `--compute {docker,modal}`.
 
 - **Docker** (`DockerBackend`) — bind-mounts the workdir; uses `images/Dockerfile`,
   runs as the `agent` user. Local; build the image first:
@@ -169,29 +169,30 @@ verify with `--agent-backend`.
   ```
   `ModalBackend`'s `image` (sans `:tag`) must match the `--name` you publish under.
 
-Example splits:
+Run a single prover on Modal instead of Docker:
 ```bash
-uv run open-atp solve path/to/project --provers agent --backend modal
-uv run open-atp solve path/to/project --provers agent \
-    --agent-backend modal --backend docker   # Modal generates, Docker does cheap verify
+uv run open-atp prove path/to/project runs/example claude --compute modal
 ```
 
 ## CLI quick reference
 
 ```
-open-atp solve <inputs...> [options]      # lake project dir, or bare .lean files
-  --provers   comma-separated names (default: agent)
-  --instructions TEXT                       # guidance forwarded to provers
-  --targets   comma-separated files relative to project
-  --image / --toolchain                     # default to images/ pins
-  --backend {docker,modal}        default docker
-  --agent-backend {docker,modal}  separate generation backend (defaults to --backend)
-  --runs-dir DIR                  default runs/
-  --max-workers N
-  --json                          emit SolveResult as JSON
+open-atp prove <path> <output> <prover> [options]   # lake project dir, or a bare .lean file
+  -c/--compute {docker,modal}     default docker
+  --json                          emit the ProofResult as JSON
 
-open-atp build-docker-image       [--tag TAG] [--no-cache]
-open-atp build-modal-image [--name N] [--app A] [--force]
+open-atp benchmark <dataset> <output> [options]     # directory of proof tasks
+  --config FILE                   YAML provers/tasks/compute/workers; CLI flags override
+  -p/--provers   comma-separated names (default: every config/standard prover)
+  -t/--tasks     comma-separated task names (default: all)
+  -c/--compute {docker,modal}     default docker
+  -w/--workers N                  default 1
+  --json                          emit the BenchmarkResult as JSON
+
+open-atp download <dataset> <output>                # lands at <output>/<dataset>
+
+open-atp build-docker-image       [-t/--tag TAG] [-C/--no-cache]
+open-atp build-modal-image        [-n/--name N] [-a/--app A] [-f/--force]
 ```
 
 Programmatic verify:
