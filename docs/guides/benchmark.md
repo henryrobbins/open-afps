@@ -53,6 +53,7 @@ list(tasks.keys())
 Single and multi-file tasks are loaded with {meth}`~open_atp.lean.create_project` which uses a lake project skeleton pinned to `v4.28.0` of the Lean toolchain and Mathlib by default. If the dataset requires different versions, supply the `skeleton` argument to {func}`~open_atp.benchmark.tasks_from_dir` which forwards to {meth}`~open_atp.lean.create_project`.
 :::
 
+(downloading-a-dataset)=
 ### Downloading a dataset
 
 Common proof-synthesis benchmarks can be downloaded with {func}`~open_atp.benchmark.download_dataset`. The available datasets are listed in {doc}`/datasets`. The following example downloads the FATE-M {cite:p}`jiang2025fate` dataset into `datasets/fate-m`:

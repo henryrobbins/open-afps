@@ -1,22 +1,15 @@
 # Datasets
 
-`open-atp` bundles several public Lean proof-synthesis benchmarks.
-{func}`~open_atp.benchmark.download_dataset` fetches one — sparse-cloning just the
-task subdirectory and lifting its `.lean` files into `dest/<dataset>`, a flat
-directory ready for {func}`~open_atp.benchmark.tasks_from_dir` (see
-{doc}`guides/benchmark`). The
-``EXAMPLES`` entry is the package's bundled {class}`~open_atp.examples.EXAMPLE` set,
-copied from the wheel rather than cloned.
-
-Each {class}`~open_atp.benchmark.DATASET` member:
+OpenATP provides utilities to download common proof-synthesis benchmarks (see {ref}`downloading-a-dataset`). The available datasets are listed in the {class}`~open_atp.benchmark.DATASET` enum. We list each in the table below.
 
 | Benchmark | `DATASET` | Toolchain | Paper | Source |
 | --- | --- | --- | --- | --- |
-| Bundled examples | `EXAMPLES` | `v4.28.0` | — | {doc}`examples` (shipped in the package) |
-| PutnamBench | `PUTNAM` | `v4.27.0` | {cite:t}`tsoukalas2024putnambench` | [trishullab/PutnamBench](https://github.com/trishullab/PutnamBench) |
-| FATE-H (hard) | `FATE_H` | `v4.28.0` | {cite:t}`jiang2025fate` | [frenzymath/FATE-H](https://github.com/frenzymath/FATE-H) |
-| FATE-M (medium) | `FATE_M` | `v4.28.0` | {cite:t}`jiang2025fate` | [frenzymath/FATE-M](https://github.com/frenzymath/FATE-M) |
-| FATE-X (extra) | `FATE_X` | `v4.28.0` | {cite:t}`jiang2025fate` | [frenzymath/FATE-X](https://github.com/frenzymath/FATE-X) |
+| {doc}`/examples` | `EXAMPLES` | `v4.28.0` | — | {doc}`API </api/examples>` |
+| PutnamBench | `PUTNAM` | `v4.27.0` | {cite:t}`tsoukalas2024putnambench` | [GitHub](https://github.com/trishullab/PutnamBench) |
+| FATE-H | `FATE_H` | `v4.28.0` | {cite:t}`jiang2025fate` | [GitHub](https://github.com/frenzymath/FATE-H) |
+| FATE-M | `FATE_M` | `v4.28.0` | {cite:t}`jiang2025fate` | [GitHub](https://github.com/frenzymath/FATE-M) |
+| FATE-X | `FATE_X` | `v4.28.0` | {cite:t}`jiang2025fate` | [GitHub](https://github.com/frenzymath/FATE-X) |
 
-PutnamBench pins an older Lean than the default skeleton, so stage it against a
-matching skeleton (`tasks_from_dir(src, skeleton=...)`).
+:::{warning}
+PutnamBench pins an older version of Lean than the default image. A custom skeleton must be supplied to {meth}`~open_atp.benchmark.tasks_from_dir` and the Docker image must be rebuilt with version `v4.27.0` of Lean and Mathlib as well.
+:::
