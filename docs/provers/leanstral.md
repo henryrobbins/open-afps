@@ -20,7 +20,9 @@ export MISTRAL_API_KEY=...
 
 It is recommended to define this in a `.env` file in your project root. Alternatively, pass the key to the harness explicitly:
 
-```python
+```{testcode}
+from open_atp.harness import VibeHarness
+
 VibeHarness(mistral_api_key="msk-...")
 ```
 
@@ -32,7 +34,7 @@ Either way the harness forwards it into the sandbox as `MISTRAL_API_KEY`, where 
 
 The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration. Here, we prove the {ref}`MUL_REORDER` example theorem:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend
@@ -56,7 +58,7 @@ open-atp prove path/to/task.lean output_dir leanstral
 
 To override knobs like `model`, `agent`, `max_turns`, and `max_price`, construct the class directly. The standard defaults are `agent="lean-standin"` with `model="magistral-medium-latest"`:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend

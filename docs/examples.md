@@ -6,7 +6,7 @@ They double as a setup smoke test: {func}`~open_atp.examples.example_task` stage
 into the pinned Mathlib skeleton (via {func}`~open_atp.lean.create_project`) and hands you
 a ready-to-run {class}`~open_atp.lean.ProofTask`.
 
-```python
+```{testcode}
 import tempfile
 
 from open_atp.backends.docker import DockerBackend
@@ -16,6 +16,10 @@ from open_atp import standard_prover
 prover = standard_prover("claude", backend=DockerBackend())
 result = prover.prove(example_task(EXAMPLE.MUL_REORDER), tempfile.mkdtemp())
 print("success:", result.success)
+```
+
+```{testoutput}
+success: True
 ```
 
 Pass any {class}`~open_atp.examples.EXAMPLE` member. The bundled exercises are:

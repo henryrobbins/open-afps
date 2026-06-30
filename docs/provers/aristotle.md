@@ -16,7 +16,7 @@ export ARISTOTLE_API_KEY=...
 
 It is recommended to define this in a `.env` file in your project root. Alternatively, pass it to the prover explicitly as {attr}`~open_atp.provers.aristotle.AristotleProver` `api_key`.
 
-```python
+```{testcode}
 from open_atp.backends.docker import DockerBackend
 from open_atp.provers.aristotle import AristotleProver
 
@@ -29,7 +29,7 @@ prover = AristotleProver(api_key="sk-...", backend=DockerBackend())
 
 The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration. Here, we prove the {ref}`MUL_REORDER` example theorem:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend

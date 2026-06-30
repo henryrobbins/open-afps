@@ -16,7 +16,9 @@ export DEEPSEEK_API_KEY=...
 
 It is recommended to define this in a `.env` file in your project root. Alternatively, pass the key matching your chosen provider to the harness explicitly:
 
-```python
+```{testcode}
+from open_atp.harness import OpenCodeHarness
+
 OpenCodeHarness(model="claude-opus-4-8", provider_api_key="sk-...")
 ```
 
@@ -28,7 +30,7 @@ The provider is inferred from the model prefix unless you pass `provider` explic
 
 The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration pointing at a DeepSeek model. Either set `DEEPSEEK_API_KEY` in the host environment or pass it explicitly to the harness. Here, we prove the {ref}`MUL_REORDER` example theorem:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend
@@ -52,7 +54,7 @@ open-atp prove path/to/task.lean output_dir opencode
 
 To override knobs like `model` and `effort`, construct the class directly. The `provider` is inferred from the model prefix unless set explicitly:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend

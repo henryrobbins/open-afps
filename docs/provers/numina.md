@@ -34,7 +34,7 @@ Also see {ref}`tracking-cost-and-usage-numina`.
 
 The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration. Here, we prove the {ref}`MUL_REORDER` example theorem:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend
@@ -58,7 +58,7 @@ open-atp prove path/to/task.lean output_dir numina
 
 To override knobs like `max_rounds` and `guard_statements`, construct {class}`~open_atp.provers.numina.NuminaProver` directly (the harness is fixed to Claude Code to match Numina-Lean-Agent's configuration):
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend

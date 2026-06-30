@@ -19,6 +19,7 @@ release = _pkg_version("open-atp")
 extensions = [
     "myst_parser",
     "sphinx.ext.autodoc",
+    "sphinx.ext.doctest",
     "sphinx.ext.extlinks",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
@@ -62,6 +63,17 @@ myst_substitutions = {
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
 }
+
+# The ``{testcode}`` example blocks construct real provers so imports, class
+# names, and keyword arguments are typo-checked by ``sphinx-build -b doctest``.
+# They must not run an actual proof, though — that needs Docker, agent
+# credentials, and real cost — so stub ``prove`` for the doctest build. Every
+# prover inherits this one method from ``AutomatedProver``.
+doctest_global_setup = """
+from unittest import mock
+from open_atp.provers.base import AutomatedProver
+AutomatedProver.prove = mock.MagicMock(return_value=mock.MagicMock(success=True))
+"""
 
 templates_path = ["_templates"]
 # PHASE*.md are internal design notes, not part of the rendered site.

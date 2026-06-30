@@ -16,7 +16,7 @@ This page uses `DockerBackend` for the compute backend and Claude Code for the p
 
 OpenATP ships with small example theorems (see {doc}`/examples`) to make testing compute and prover setup easy. In the script below, we load the {ref}`MUL_REORDER` example task, configure the {doc}`/provers/claude_code` prover, and then run the prover on the task.
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend

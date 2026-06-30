@@ -20,7 +20,7 @@ This quickstart runs the Claude Code agent harness in a local Docker container t
 
 ### Running the prover
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend

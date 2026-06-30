@@ -1,6 +1,6 @@
 # AxProverBase
 
-```{include} _meta_axprover.md
+```{include} _meta_axproverbase.md
 :parser: myst
 ```
 
@@ -16,7 +16,9 @@ export ANTHROPIC_API_KEY=...
 
 It is recommended to define this in a `.env` file in your project root. Alternatively, pass the key to the harness explicitly:
 
-```python
+```{testcode}
+from open_atp.harness import AxProverBaseHarness
+
 AxProverBaseHarness(provider_api_key="sk-...")
 ```
 
@@ -28,7 +30,7 @@ The provider is inferred from the model prefix, and the harness forwards the key
 
 The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration pointing at the `claude-opus-4-8` model. Either set `ANTHROPIC_API_KEY` in the host environment or pass it explicitly to the harness. Here, we prove the {ref}`MUL_REORDER` example theorem:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend
@@ -52,7 +54,7 @@ open-atp prove path/to/task.lean output_dir axproverbase
 
 To override knobs like `model`, `effort`, and `max_iterations`, construct the class directly.
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend

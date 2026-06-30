@@ -16,7 +16,11 @@ codex login
 
 This writes credentials to `~/.codex/auth.json`. By default the harness reads that file; pass it explicitly to override:
 
-```python
+```{testcode}
+from pathlib import Path
+
+from open_atp.harness import CodexHarness
+
 CodexHarness(auth_file=Path("~/.codex/auth.json").expanduser())
 ```
 
@@ -28,7 +32,7 @@ The harness mounts the credential into the sandbox at run time so Codex can refr
 
 The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration. Here, we prove the {ref}`MUL_REORDER` example theorem:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend
@@ -52,7 +56,7 @@ open-atp prove path/to/task.lean output_dir codex
 
 To override knobs like `model` and `effort`, construct the class directly:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend

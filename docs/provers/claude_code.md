@@ -22,7 +22,9 @@ CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
 
 Alternatively, pass the token to the harness explicitly:
 
-```python
+```{testcode}
+from open_atp.harness import ClaudeCodeHarness
+
 ClaudeCodeHarness(oauth_token="sk-ant-oat01-...")
 ``` 
 
@@ -35,7 +37,7 @@ time, billing against your Claude plan (not the API). See {ref}`tracking-cost-an
 
 The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration. Here, we prove the {ref}`MUL_REORDER` example theorem:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend
@@ -59,7 +61,7 @@ open-atp prove path/to/task.lean output_dir claude
 
 To override knobs like `model` and `effort`, construct the class directly. In this example, we use the `claude-opus-4-8` model with `high` effort:
 
-```python
+```{testcode}
 from pathlib import Path
 
 from open_atp.backends.docker import DockerBackend
