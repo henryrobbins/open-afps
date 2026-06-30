@@ -47,9 +47,9 @@ provers:
     cite: null
     source: { label: GitHub, url: https://github.com/sst/opencode }
 
-  - name: AxProver
+  - name: AxProverBase
     page: axprover
-    id:   axprover
+    id:   axproverbase
     skills: []              # ships its own Lean tooling
     mcp: false              # uses its own Lean tools, not lean-lsp-mcp
     company: { label: Axiomatic AI, url: https://axiomatic-ai.com }
@@ -57,17 +57,17 @@ provers:
     cite: requena2026a
     source: { label: GitHub, url: https://github.com/Axiomatic-AI/ax-prover-base }
 
-  - name: Vibe / Leanstral
-    page: vibe
-    id:   vibe
+  - name: Leanstral
+    page: leanstral
+    id:   leanstral
     skills: [leanprover]
     mcp: true
     company: { label: Mistral AI, url: https://mistral.ai }
     paper: { label: "Leanstral (blog)", url: "https://mistral.ai/news/leanstral" }
-    cite: null
+    cite: mistral2026leanstral
     source: { label: HuggingFace, url: https://huggingface.co/mistralai/Leanstral-2603 }
 
-  - name: NuminaProver
+  - name: Numina
     page: numina
     id:   numina
     skills: []              # uses Numina's own vendored scaffold
@@ -77,11 +77,11 @@ provers:
     cite: liu2026numina
     source: { label: GitHub, url: https://github.com/project-numina/numina-lean-agent }
 
-  - name: AristotleProver
+  - name: Aristotle
     page: aristotle
     id:   aristotle
     skills: []              # hosted; no local generation sandbox
-    mcp: false              # hosted; no local generation sandbox
+    mcp: null               # hosted; no local generation sandbox
     company: { label: Harmonic, url: https://www.harmonic.fun }
     paper: { label: "Achim et al. 2025", url: "https://arxiv.org/abs/2510.01346" }
     cite: achim2025aristotle

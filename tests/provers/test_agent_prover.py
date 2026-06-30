@@ -159,9 +159,9 @@ def test_stage_skills_copies_into_harness_location(
     assert not (tmp_path / dest / "lean-proof" / "tests").exists()
 
 
-def test_axprover_ignores_skills(tmp_path: Path) -> None:
+def test_axprover_base_ignores_skills(tmp_path: Path) -> None:
     """ax-prover ships its own prompts and consumes no skills (skills_dest is None)."""
-    harness = _HARNESSES["axprover"](model="claude-opus-4-8")
+    harness = _HARNESSES["axproverbase"](model="claude-opus-4-8")
     assert harness.skills_dest is None
     harness.stage_skills(tmp_path, [resolve_skill("lean-proof")])  # no-op, no error
     assert not list(tmp_path.iterdir())

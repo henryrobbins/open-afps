@@ -52,6 +52,13 @@ def _link(item: dict | None) -> str:
     return f"[{item['label']}]({item['url']})"
 
 
+def _mcp_cell(prover: dict) -> str:
+    """Render the MCP cell: ✓/✗ for a boolean, — when null (e.g. hosted)."""
+    if prover.get("mcp") is None:
+        return EM_DASH
+    return CHECK if prover["mcp"] else CROSS
+
+
 def _skills_cell(keys: list[str], skill_urls: dict[str, str]) -> str:
     if not keys:
         return EM_DASH
@@ -86,7 +93,7 @@ def _render_table(data: dict, page_prefix: str, *, cite: bool) -> str:
             prover,
             f"`{p['id']}`",
             _skills_cell(p.get("skills") or [], skill_urls),
-            CHECK if p.get("mcp") else CROSS,
+            _mcp_cell(p),
             _paper_cell(p, cite=cite),
             _link(p.get("source")),
         ]
@@ -113,20 +120,12 @@ def render_meta(prover: dict, skill_urls: dict[str, str]) -> str:
     """Render a prover's metadata as one compact inline bar.
 
     A field list wastes vertical space (each value drops to its own line), so we
-    emit a single ``label value · label value`` paragraph. Empty fields (—) are
-    dropped; ``Spec`` and ``MCP`` are always shown. The Paper field renders its
-    ``{cite:t}`` citation in the docs (``cite=True``).
+    emit a single ``label value · label value`` paragraph. ``ID`` is always
+    shown; ``Company`` is dropped when null (e.g. unaffiliated).
     """
-    mcp = CHECK if prover.get("mcp") else CROSS
-    parts = [f"**ID** `{prover['id']}`", f"**MCP** {mcp}"]
-    if prover.get("skills"):
-        parts.append(f"**Skills** {_skills_cell(prover['skills'], skill_urls)}")
+    parts = [f"**ID** `{prover['id']}`"]
     if prover.get("company"):
         parts.append(f"**Company** {_link(prover['company'])}")
-    if prover.get("cite") or prover.get("paper"):
-        parts.append(f"**Paper** {_paper_cell(prover, cite=True)}")
-    if prover.get("source"):
-        parts.append(f"**Source** {_link(prover['source'])}")
     return " · ".join(parts) + "\n"
 
 

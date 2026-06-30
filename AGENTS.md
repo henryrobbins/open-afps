@@ -25,7 +25,7 @@ ComputeBackend (docker | modal)         ← the sandbox primitive
         ├── Verifier  ──────────────────← shared final check (ALL provers)
         │
 AutomatedProver (provers/base.py, base)
- ├── AgentProver      coding-agent harness (claude/codex/opencode/axprover/vibe) + lean-lsp-mcp
+ ├── AgentProver      coding-agent harness (claude/codex/opencode/axproverbase/vibe) + lean-lsp-mcp
  ├── NuminaProver     configured AgentProver: claude + vendored Numina assets + round loop
  └── AristotleProver  remote `aristotle submit --project-dir --wait` (no local generation sandbox)
 ```
@@ -52,7 +52,7 @@ src/open_atp/
   provers/          agent_prover.py  numina.py  numina_tracker.py  aristotle.py
   harness/          coding-agent CLIs staged into the sandbox:
                       base.py  claude_code.py  codex.py  opencode.py
-                      axprover.py  vibe.py  bundles.py  cost.py  _paths.py
+                      axprover_base.py  vibe.py  bundles.py  cost.py  _paths.py
                     assets/  scripts/*.sh  configs/mcp.json  vibe/lean-standin.toml
 
 images/             Dockerfile (Mathlib base image) + lean/ skeleton (toolchain, lakefile)
@@ -85,9 +85,9 @@ Names accepted by `--provers` and the `Platform` registry (`api.py`):
 | `agent` | Claude Code (`claude_code` harness) | default; coding agent + lean-lsp-mcp |
 | `codex` | OpenAI Codex CLI | model `gpt-5.5` |
 | `opencode` | opencode | |
-| `axprover` | ax-prover (LangGraph) | proposer→builder→reviewer loop; default model `claude-opus-4-8`, effort `high` |
+| `axproverbase` | ax-prover (LangGraph) | proposer→builder→reviewer loop; default model `claude-opus-4-8`, effort `high` |
 | `numina` | Numina skills/prompts on Claude Code | round-continuation loop |
-| `vibe` | Mistral Vibe `lean` scaffold | hosted model (default `magistral-medium-latest`), no GPU; `--model` configurable |
+| `leanstral` | Mistral Vibe `lean` scaffold | hosted model (default `magistral-medium-latest`), no GPU; `--model` configurable |
 
 Agentic harnesses share **lean-lsp-mcp** as their LSP server. The shared `Verifier`
 does the final compile/sorry/axiom check regardless of which tool generated the proof.
@@ -212,7 +212,7 @@ skill/test degrade or skip:
 - `CLAUDE_CODE_OAUTH_TOKEN` — `agent_api` test with default claude_code harness
   (`claude setup-token`)
 - `GEMINI_API_KEY` / `OPENAI_API_KEY` / `LEAN_LEANDEX_API_KEY` — Numina helper skills
-- `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` — `axprover` (raw provider key matching
+- `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` — `axproverbase` (raw provider key matching
   the configured `model`); `TAVILY_API_KEY` optional (ax-prover web search)
 - `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — Modal backend
 

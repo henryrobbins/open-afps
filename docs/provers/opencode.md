@@ -1,94 +1,89 @@
-(prover-opencode)=
 # OpenCode
 
 ```{include} _meta_opencode.md
 :parser: myst
 ```
 
-The OpenCode prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on the
-{class}`~open_atp.harness.opencode.OpenCodeHarness` — the
-[OpenCode](https://opencode.ai/) CLI driving the `sorry`s in a sandbox with the
-[lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp) server. Unlike Claude Code and
-Codex, OpenCode is provider-agnostic: one CLI fronts Anthropic, OpenAI, Google, or
-DeepSeek, billed directly against that provider's API. The shared
-{class}`~open_atp.verify.Verifier` does the final compile / sorry / axiom
-check. See {doc}`index` for the staging/diff lifecycle every agent harness shares.
+Use [OpenCode](https://opencode.ai/) as an automated theorem prover with Lean skills and MCP tooling. This prover uses the {class}`~open_atp.provers.agent_prover.AgentProver` with the {class}`~open_atp.harness.opencode.OpenCodeHarness`. Unlike Claude Code and Codex, OpenCode is provider-agnostic: one CLI fronts Anthropic, OpenAI, Google, or DeepSeek models.
 
 ## Authentication
 
-OpenCode bills directly against an API provider rather than a flat-rate subscription.
-Sign up for an API account with your chosen provider, fund it, and monitor consumption
-from that provider's usage dashboard — see
-[OpenCode providers](https://opencode.ai/docs/providers/) for the full list. Pass the
-key matching your chosen provider to the harness explicitly:
-
-```python
-OpenCodeHarness(model="claude-opus-4-8", provider_api_key="sk-...")
-```
-
-or leave `provider_api_key` unset (the default) to read it from the host environment,
-for example:
+OpenCode bills directly against an API provider rather than a flat-rate subscription. Sign up for an API account with your chosen provider, fund it, and find the full provider list at [OpenCode providers](https://opencode.ai/docs/providers/). By default the harness reads the provider's key from the host environment, for example:
 
 ```bash
 export DEEPSEEK_API_KEY=...
 ```
 
-The provider is inferred from the model prefix unless you pass `provider`
-explicitly. Either way the harness forwards the selected provider's key into the
-sandbox under its canonical env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-`GOOGLE_API_KEY`, or `DEEPSEEK_API_KEY`); resolution fails if neither the explicit
-key nor the host env var is set.
-
-## Usage
+It is recommended to define this in a `.env` file in your project root. Alternatively, pass the key matching your chosen provider to the harness explicitly:
 
 ```python
+OpenCodeHarness(model="claude-opus-4-8", provider_api_key="sk-...")
+```
+
+The provider is inferred from the model prefix unless you pass `provider` explicitly. Either way the harness forwards the key into the sandbox under its canonical env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, or `DEEPSEEK_API_KEY`). See {ref}`tracking-cost-and-usage-opencode` for details.
+
+## Using the prover
+
+### Standard prover via Python API
+
+The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration pointing at a DeepSeek model. Either set `DEEPSEEK_API_KEY` in the host environment or pass it explicitly to the harness. Here, we prove the {ref}`MUL_REORDER` example theorem:
+
+```python
+from pathlib import Path
+
 from open_atp.backends.docker import DockerBackend
+from open_atp.config import standard_prover
+from open_atp.examples import EXAMPLE, example_task
+
+task = example_task(EXAMPLE.MUL_REORDER)
+prover = standard_prover("opencode", backend=DockerBackend())
+result = prover.prove(task, output_dir=Path("demo"))
+```
+
+### Standard prover via CLI
+
+The standard prover can also be run from the CLI:
+
+```bash
+open-atp prove path/to/task.lean output_dir opencode
+```
+
+### Customizing the prover
+
+To override knobs like `model` and `effort`, construct the class directly. The `provider` is inferred from the model prefix unless set explicitly:
+
+```python
+from pathlib import Path
+
+from open_atp.backends.docker import DockerBackend
+from open_atp.examples import EXAMPLE, example_task
 from open_atp.harness import OpenCodeHarness
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers import AgentProver
 
-backend = DockerBackend(image=DEFAULT_IMAGE)
+task = example_task(EXAMPLE.MUL_REORDER)
 prover = AgentProver(
     harness=OpenCodeHarness(model="claude-opus-4-8", effort="medium"),
-    backend=backend,
+    backend=DockerBackend(image=DEFAULT_IMAGE),
 )
+result = prover.prove(task, output_dir=Path("demo"))
 ```
 
-{class}`~open_atp.harness.OpenCodeHarness` selects the OpenCode CLI; its
-`provider` is inferred from the model prefix unless set explicitly.
-
-Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
-`opencode`. The provider is inferred from the model prefix (`claude-*` →
-`anthropic`, `gpt-*` → `openai`, and so on), so any provider's model is selected by
-name through the same `model` knob.
+:::{tip}
+If you are harness agnostic and want to use Anthropic or OpenAI models, it is recommended to use the {doc}`/provers/claude_code` or {doc}`/provers/codex`  provers. These provers are billed against subscription plans rather than API usage, which is often much cheaper.
+:::
 
 ## Harness details
 
-`stage` writes an `opencode.json` carrying the inferred provider, the model and
-its reasoning-effort config, and the lean-lsp MCP server; the prover then stages the
-`AgentProver`'s `skills` — the host-agnostic
-[`leanprover/skills`](https://github.com/leanprover/skills) — under `.agents/skills/`.
-The MCP `timeout` is raised to **180 000 ms (180 s)**
-— the first `lean_diagnostic_messages` call starts `lake serve` and loads the file's
-full Mathlib import closure, which blows past the 60 s default on a cold, few-CPU
-sandbox. Reasoning effort maps per provider: Anthropic gets `thinking: {type:
-"adaptive"}` plus an effort `output_config`, while OpenAI / Google / DeepSeek get
-`reasoningEffort`. The launch script (`assets/scripts/opencode_agent.sh`) runs:
+By default, the OpenCode harness is equipped with:
 
-```bash
-opencode run --dir /workspace/wd --format json \
-    --model '<PROVIDER>/<MODEL>' \
-    "$PROMPT"
-```
+- Official Lean skills {cite:p}`leanprover_skills`.
+- `lean-lsp-mcp` MCP server {cite:p}`lean_lsp_mcp`.
 
-The `--format json` event stream goes to stdout.
+The agent prompt (below) is written into the working directory and read into `$PROMPT`. The OpenCode CLI is then invoked in non-interactive mode with `$PROMPT` as the input. See the script below for the full OpenCode CLI invocation.
 
-`$PROMPT` is the shared agent prover prompt baked into the
-{class}`~open_atp.provers.agent_prover.AgentProver`, with the task's optional
-`user_prompt` appended under an *Additional instructions* heading when set:
-
-:::{dropdown} Agent prover prompt
-:icon: code
+:::{dropdown} Agent Prompt
+:icon: book
 ```{literalinclude} ../../src/open_atp/provers/agent_prover.py
 :language: text
 :start-after: PROVER_PROMPT = """
@@ -96,10 +91,14 @@ The `--format json` event stream goes to stdout.
 ```
 :::
 
-## Cost tracking
+:::{dropdown} `src/open_atp/harness/assets/scripts/opencode_agent.sh`
+:icon: code
+```{literalinclude} ../../src/open_atp/harness/assets/scripts/opencode_agent.sh
+:language: bash
+```
+:::
 
-The OpenCode CLI reports a per-step cost and token breakdown for each provider call.
-`parse` sums `step_finish` events — input (`tokens.input` plus cache write/read),
-output (`tokens.output`), and `cost` — into `cost_usd` in
-{class}`~open_atp.harness.base.HarnessRunResult`, so cost comes straight from the
-provider via OpenCode.
+(tracking-cost-and-usage-opencode)=
+## Tracking cost and usage
+
+The OpenCode CLI reports a per-step cost and token breakdown for each provider call. The cost is summed to populate `cost_usd` in {class}`~open_atp.provers.base.ProofResult`. You can also monitor consumption from your provider's usage dashboard. For example, DeepSeek's dashboard is at [DeepSeek Usage](https://platform.deepseek.com/usage).

@@ -6,7 +6,7 @@ parsing. The *compute* concern (where the command runs, with Lean+Mathlib) lives
 in the injected :class:`~open_atp.backends.base.ComputeBackend`.
 """
 
-from open_atp.harness.axprover import AxProverHarness
+from open_atp.harness.axproverbase import AxProverBaseHarness
 from open_atp.harness.base import (
     PROMPT_FILE,
     SCRIPT_FILE,
@@ -29,7 +29,7 @@ _HARNESSES: dict[str, type[Harness]] = {
         CodexHarness,
         OpenCodeHarness,
         VibeHarness,
-        AxProverHarness,
+        AxProverBaseHarness,
     )
 }
 
@@ -43,7 +43,7 @@ __all__ = [
     "CodexHarness",
     "OpenCodeHarness",
     "VibeHarness",
-    "AxProverHarness",
+    "AxProverBaseHarness",
     "compute_cost_usd",
     "COST_PER_MTOK",
 ]

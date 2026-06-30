@@ -13,16 +13,16 @@ set -euo pipefail
 #   * --config is a TOP-LEVEL flag and MUST precede the `prove` subcommand. The
 #     CLI's --config is argparse action="append" with default ["default.yaml"], so
 #     passing axprover.yaml *appends* to (does not replace) the bundled default.yaml:
-#     the effective merge is [default.yaml, axprover.yaml]. AxProverHarness relies on
+#     the effective merge is [default.yaml, axprover.yaml]. AxProverBaseHarness relies on
 #     this (it overrides only deltas) and works around the deep-merge it implies --
-#     see AxProverHarness._render_config.
+#     see AxProverBaseHarness._render_config.
 #   * --skip-build reuses the warm Mathlib .lake instead of re-running lake build
 #     (the same assumption the other harnesses make).
 #   * --overwrite re-proves even files ax-prover thinks are already done.
 #   * `|| true` keeps one unprovable file from aborting the rest; the final
 #     Verifier pass is the source of truth either way.
 #   * -o writes ax_output.<target>.json: per-target {success, error, summary,
-#     input_tokens, output_tokens, ...}. AxProverHarness.parse_result sums the token fields
+#     input_tokens, output_tokens, ...}. AxProverBaseHarness.parse_result sums the token fields
 #     across these files for cost (the pinned fork commit adds the usage fields).
 #   * ax-prover logs are human-readable (not the JSONL the parsers consume), so we
 #     tee each run's stdout+stderr to ax_prover.<target>.log. The file lands in the

@@ -72,10 +72,10 @@ does the final check regardless of which tool generated the proof.
 | [Claude Code](docs/provers/claude_code.md) | `claude` | [leanprover](https://github.com/leanprover/skills), [lean4](https://github.com/cameronfreer/lean4-skills) | ✓ | — | — |
 | [Codex](docs/provers/codex.md) | `codex` | [leanprover](https://github.com/leanprover/skills) | ✓ | — | [GitHub](https://github.com/openai/codex) |
 | [OpenCode](docs/provers/opencode.md) | `opencode` | [leanprover](https://github.com/leanprover/skills) | ✓ | — | [GitHub](https://github.com/sst/opencode) |
-| [AxProver](docs/provers/axprover.md) | `axprover` | — | ✗ | [Requena et al. 2026](https://openreview.net/forum?id=E30g7bO7rU) | [GitHub](https://github.com/Axiomatic-AI/ax-prover-base) |
-| [Vibe / Leanstral](docs/provers/vibe.md) | `vibe` | [leanprover](https://github.com/leanprover/skills) | ✓ | [Leanstral (blog)](https://mistral.ai/news/leanstral) | [HuggingFace](https://huggingface.co/mistralai/Leanstral-2603) |
-| [NuminaProver](docs/provers/numina.md) | `numina` | — | ✓ | [Liu et al. 2026](https://arxiv.org/abs/2601.14027) | [GitHub](https://github.com/project-numina/numina-lean-agent) |
-| [AristotleProver](docs/provers/aristotle.md) | `aristotle` | — | ✗ | [Achim et al. 2025](https://arxiv.org/abs/2510.01346) | — |
+| [AxProverBase](docs/provers/axprover.md) | `axproverbase` | — | ✗ | [Requena et al. 2026](https://openreview.net/forum?id=E30g7bO7rU) | [GitHub](https://github.com/Axiomatic-AI/ax-prover-base) |
+| [Leanstral](docs/provers/leanstral.md) | `leanstral` | [leanprover](https://github.com/leanprover/skills) | ✓ | [Leanstral (blog)](https://mistral.ai/news/leanstral) | [HuggingFace](https://huggingface.co/mistralai/Leanstral-2603) |
+| [Numina](docs/provers/numina.md) | `numina` | — | ✓ | [Liu et al. 2026](https://arxiv.org/abs/2601.14027) | [GitHub](https://github.com/project-numina/numina-lean-agent) |
+| [Aristotle](docs/provers/aristotle.md) | `aristotle` | — | — | [Achim et al. 2025](https://arxiv.org/abs/2510.01346) | — |
 <!-- END PROVER TABLE -->
 
 Both `DockerBackend` and `ModalBackend` run the provers and the shared

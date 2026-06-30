@@ -1,111 +1,98 @@
-(prover-numina)=
-# NuminaProver
+# Numina
 
 ```{include} _meta_numina.md
 :parser: myst
 ```
 
-The {class}`~open_atp.provers.numina.NuminaProver` is a configured variant of the
-{class}`~open_atp.provers.agent_prover.AgentProver`. Structurally, Numina is
-"Claude Code + a specific skills/prompts/search toolkit, run in a multi-round loop in
-a sandbox", so rather than re-implement it, `open-atp` extends `AgentProver` pinned
-to the `claude_code` harness with Numina's vendored assets and adds the two genuinely
-different behaviours:
-
-- a **round-continuation loop** — re-invoke the agent while it reports it hit a limit
-  rather than completing; and
-- the **statement tracker** — guard against the agent deleting or weakening the
-  theorems it was asked to prove.
-
-The shared {class}`~open_atp.verify.Verifier` does the final compile / sorry / axiom
-check. See {doc}`index` for the lifecycle every agent harness shares.
+Numina-Lean-Agent {cite:p}`liu2026numina` is an automated theorem prover built on top of Claude Code. It adds a custom selection of skills, prompts, and search tooling to the base harness, and runs in a multi-round loop with a statement tracker. The prover uses the {class}`~open_atp.provers.numina.NuminaProver` with the {class}`~open_atp.harness.claude_code.ClaudeCodeHarness`.
 
 ## Authentication
 
-Numina runs on the Claude Code CLI, so it authenticates exactly like the
-{doc}`claude_code` prover. Generate a long-lived OAuth token once on the host:
+Numina runs on the Claude Code CLI, so it authenticates exactly like the {doc}`claude_code` prover. Generate a long-lived OAuth token once on the host:
 
 ```bash
 claude setup-token
 ```
 
-`NuminaProver` exposes no `oauth_token` knob — it reads `CLAUDE_CODE_OAUTH_TOKEN`
-from the host environment (for example a `.env` file in your project) and forwards it
-into the sandbox, billing against your Claude plan rather than the API.
+By default {class}`~open_atp.provers.numina.NuminaProver` reads `CLAUDE_CODE_OAUTH_TOKEN` from the host environment (for example a `.env` file in your project) and forwards it into the sandbox. To supply the token explicitly, pass it as the `oauth_token` argument to {class}`~open_atp.provers.numina.NuminaProver`.
 
-Numina's helper skills additionally call out to Leandex / Gemini / GPT (and Claude
-for the informal prover). Their keys — `LEAN_LEANDEX_API_KEY`, `GEMINI_API_KEY`,
-`OPENAI_API_KEY`, and `ANTHROPIC_API_KEY` — are forwarded into the sandbox
-best-effort when present in the host env; a skill whose key is absent degrades or
-skips rather than failing the run.
-{attr}`~open_atp.provers.numina.NuminaProver.helper_env_keys` selects which keys are
-forwarded.
+Numina's helper skills additionally call out to Leandex / Gemini / GPT (and Claude for the informal prover). Their keys (`LEAN_LEANDEX_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, and `ANTHROPIC_API_KEY`) are forwarded into the sandbox when present in the host env. A skill whose key is absent degrades or skips rather than failing the run. It is recommended to define all keys in a `.env` file in your project root.
 
-## Usage
+```
+CLAUDE_CODE_OAUTH_TOKEN=...
+LEAN_LEANDEX_API_KEY=...
+GEMINI_API_KEY=...
+OPENAI_API_KEY=...
+ANTHROPIC_API_KEY=...
+```
+
+Also see {ref}`tracking-cost-and-usage-numina`.
+
+## Using the prover
+
+### Standard prover via Python API
+
+The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration. Here, we prove the {ref}`MUL_REORDER` example theorem:
 
 ```python
+from pathlib import Path
+
 from open_atp.backends.docker import DockerBackend
+from open_atp.config import standard_prover
+from open_atp.examples import EXAMPLE, example_task
+
+task = example_task(EXAMPLE.MUL_REORDER)
+prover = standard_prover("numina", backend=DockerBackend())
+result = prover.prove(task, output_dir=Path("demo"))
+```
+
+### Standard prover via CLI
+
+The standard prover can also be run from the CLI:
+
+```bash
+open-atp prove path/to/task.lean output_dir numina
+```
+
+### Customizing the prover
+
+To override knobs like `max_rounds` and `guard_statements`, construct {class}`~open_atp.provers.numina.NuminaProver` directly (the harness is fixed to Claude Code to match Numina-Lean-Agent's configuration):
+
+```python
+from pathlib import Path
+
+from open_atp.backends.docker import DockerBackend
+from open_atp.examples import EXAMPLE, example_task
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers.numina import NuminaProver
 
-backend = DockerBackend(image=DEFAULT_IMAGE)
+task = example_task(EXAMPLE.MUL_REORDER)
 prover = NuminaProver(
-    backend=backend,
+    backend=DockerBackend(image=DEFAULT_IMAGE),
     max_rounds=20,
     guard_statements=True,
 )
+result = prover.prove(task, output_dir=Path("demo"))
 ```
 
-The harness is fixed to `claude_code` and assets to `numina`. See
-{class}`~open_atp.provers.numina.NuminaProver` in the {doc}`../api/provers`
-reference for the full set of fields.
+See the {doc}`/api/index` for all {class}`~open_atp.provers.numina.NuminaProver` configuration options.
 
-Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
-`numina`.
+## Prover details
 
-## Harness details
+The Numina prover uses Claude Code without any of the skills used by the other agent harnesses or the Lean LSP MCP server {cite:p}`leanprover_skills`. Instead, it defines its own set of skills and prompts. It runs a multi-round loop with a statement tracker. Each round makes a single call to the Claude Code CLI with the `main_entry.md` prompt below.
 
-The harness is pinned to an internal `NuminaHarness` — Claude Code with **no
-plugins**, since Numina ships its own scaffold — and is not configurable. Rather
-than wire skills through the shared bundle, `_stage_numina_assets` mounts Numina's
-vendored scaffold (`vendor/numina/skills` + `vendor/numina/prompts`) straight into
-the known `.claude/` locations: the coordinator skill's contents at `.claude/skills`
-and the subagent-prompt tree at `.claude/prompts`.
-
-Two behaviours differ from a plain agent run:
-
-- **Round-continuation loop.** Each round is a fresh `claude -p` invocation over the
-  same persistent workdir; the loop re-invokes the agent while it reports
-  `END_REASON:LIMIT` (made progress but ran out of turns/budget) and stops on
-  `END_REASON:COMPLETE`, up to `max_rounds`. `max_consecutive_limits` triggers a
-  session reset after that many LIMIT rounds in a row.
-- **Statement tracker.** When `guard_statements` is set, the target theorems are
-  snapshotted before the run; if a round weakens or deletes one, the originals are
-  restored and (with `on_statement_change="error"`, the default) the run stops.
-
-`$PROMPT` is Numina's coordinator scaffold (`main_entry.md`) plus an explicit
-session-control protocol so the loop can tell "done" from "out of budget", with the
-task's optional `user_prompt` appended under an *Additional instructions* heading
-when set:
-
-:::{dropdown} Round-control protocol (appended to Numina's coordinator prompt)
-:icon: code
-```{literalinclude} ../../src/open_atp/provers/numina.py
-:language: text
-:start-after: _END_REASON_PROTOCOL = """
-:end-before: '"""'
+:::{dropdown} `vendor/numina/prompts/main_entry.md`
+```{literalinclude} ../../vendor/numina/prompts/main_entry.md
+:class: wrap
+:language: markdown
 ```
 :::
 
-## Cost tracking
+(tracking-cost-and-usage-numina)=
+## Tracking cost and usage
 
-The Claude Code CLI reports per-round USD directly, summed across rounds into the
-agent's cost. On top of that, the `discussion_partner` skill (Gemini/GPT) appends a
-per-call token-usage record to a workdir ledger (`.claude/helper_usage.jsonl`);
-after the run `prove()` prices it via the {mod}`~open_atp.harness.cost` table and
-folds it into `cost_usd`, so the reported cost includes discussion-partner spend
-rather than only the Claude agent. The split is preserved in metadata
-(`agent_cost_usd`, `helper_cost_usd`, `helper_breakdown`). Helper models absent from
-the price table are billed at `0` but surfaced in `helper_unpriced_models` so the gap
-is visible — the `gpt-5.4-pro` / `gemini-3.1-pro-preview` defaults carry
-**estimated** prices that should be verified against the provider pricing pages.
+The Claude Code CLI's JSON output reports per-run cost directly. The `discussion_partner` skill makes API calls to Gemini and GPT — the cost of each API call is recorded in the working directory. Claude Code CLI and API costs are added to populate `cost_usd` in {class}`~open_atp.provers.base.ProofResult`. Gemini and GPT usage can be monitored from their respective dashboards.
+
+:::{warning}
+Unlike the {doc}`/provers/claude_code` prover, the Numina prover does not solely bill your Claude plan. The `discussion_partner` skill makes API calls to Gemini and GPT, which can quickly become costly.
+:::

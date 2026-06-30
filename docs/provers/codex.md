@@ -1,89 +1,91 @@
-(prover-codex)=
 # Codex
 
 ```{include} _meta_codex.md
 :parser: myst
 ```
 
-The Codex prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on the
-{class}`~open_atp.harness.codex.CodexHarness` — OpenAI's
-[Codex](https://chatgpt.com/codex) CLI driving the `sorry`s in a sandbox with the
-[lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp) server. The shared
-{class}`~open_atp.verify.Verifier` does the final compile / sorry / axiom
-check. See {doc}`index` for the staging/diff lifecycle every agent harness shares.
+Use OpenAI's [Codex](https://chatgpt.com/codex) CLI as an automated theorem prover with Lean skills and MCP tooling. This prover uses the {class}`~open_atp.provers.agent_prover.AgentProver` with the {class}`~open_atp.harness.codex.CodexHarness`.
 
 ## Authentication
 
-Codex is available on paid ChatGPT plans — compare plans at
-[ChatGPT pricing](https://chatgpt.com/pricing/) and monitor consumption at
-[Analytics](https://chatgpt.com/codex/cloud/settings/analytics). Authenticate the
-Codex CLI once on the host:
+Codex is available on paid ChatGPT plans. [Choose a plan](https://chatgpt.com/pricing/) and sign up if you don't have an account. [Install](https://developers.openai.com/codex/cli) the Codex CLI and generate an ephemeral API token once on the host:
 
 ```bash
 codex login
 ```
 
-This writes credentials to `~/.codex/auth.json`. Pass that file to the harness
-explicitly:
+This writes credentials to `~/.codex/auth.json`. By default the harness reads that file; pass it explicitly to override:
 
 ```python
 CodexHarness(auth_file=Path("~/.codex/auth.json").expanduser())
 ```
 
-or leave `auth_file` unset (the default) to use `~/.codex/auth.json`. Either way the
-harness mounts just that credential inside the sandbox at run time so Codex can
-refresh its access token mid-session, billing against your ChatGPT subscription;
-resolution fails if the file is absent.
+The harness mounts the credential into the sandbox at run time so Codex can refresh its access token mid-session, billing against your ChatGPT subscription. See {ref}`tracking-cost-and-usage-codex` for details.
 
-## Usage
+## Using the prover
+
+### Standard prover via Python API
+
+The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration. Here, we prove the {ref}`MUL_REORDER` example theorem:
 
 ```python
+from pathlib import Path
+
 from open_atp.backends.docker import DockerBackend
+from open_atp.config import standard_prover
+from open_atp.examples import EXAMPLE, example_task
+
+task = example_task(EXAMPLE.MUL_REORDER)
+prover = standard_prover("codex", backend=DockerBackend())
+result = prover.prove(task, output_dir=Path("demo"))
+```
+
+### Standard prover via CLI
+
+The standard prover can also be run from the CLI:
+
+```bash
+open-atp prove path/to/task.lean output_dir codex
+```
+
+### Customizing the prover
+
+To override knobs like `model` and `effort`, construct the class directly:
+
+```python
+from pathlib import Path
+
+from open_atp.backends.docker import DockerBackend
+from open_atp.examples import EXAMPLE, example_task
 from open_atp.harness import CodexHarness
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers import AgentProver
 
-backend = DockerBackend(image=DEFAULT_IMAGE)
-prover = AgentProver(harness=CodexHarness(effort="high"), backend=backend)
+task = example_task(EXAMPLE.MUL_REORDER)
+prover = AgentProver(
+    harness=CodexHarness(effort="high"),
+    backend=DockerBackend(image=DEFAULT_IMAGE),
+)
+result = prover.prove(task, output_dir=Path("demo"))
 ```
 
-{class}`~open_atp.harness.CodexHarness` selects the Codex CLI. Because Codex
-authenticates through ChatGPT/OpenAI it must run an OpenAI model, so its `model`
-defaults to `gpt-5.5` rather than the Anthropic base default.
+See the {doc}`/api/index` for all {class}`~open_atp.harness.codex.CodexHarness` configuration options.
 
-Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
-`codex`.
+:::{warning}
+Codex does not support all of the models available in the OpenAI API.
+:::
 
 ## Harness details
 
-Codex does not auto-discover `.mcp.json`, so the prover stages the
-`AgentProver`'s `skills` — the host-agnostic
-[`leanprover/skills`](https://github.com/leanprover/skills) — under
-`.agents/skills/` and the lean-lsp MCP server is wired through `-c` overrides on
-the command line instead of a config file. The launch script
-(`assets/scripts/codex_agent.sh`) runs:
+By default, the Codex harness is equipped with:
 
-```bash
-codex exec --json --skip-git-repo-check \
-    --sandbox danger-full-access \
-    --model '<MODEL>' \
-    -c 'mcp_servers.lean-lsp.command="lean-lsp-mcp"' \
-    -c 'mcp_servers.lean-lsp.args=[]' \
-    -c 'model_reasoning_effort="<EFFORT>"' \
-    "$PROMPT"
-```
+- Official Lean skills {cite:p}`leanprover_skills`.
+- `lean-lsp-mcp` MCP server {cite:p}`lean_lsp_mcp`.
 
-`codex exec` runs non-interactively; `danger-full-access` grants the broad
-permissions the in-place edits need (safe in the container). Note `effort` is passed
-via the `model_reasoning_effort` override, not a `--effort` flag. The `--json` event
-stream goes to stdout.
+The agent prompt (below) is written into the working directory and read into `$PROMPT`. The Codex CLI is then invoked in non-interactive mode with `$PROMPT` as the input. See the script below for the full Codex CLI invocation.
 
-`$PROMPT` is the shared agent prover prompt baked into the
-{class}`~open_atp.provers.agent_prover.AgentProver`, with the task's optional
-`user_prompt` appended under an *Additional instructions* heading when set:
-
-:::{dropdown} Agent prover prompt
-:icon: code
+:::{dropdown} Agent Prompt
+:icon: book
 ```{literalinclude} ../../src/open_atp/provers/agent_prover.py
 :language: text
 :start-after: PROVER_PROMPT = """
@@ -91,11 +93,18 @@ stream goes to stdout.
 ```
 :::
 
-## Cost tracking
+:::{dropdown} `src/open_atp/harness/assets/scripts/codex_agent.sh`
+:icon: code
+```{literalinclude} ../../src/open_atp/harness/assets/scripts/codex_agent.sh
+:language: bash
+```
+:::
 
-The Codex CLI does not report per-run USD. `parse` sums token totals from the
-`turn.completed` events (tolerating the `input_tokens` / `inputTokens` /
-`prompt_tokens` field-name variants) and leaves `cost_usd` `None`, so the prover
-estimates USD from the pricing table in
-{data}`~open_atp.harness.cost.COST_PER_MTOK`. Keep that table aligned with current
-OpenAI API prices.
+(tracking-cost-and-usage-codex)=
+## Tracking cost and usage
+
+The Codex CLI does not report per-run USD. Token totals from the `turn.completed` events are summed and the pricing table in {data}`~open_atp.harness.cost.COST_PER_MTOK` is used to compute the cost in USD. This populates `cost_usd` in {class}`~open_atp.provers.base.ProofResult`. Usage within your plan's quota is not billed. You can monitor plan consumption at [Analytics](https://chatgpt.com/codex/cloud/settings/analytics).
+
+:::{warning}
+Running a large number of proofs can quickly consume your plan's 5 hour session quota.
+:::

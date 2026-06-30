@@ -47,7 +47,7 @@ Each harness adapts one agent CLI and is a
    :show-inheritance:
    :exclude-members: stage
 
-.. autoclass:: open_atp.harness.axprover.AxProverHarness
+.. autoclass:: open_atp.harness.axproverbase.AxProverBaseHarness
    :show-inheritance:
    :exclude-members: stage
 ```

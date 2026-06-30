@@ -101,7 +101,7 @@ class AgentProver(AutomatedProver):
     :class:`~open_atp.backends.base.ComputeBackend` (the *compute* concern): the
     harness edits the staged ``.lean`` files in place, then the shared
     :class:`~open_atp.verify.Verifier` does the final compile/sorry/axiom check.
-    ``codex``, ``opencode``, ``axprover``, and ``vibe`` are this prover on a
+    ``codex``, ``opencode``, ``axproverbase``, and ``vibe`` are this prover on a
     different harness.
 
     Parameters
@@ -115,8 +115,8 @@ class AgentProver(AutomatedProver):
         :class:`~open_atp.harness.CodexHarness`,
         :class:`~open_atp.harness.OpenCodeHarness`,
         :class:`~open_atp.harness.VibeHarness`, or
-        :class:`~open_atp.harness.AxProverHarness`. Carries ``model``/``effort`` plus
-        any harness-specific knobs. Plugins are Claude-only and live on
+        :class:`~open_atp.harness.AxProverBaseHarness`. Carries ``model``/``effort``
+        plus any harness-specific knobs. Plugins are Claude-only and live on
         :class:`~open_atp.harness.ClaudeCodeHarness`.
     skills : list[str], optional
         Skills to mount into the agent workdir, each a name (resolved from the

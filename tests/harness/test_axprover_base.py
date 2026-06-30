@@ -1,4 +1,4 @@
-"""AxProverHarness tests (ax-prover-base via the ``ax-prover prove`` CLI).
+"""AxProverBaseHarness tests (ax-prover-base via the ``ax-prover prove`` CLI).
 
 Fast unit layer (no Docker, no creds, no API):
 
@@ -26,7 +26,7 @@ import pytest
 from open_atp.backends.docker import DockerBackend
 from open_atp.harness import (
     _HARNESSES,
-    AxProverHarness,
+    AxProverBaseHarness,
     Harness,
 )
 from open_atp.images import DEFAULT_IMAGE
@@ -76,7 +76,7 @@ def _write_usage(wd: Path, target: str, input_tokens: int, output_tokens: int) -
 def prover(fake_session_backend: object) -> AgentProver:
     # The in-process fake session keeps the diff unit test (which stubs _run_agent)
     # off a live backend while _generate opens its session and verifies in it.
-    harness = AxProverHarness(model="claude-opus-4-8", effort="high")
+    harness = AxProverBaseHarness(model="claude-opus-4-8", effort="high")
     return AgentProver(harness=harness, backend=fake_session_backend)
 
 
@@ -84,14 +84,14 @@ def prover(fake_session_backend: object) -> AgentProver:
 
 
 def test_registered_and_construction_carries_max_iterations() -> None:
-    assert _HARNESSES["axprover"] is AxProverHarness
+    assert _HARNESSES["axproverbase"] is AxProverBaseHarness
 
-    harness = AxProverHarness(
+    harness = AxProverBaseHarness(
         model="claude-opus-4-8",
         effort="high",
         max_iterations=20,
     )
-    assert isinstance(harness, AxProverHarness)
+    assert isinstance(harness, AxProverBaseHarness)
     assert harness.model == "claude-opus-4-8"
     assert harness.effort == "high"
     assert harness.max_iterations == 20
@@ -101,7 +101,7 @@ def test_agent_auth_requires_the_selected_provider_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # claude-* selects the anthropic provider, so it requires ANTHROPIC_API_KEY.
-    harness = AxProverHarness(model="claude-opus-4-8")
+    harness = AxProverBaseHarness(model="claude-opus-4-8")
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"):
         monkeypatch.delenv(key, raising=False)
     with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
@@ -114,12 +114,14 @@ def test_agent_auth_explicit_provider_key_overrides_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    harness = AxProverHarness(model="claude-opus-4-8", provider_api_key="sk-explicit")
+    harness = AxProverBaseHarness(
+        model="claude-opus-4-8", provider_api_key="sk-explicit"
+    )
     assert harness.agent_auth().env == {"ANTHROPIC_API_KEY": "sk-explicit"}
 
 
 def test_agent_command_is_self_discovering_script() -> None:
-    script = AxProverHarness(model="claude-opus-4-8")._agent_command()
+    script = AxProverBaseHarness(model="claude-opus-4-8")._agent_command()
     # --config must precede the `prove` subcommand; warm-cache + robustness flags.
     assert "ax-prover --config axprover.yaml prove" in script
     assert "--skip-build" in script
@@ -131,7 +133,9 @@ def test_agent_command_is_self_discovering_script() -> None:
 
 
 def test_render_config_anthropic_model_and_effort(tmp_path: Path) -> None:
-    harness = AxProverHarness(model="claude-opus-4-8", effort="high", max_iterations=15)
+    harness = AxProverBaseHarness(
+        model="claude-opus-4-8", effort="high", max_iterations=15
+    )
     harness.stage_wd(tmp_path)
 
     assert (tmp_path / "agent.sh").is_file()
@@ -153,21 +157,22 @@ def test_render_config_anthropic_model_and_effort(tmp_path: Path) -> None:
 
 
 def test_render_config_provider_prefix_and_knob_per_provider() -> None:
-    assert "openai:gpt-5.2" == AxProverHarness(model="gpt-5.2")._ax_model()
+    assert "openai:gpt-5.2" == AxProverBaseHarness(model="gpt-5.2")._ax_model()
     assert (
-        "google_genai:gemini-3-pro" == AxProverHarness(model="gemini-3-pro")._ax_model()
+        "google_genai:gemini-3-pro"
+        == AxProverBaseHarness(model="gemini-3-pro")._ax_model()
     )
 
-    openai_cfg = AxProverHarness(model="gpt-5.2", effort="high")._provider_config()
+    openai_cfg = AxProverBaseHarness(model="gpt-5.2", effort="high")._provider_config()
     assert openai_cfg["reasoning"] == {"effort": "high"}
-    google_cfg = AxProverHarness(
+    google_cfg = AxProverBaseHarness(
         model="gemini-3-pro", effort="medium"
     )._provider_config()
     assert google_cfg["thinking_level"] == "medium"
 
 
 def test_render_config_omits_max_iterations_when_unset(tmp_path: Path) -> None:
-    AxProverHarness(model="claude-opus-4-8").stage_wd(tmp_path)
+    AxProverBaseHarness(model="claude-opus-4-8").stage_wd(tmp_path)
     cfg = json.loads((tmp_path / "axprover.yaml").read_text())
     assert "max_iterations" not in cfg["prover"]
 
@@ -176,7 +181,7 @@ def test_render_config_omits_max_iterations_when_unset(tmp_path: Path) -> None:
 
 
 def test_parse_sums_tokens_across_usage_files(tmp_path: Path) -> None:
-    harness = AxProverHarness(model="claude-opus-4-8")
+    harness = AxProverBaseHarness(model="claude-opus-4-8")
     harness.stage_wd(tmp_path)
     _write_usage(tmp_path, "A_lean", 1000, 200)
     _write_usage(tmp_path, "B_lean", 500, 50)
@@ -190,7 +195,7 @@ def test_parse_sums_tokens_across_usage_files(tmp_path: Path) -> None:
 
 
 def test_parse_without_usage_files_reports_zero_tokens(tmp_path: Path) -> None:
-    harness = AxProverHarness(model="claude-opus-4-8")
+    harness = AxProverBaseHarness(model="claude-opus-4-8")
     harness.stage_wd(tmp_path)  # no usage files written
     result = harness.parse_result(STREAM_LINES)
     assert result.input_tokens == 0
@@ -219,7 +224,7 @@ def test_generate_reports_changes_and_token_cost(
     ) -> tuple[list[str], str]:
         (workdir / "MILExample.lean").write_text(SOLVED_FILE)
         # The real run writes this; emulate it so parse_result() finds the tokens.
-        assert isinstance(harness, AxProverHarness)
+        assert isinstance(harness, AxProverBaseHarness)
         _write_usage(workdir, "MILExample_lean", 1_000_000, 100_000)
         return STREAM_LINES, ""
 
@@ -240,7 +245,7 @@ def test_generate_reports_changes_and_token_cost(
     # cost_usd is derived from the token table for claude-opus-4-8 (5/25 per Mtok).
     expected = 1_000_000 * 5.0 / 1e6 + 100_000 * 25.0 / 1e6
     assert result.cost_usd == pytest.approx(expected)
-    assert result.metadata["harness"] == "axprover"
+    assert result.metadata["harness"] == "axproverbase"
     assert result.metadata["model"] == "claude-opus-4-8"
     assert result.metadata["input_tokens"] == 1_000_000
 
@@ -294,7 +299,7 @@ def test_live_axprover_solves_trivial_theorem(backend: str, tmp_path: Path) -> N
     if not _backend_available(backend):
         pytest.skip(f"backend {backend} not available")
 
-    harness = AxProverHarness(
+    harness = AxProverBaseHarness(
         model="claude-opus-4-8",
         effort="high",
         max_iterations=10,

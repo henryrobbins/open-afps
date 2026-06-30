@@ -23,7 +23,7 @@ from open_atp.harness.base import (
 _LLM_MAX_RETRIES = 3
 
 
-class AxProverHarness(Harness):
+class AxProverBaseHarness(Harness):
     """ax-prover-base (LangGraph Lean agent), driven by ``ax-prover prove`` in-sandbox.
 
     ax-prover is a self-contained proving agent (its own
@@ -66,22 +66,22 @@ class AxProverHarness(Harness):
 
     Examples
     --------
-    >>> from open_atp.harness import AxProverHarness
-    >>> harness = AxProverHarness()
+    >>> from open_atp.harness import AxProverBaseHarness
+    >>> harness = AxProverBaseHarness()
     >>> harness.name
-    'axprover'
+    'axproverbase'
     >>> harness.model
     'claude-opus-4-8'
 
     With the provider key supplied explicitly, :meth:`agent_auth` forwards it under
     the provider's canonical env var without reading the host environment:
 
-    >>> harness = AxProverHarness(provider_api_key="sk-fake")
+    >>> harness = AxProverBaseHarness(provider_api_key="sk-fake")
     >>> harness.agent_auth().env
     {'ANTHROPIC_API_KEY': 'sk-fake'}
     """
 
-    name = "axprover"
+    name = "axproverbase"
 
     #: open-atp provider name -> ax-prover's LangChain ``provider:model`` prefix.
     _AX_PROVIDER_PREFIX: ClassVar[dict[str, str]] = {

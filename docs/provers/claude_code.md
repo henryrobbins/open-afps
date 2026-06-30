@@ -1,104 +1,99 @@
-(prover-claude-code)=
 # Claude Code
 
 ```{include} _meta_claude_code.md
 :parser: myst
 ```
 
-The Claude Code prover is the {class}`~open_atp.provers.agent_prover.AgentProver` on
-the {class}`~open_atp.harness.claude_code.ClaudeCodeHarness` — Anthropic's
-[Claude Code](https://claude.com/claude-code) CLI driving the `sorry`s in a sandbox
-with the [lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp) server. It is the
-default harness: the bare `agent` registry spec selects it, and the shared
-{class}`~open_atp.verify.Verifier` does the final compile / sorry / axiom
-check. See {doc}`index` for the staging/diff lifecycle every agent harness shares.
+Use [Claude Code](https://claude.com/claude-code) as an automated theorem prover with common skills and MCP tooling for working with Lean. This prover uses the {class}`~open_atp.provers.agent_prover.AgentProver` with the {class}`~open_atp.harness.claude_code.ClaudeCodeHarness`.
 
 ## Authentication
 
-Claude Code is included with every paid Claude plan — compare plans at
-[Choose a Claude plan](https://support.claude.com/en/articles/11049762-choose-a-claude-plan)
-and monitor consumption at [Usage](https://claude.ai/settings/usage). Generate a
-long-lived OAuth token once on the host:
+Claude Code is included with every paid Claude plan. [Choose a Claude plan](https://support.claude.com/en/articles/11049762-choose-a-claude-plan) and sign up if you don't have an account. [Install](https://code.claude.com/docs/en/quickstart) the Claude Code CLI and generate a long-lived OAuth token once on the host:
 
 ```bash
 claude setup-token
 ```
 
-Pass the token to the harness explicitly:
-
-```python
-ClaudeCodeHarness(oauth_token="sk-ant-oat01-...")
-```
-
-or leave `oauth_token` unset (the default) to read it from the host
-`CLAUDE_CODE_OAUTH_TOKEN` environment variable — for example from a `.env` file in
-your project:
+By default, the harness will read `CLAUDE_CODE_OAUTH_TOKEN` from the host environment. It is recommended to define this in a `.env` file in your project root.
 
 ```
 CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
 ```
 
-Either way the harness forwards `CLAUDE_CODE_OAUTH_TOKEN` into the sandbox at run
-time, billing against your Claude plan rather than the API; resolution fails if
-neither is supplied.
-
-## Usage
+Alternatively, pass the token to the harness explicitly:
 
 ```python
+ClaudeCodeHarness(oauth_token="sk-ant-oat01-...")
+``` 
+
+The harness forwards `CLAUDE_CODE_OAUTH_TOKEN` into the sandbox at run
+time, billing against your Claude plan (not the API). See {ref}`tracking-cost-and-usage-claude`.
+
+## Using the prover
+
+### Standard prover via Python API
+
+The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration. Here, we prove the {ref}`MUL_REORDER` example theorem:
+
+```python
+from pathlib import Path
+
 from open_atp.backends.docker import DockerBackend
+from open_atp.config import standard_prover
+from open_atp.examples import EXAMPLE, example_task
+
+task = example_task(EXAMPLE.MUL_REORDER)
+prover = standard_prover("claude", backend=DockerBackend())
+result = prover.prove(task, output_dir=Path("demo"))
+```
+
+### Standard prover via CLI
+
+The standard prover can also be run from the CLI:
+
+```bash
+open-atp prove path/to/task.lean output_dir claude
+```
+
+### Customizing the prover
+
+To override knobs like `model` and `effort`, construct the class directly. In this example, we use the `claude-opus-4-8` model with `high` effort:
+
+```python
+from pathlib import Path
+
+from open_atp.backends.docker import DockerBackend
+from open_atp.examples import EXAMPLE, example_task
 from open_atp.harness import ClaudeCodeHarness
 from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers import AgentProver
 
-backend = DockerBackend(image=DEFAULT_IMAGE)
+task = example_task(EXAMPLE.MUL_REORDER)
 prover = AgentProver(
     harness=ClaudeCodeHarness(model="claude-opus-4-8", effort="high"),
-    backend=backend,
+    backend=DockerBackend(image=DEFAULT_IMAGE),
 )
+result = prover.prove(task, output_dir=Path("demo"))
 ```
 
-{class}`~open_atp.provers.agent_prover.AgentProver` composes a
-{class}`~open_atp.harness.Harness`; here a
-{class}`~open_atp.harness.ClaudeCodeHarness` selects the Claude Code CLI and
-carries its `model`/`effort`. Swap in any other harness to change CLI. Claude
-Code is the default, so a bare `AgentProver(backend=...)` already uses it.
+See the {doc}`/api/index` for all {class}`~open_atp.harness.claude_code.ClaudeCodeHarness` configuration options.
 
-Or by catalog name through {func}`~open_atp.config.standard_prover` / the CLI:
-`claude`.
+:::{warning}
+Claude Code does not support all of the models available in the Claude API.
+:::
 
 ## Harness details
 
-`stage` writes a project-scope `.mcp.json` registering the lean-lsp MCP server. The
-prover then stages the `AgentProver`'s `skills` — the host-agnostic
-[`leanprover/skills`](https://github.com/leanprover/skills), default `lean-proof` —
-under `.claude/skills/` (via `stage_skills`). Claude Code is the only harness that
-also loads **plugins**, so they live on `ClaudeCodeHarness`'s `plugins` (default
-`lean4`, vendored from
-[`cameronfreer/lean4-skills`](https://github.com/cameronfreer/lean4-skills)) rather
-than the shared bundle; each is staged under `.plugins/<name>/`. The launch script
-(`assets/scripts/claude_code_agent.sh`) runs:
+By default, the Claude Code harness is equipped with:
 
-```bash
-claude -p "$PROMPT" \
-    --output-format stream-json --verbose \
-    --permission-mode bypassPermissions \
-    --mcp-config .mcp.json --strict-mcp-config \
-    --model '<MODEL>' --effort '<EFFORT>'<PLUGIN_FLAGS>
-```
+- Official Lean skills {cite:p}`leanprover_skills`.
+- Lean4 Claude Code plugin {cite:p}`lean4_skills`.
+- `lean-lsp-mcp` MCP server {cite:p}`lean_lsp_mcp`.
 
-`<PLUGIN_FLAGS>` expands to one `--plugin-dir .plugins/<name>` per mounted plugin —
-the only way to load a local plugin in a headless `-p` run, so its `SessionStart`
-hooks and subagents fire. `bypassPermissions` skips approval prompts (safe in the
-container); the prover sets `IS_SANDBOX=1` so that mode runs non-interactively, and
-`CLAUDE_CODE_FORK_SUBAGENT=1` when plugins are mounted. The `stream-json` event
-stream goes to stdout.
+The agent prompt (below) is written into the working directory and read into `$PROMPT`. The Claude Code CLI is then invoked in non-interactive mode with `$PROMPT` as the input. See the script below for the full Claude Code CLI invocation.
 
-`$PROMPT` is the shared agent prover prompt baked into the
-{class}`~open_atp.provers.agent_prover.AgentProver`, with the task's optional
-`user_prompt` appended under an *Additional instructions* heading when set:
-
-:::{dropdown} Agent prover prompt
-:icon: code
+:::{dropdown} Agent Prompt
+:icon: book
 ```{literalinclude} ../../src/open_atp/provers/agent_prover.py
 :language: text
 :start-after: PROVER_PROMPT = """
@@ -106,9 +101,23 @@ stream goes to stdout.
 ```
 :::
 
-## Cost tracking
+:::{dropdown} `src/open_atp/harness/assets/scripts/claude_code_agent.sh`
+:icon: code
+```{literalinclude} ../../src/open_atp/harness/assets/scripts/claude_code_agent.sh
+:language: bash
+```
+:::
 
-The Claude Code CLI's JSON event stream reports per-run USD directly (`total_cost_usd`
-in the final `result` object), so `cost_usd` in
-{class}`~open_atp.harness.base.HarnessRunResult` is read straight from the stream
-along with input/output token totals.
+(tracking-cost-and-usage-claude)=
+## Tracking cost and usage
+
+The Claude Code CLI's JSON event stream reports per-run USD directly (`total_cost_usd` in the final `result` object). This populates `cost_usd` in
+{class}`~open_atp.provers.base.ProofResult`. Note that this cost is based on API rates. Usage within your plan's quota is not billed. You can monitor plan consumption at [Usage](https://claude.ai/settings/usage).
+
+:::{warning}
+There are plans to migrate the Claude Agent SDK and `claude -p` non-interactive usage to no longer count towards Claude plan usage limits. This was originally planned for June 15, 2026. It has been delayed to a later date. See [this article](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan).
+:::
+
+:::{warning}
+Running a large number of proofs can quickly consume your plan's 5 hour session quota.
+:::

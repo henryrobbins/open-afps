@@ -1,63 +1,67 @@
-(prover-aristotle)=
-# AristotleProver
+# Aristotle
 
 ```{include} _meta_aristotle.md
 :parser: myst
 ```
 
-The {class}`~open_atp.provers.aristotle.AristotleProver` wraps Harmonic's hosted
-[Aristotle](https://www.harmonic.fun/) API. No agentic sandbox is needed for
-generation — the lake project is handed to the hosted agent via `aristotlelib`
-(submit → wait → download), the returned archive is unpacked over the workdir, and
-the shared {class}`~open_atp.verify.Verifier` does the final check in a local
-Docker sandbox. This is the platform's simplest end-to-end slice.
+Harmonic offers API access to their advanced formal reasoning agent, [Aristotle](https://www.harmonic.fun/). The {class}`~open_atp.provers.aristotle.AristotleProver` hands the lake project to the hosted agent via the Aristotle Python package: `aristotlelib`. The prover still requires a compute backend to run the final verification on Aristotle's returned output.
 
 ## Authentication
 
-The prover reads the Harmonic API key from the `ARISTOTLE_API_KEY` environment
-variable (or pass it explicitly as
-{attr}`~open_atp.provers.aristotle.AristotleProver` `api_key`). Set it on the host:
+By default the prover reads the Harmonic API key from the host environment:
 
 ```bash
 export ARISTOTLE_API_KEY=...
 ```
 
-or add it to a `.env` file in your project.
-
-## Usage
+It is recommended to define this in a `.env` file in your project root. Alternatively, pass it to the prover explicitly as {attr}`~open_atp.provers.aristotle.AristotleProver` `api_key`.
 
 ```python
 from open_atp.backends.docker import DockerBackend
-from open_atp.images import DEFAULT_IMAGE
 from open_atp.provers.aristotle import AristotleProver
 
-backend = DockerBackend(image=DEFAULT_IMAGE)
-prover = AristotleProver(backend=backend)
+prover = AristotleProver(api_key="sk-...", backend=DockerBackend())
 ```
 
-The remote interaction is isolated in
-`AristotleProver._submit_and_download`, so tests can stand in a fake result without
-touching the network or an API key. See {doc}`../guides/run_provers` for an
-end-to-end run and {class}`~open_atp.provers.aristotle.AristotleProver` in the
-{doc}`../api/provers` reference for configuration.
+## Using the prover
 
-The prompt submitted to the hosted agent is Aristotle's own prover prompt, with the
-task's optional `user_prompt` appended under an *Additional instructions* heading
-when set (the agent CLI harnesses share a longer, tool-specific prover prompt
-instead):
+### Run via the Python API
 
-:::{dropdown} Aristotle prover prompt
-:icon: code
+The simplest way to run the prover is through {func}`~open_atp.config.standard_prover` which uses a standard configuration. Here, we prove the {ref}`MUL_REORDER` example theorem:
+
+```python
+from pathlib import Path
+
+from open_atp.backends.docker import DockerBackend
+from open_atp.config import standard_prover
+from open_atp.examples import EXAMPLE, example_task
+
+task = example_task(EXAMPLE.MUL_REORDER)
+prover = standard_prover("aristotle", backend=DockerBackend())
+result = prover.prove(task, output_dir=Path("demo"))
+```
+
+### Run via the CLI
+
+The standard prover can also be run from the CLI:
+
+```bash
+open-atp prove path/to/task.lean output_dir aristotle
+```
+
+## Prover details
+
+The agent prompt passed to Aristotle is simple:
+
 ```{literalinclude} ../../src/open_atp/provers/aristotle.py
 :language: python
 :start-after: PROVER_PROMPT = (
-:end-before: END PROVER_PROMPT
+:end-before: )
 ```
-:::
 
-## Cost tracking
+Since Aristotle is closed-source, no other prover details are known. However, `aristotlelib` does provide rich agent logs which are written to the logs subdirectory of the output folder.
 
-Aristotle is currently available for **free** — runs against your
-`ARISTOTLE_API_KEY` are not billed by Harmonic, and the hosted API returns no
-per-run cost, so the prover reports `cost_usd` as `None`. Verification still happens
-locally in your own Docker sandbox.
+(tracking-cost-and-usage-aristotle)=
+## Tracking cost and usage
+
+Aristotle is currently available for **free**! The cost is reported as `None` in {class}`~open_atp.provers.base.ProofResult`.

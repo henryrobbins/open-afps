@@ -54,7 +54,7 @@ from open_atp.provers.base import AutomatedProver, ProofResult
 #:     nearby docstring contains the word ``sorry``, wasting a prove loop on a phantom
 #:     target; the rewrite asks the Lean server for real declarations + ``Sorry`` terms.
 #:   * per-target token usage in the ``-o`` JSON, which
-#:     ``AxProverHarness.parse_result`` reads to report cost (the PyPI release emits
+#:     ``AxProverBaseHarness.parse_result`` reads to report cost (the PyPI release emits
 #:     no usage).
 #: Fork is public; HTTPS clone needs no credentials in the image build.
 AX_PROVER_REPO = "https://github.com/henryrobbins/ax-prover-base"
@@ -405,8 +405,8 @@ def _build_modal_image(args: argparse.Namespace) -> int:
         .run_commands(
             "pipx install lean-lsp-mcp && pipx install uv && pipx install mistral-vibe"
         )
-        # ax-prover (LangGraph Lean agent) backing the AxProverHarness, pipx-isolated
-        # from open-atp and the CLIs. Keep AX_PROVER_REF in sync with the
+        # ax-prover (LangGraph Lean agent) backing the AxProverBaseHarness,
+        # pipx-isolated from open-atp and the CLIs. Keep AX_PROVER_REF in sync with the
         # images/Dockerfile ARG. Pinned to a git commit (not a PyPI release) for the
         # lean_interact target discovery -- see AX_PROVER_SPEC above.
         .run_commands(f"pipx install '{AX_PROVER_SPEC}'")
