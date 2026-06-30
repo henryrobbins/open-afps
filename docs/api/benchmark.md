@@ -48,7 +48,7 @@ clone of just the dataset's `.lean` subdirectory — ready for
 
 ```{eval-rst}
 .. autoclass:: open_atp.benchmark.BenchmarkResult
-   :members: table, to_dict
+   :members: to_dict
 
 .. autoclass:: open_atp.benchmark.BenchmarkRun
 ```

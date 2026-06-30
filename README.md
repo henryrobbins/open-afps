@@ -54,7 +54,7 @@ result = prover.prove(task, output_dir="runs/example")
 
 ## Available provers
 
-The `ID` is the standard prover name used by `standard_prover` and the CLI `-p/--prover` option. Also see [Provers](https://open-atp.readthedocs.io/en/latest/provers/index.html).
+The `ID` is the standard prover name used by `standard_prover`, the CLI `prove` command's `prover` argument, and the `benchmark` command's `-p/--provers` option. Also see [Provers](https://open-atp.readthedocs.io/en/latest/provers/index.html).
 
 <!-- BEGIN PROVER TABLE (generated from docs/provers.yaml) -->
 | Prover | ID | Skills | MCP | Paper | Source |
@@ -70,7 +70,7 @@ The `ID` is the standard prover name used by `standard_prover` and the CLI `-p/-
 
 ## Download common datasets
 
-OpenATP provides utilities to download common proof-synthesis benchmarks (see [Downloading a dataset](https://open-atp.henryrobbins.com/en/latest/guides/benchmark.html#downloading-a-dataset)). The available datasets are listed in the `DATASET` enum.
+OpenATP provides utilities to download common proof-synthesis benchmarks (see [Downloading a dataset](https://open-atp.readthedocs.io/en/latest/guides/benchmark.html#downloading-a-dataset)). The available datasets are listed in the `DATASET` enum.
 
 | Benchmark | `DATASET` | Toolchain | Paper | Source |
 | --- | --- | --- | --- | --- |
@@ -94,7 +94,7 @@ If you use `OpenATP` in your work, please cite it:
 }
 ```
 
-OpenATP includes provers with associated papers and bundles popular open-source tools for improving agentic theorem proving. Please see [Citations](https://open-atp.henryrobbins.com/en/latest/citations.html) for a comprehensive list of references.
+OpenATP includes provers with associated papers and bundles popular open-source tools for improving agentic theorem proving. Please see [Citations](https://open-atp.readthedocs.io/en/latest/citations.html) for a comprehensive list of references.
 
 ## Development
 

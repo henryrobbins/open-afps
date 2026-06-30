@@ -79,7 +79,7 @@ See the {doc}`/api/index` for all {class}`~open_atp.provers.numina.NuminaProver`
 
 ## Prover details
 
-The Numina prover uses Claude Code without any of the skills used by the other agent harnesses or the Lean LSP MCP server {cite:p}`leanprover_skills`. Instead, it defines its own set of skills and prompts. It runs a multi-round loop with a statement tracker. Each round makes a single call to the Claude Code CLI with the `main_entry.md` prompt below.
+The Numina prover uses Claude Code without any of the skills used by the other agent harnesses {cite:p}`leanprover_skills`. Instead, it defines its own set of skills and prompts. It runs a multi-round loop with a statement tracker. Each round makes a single call to the Claude Code CLI with the `main_entry.md` prompt below.
 
 :::{dropdown} `vendor/numina/prompts/main_entry.md`
 ```{literalinclude} ../../vendor/numina/prompts/main_entry.md

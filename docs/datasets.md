@@ -11,5 +11,5 @@ OpenATP provides utilities to download common proof-synthesis benchmarks (see {r
 | FATE-X | `FATE_X` | `v4.28.0` | {cite:t}`jiang2025fate` | [GitHub](https://github.com/frenzymath/FATE-X) |
 
 :::{warning}
-PutnamBench pins an older version of Lean than the default image. A custom skeleton must be supplied to {meth}`~open_atp.benchmark.tasks_from_dir` and the Docker image must be rebuilt with version `v4.27.0` of Lean and Mathlib as well.
+PutnamBench pins an older version of Lean than the default image. A custom skeleton must be supplied to {func}`~open_atp.benchmark.tasks_from_dir` and the Docker image must be rebuilt with version `v4.27.0` of Lean and Mathlib as well.
 :::

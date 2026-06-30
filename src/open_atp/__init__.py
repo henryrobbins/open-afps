@@ -1,4 +1,4 @@
-"""Open Automated Formal Proof Synthesis (open-atp).
+"""Open Automated Theorem Proving (open-atp).
 
 A platform that takes Lean projects containing ``sorry`` and returns verified
 completed proofs across multiple proof-synthesis backends (agentic coding agents,

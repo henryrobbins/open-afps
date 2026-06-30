@@ -4,7 +4,7 @@ OpenATP ships a handful of trivial theorem examples, each an exercise from [*Mat
 
 ## Running an example
 
-Use the {func}`~open_atp.examples.example_task` to load a task from the {data}`~open_atp.examples.EXAMPLE` enum.
+Use {func}`~open_atp.examples.example_task` to load a task from the {class}`~open_atp.examples.EXAMPLE` enum.
 
 ```{testcode}
 from open_atp.backends.docker import DockerBackend

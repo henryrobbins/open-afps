@@ -14,7 +14,7 @@ By default the prover reads the Harmonic API key from the host environment:
 export ARISTOTLE_API_KEY=...
 ```
 
-It is recommended to define this in a `.env` file in your project root. Alternatively, pass it to the prover explicitly as {attr}`~open_atp.provers.aristotle.AristotleProver` `api_key`.
+It is recommended to define this in a `.env` file in your project root. Alternatively, pass it explicitly as the `api_key` argument to {class}`~open_atp.provers.aristotle.AristotleProver`.
 
 ```{testcode}
 from open_atp.backends.docker import DockerBackend

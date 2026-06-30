@@ -68,7 +68,7 @@ prover = AgentProver(
     harness=AxProverBaseHarness(
         model="claude-opus-4-8",
         effort="high",
-        max_iterations=None,  # cap ax-prover's loop (its own default is 50)
+        max_iterations=None,  # None keeps ax-prover's own default of 50; set an int to cap
     ),
     backend=DockerBackend(image=DEFAULT_IMAGE),
 )

@@ -114,7 +114,7 @@ The `wd` subdirectory is the agent's working directory.
 - `.lake -> /workspace/.lake` — forwards the Docker image's cache into the working directory
 
 :::{tip}
-The `.lean` files are the most relevant artifacts in the `wd` subdirectory. However, the working directory combined with the prover logs in `stdout.txt` can be a very valuable debugging resources.
+The `.lean` files are the most relevant artifacts in the `wd` subdirectory. However, the working directory combined with the prover logs in `stdout.txt` can be a very valuable debugging resource.
 :::
 
 Inspecting `MulReorder.lean`, we find the generated proof is a simple application of the `ring` tactic.
@@ -172,7 +172,7 @@ result = prover.prove(task, output_dir=Path("demo/run"))
 ```
 
 :::{warning}
-All {class}`~open_atp.backends.base.ComputeBackend`s uses the {data}`~open_atp.images.DEFAULT_IMAGE` which pins `v4.28.0` of the Lean toolchain and Mathlib. If your lake project uses different versions, {meth}`~open_atp.provers.base.AutomatedProver.prove` will raise a {class}`~open_atp.lean.ToolchainMismatch` or {class}`~open_atp.lean.MathlibRevMismatch`. Supply a custom {class}`~open_atp.images.Image` to {class}`~open_atp.backends.base.ComputeBackend` via the `image` argument with `lean_version` and `mathlib_rev` matching your project. You also need to ensure the deployed Docker image has been built with the same versions.
+All {class}`~open_atp.backends.base.ComputeBackend`s use the {data}`~open_atp.images.DEFAULT_IMAGE` which pins `v4.28.0` of the Lean toolchain and Mathlib. If your lake project uses different versions, {meth}`~open_atp.provers.base.AutomatedProver.prove` will raise a {class}`~open_atp.lean.ToolchainMismatch` or {class}`~open_atp.lean.MathlibRevMismatch`. Supply a custom {class}`~open_atp.images.Image` to {class}`~open_atp.backends.base.ComputeBackend` via the `image` argument with `lean_version` and `mathlib_rev` matching your project. You also need to ensure the deployed Docker image has been built with the same versions.
 :::
 
 ## Run with CLI

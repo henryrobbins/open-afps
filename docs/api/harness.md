@@ -33,23 +33,23 @@ Each harness adapts one agent CLI and is a
 ```{eval-rst}
 .. autoclass:: open_atp.harness.claude_code.ClaudeCodeHarness
    :show-inheritance:
-   :exclude-members: stage
+   :exclude-members: stage_wd
 
 .. autoclass:: open_atp.harness.codex.CodexHarness
    :show-inheritance:
-   :exclude-members: stage
+   :exclude-members: stage_wd
 
 .. autoclass:: open_atp.harness.opencode.OpenCodeHarness
    :show-inheritance:
-   :exclude-members: stage
+   :exclude-members: stage_wd
 
 .. autoclass:: open_atp.harness.vibe.VibeHarness
    :show-inheritance:
-   :exclude-members: stage
+   :exclude-members: stage_wd
 
 .. autoclass:: open_atp.harness.axproverbase.AxProverBaseHarness
    :show-inheritance:
-   :exclude-members: stage
+   :exclude-members: stage_wd
 ```
 
 ## Pricing
