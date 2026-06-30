@@ -6,6 +6,7 @@ on:
     paths:
       - "src/**"
       - "tests/**"
+      - "docs/**"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/ci-python.yml"
@@ -14,6 +15,7 @@ on:
     paths:
       - "src/**"
       - "tests/**"
+      - "docs/**"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/ci-python.yml"
@@ -70,6 +72,23 @@ jobs:
 
       - name: Type check (mypy)
         run: uv run mypy
+
+  doctest:
+    name: Docs doctest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Doctest docs
+        run: uv run sphinx-build -W -b doctest docs docs/_build/doctest
 
   test:
     name: Test
